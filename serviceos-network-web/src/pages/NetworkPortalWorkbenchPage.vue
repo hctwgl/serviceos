@@ -19,6 +19,7 @@ const props = defineProps<{ networkContextId: string | null }>()
 const data = ref<NetworkPortalWorkbench | null>(null)
 const unassignedTasks = ref<NetworkPortalTaskItem[]>([])
 const assignCandidates = ref<NetworkPortalAssignCandidateItem[]>([])
+const workOrderRegionSummary = ref<string | null>(null)
 const loading = ref(false)
 const loadingCandidates = ref(false)
 const error = ref<string | null>(null)
@@ -99,6 +100,7 @@ async function load() {
     data.value = null
     unassignedTasks.value = []
     assignCandidates.value = []
+    workOrderRegionSummary.value = null
     error.value = '请选择网点上下文'
     loading.value = false
     return
@@ -135,9 +137,11 @@ async function loadAssignCandidates(taskId: string) {
   try {
     const page = await listNetworkPortalAssignCandidates(props.networkContextId, taskId)
     assignCandidates.value = page.items
+    workOrderRegionSummary.value = page.workOrderRegionSummary
     candidatesError.value = null
   } catch (err) {
     assignCandidates.value = []
+    workOrderRegionSummary.value = null
     candidatesError.value = safeProblemMessage(err)
   } finally {
     loadingCandidates.value = false
@@ -285,6 +289,7 @@ watch(
       :network-context-id="networkContextId"
       :task="assignTask"
       :candidates="assignCandidates"
+      :work-order-region-summary="workOrderRegionSummary"
       :loading-candidates="loadingCandidates"
       @close="drawerOpen = false"
       @assigned="onAssigned"

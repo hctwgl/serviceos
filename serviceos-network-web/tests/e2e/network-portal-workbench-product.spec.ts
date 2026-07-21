@@ -113,6 +113,7 @@ async function stubWorkbenchProduct(page: Page) {
           networkId: NETWORK_ID,
           taskId: TASK_ID,
           businessType: 'INSTALLATION',
+          workOrderRegionSummary: '青岛市',
           items: [
             {
               technicianProfileId: TECH_ID,
@@ -126,6 +127,9 @@ async function stubWorkbenchProduct(page: Page) {
               upcomingAppointmentCount: 1,
               scheduleConflictSummary: '另有 1 个未完成预约',
               scheduleOverlap: false,
+              distanceTier: 'SAME_CITY',
+              distanceSummary: '同城 · 青岛市',
+              coverageMatched: true,
               capacityAvailableUnits: 7,
               capacityMaxUnits: 10,
               warnings: [],
@@ -201,7 +205,7 @@ async function stubWorkbenchProduct(page: Page) {
   })
 }
 
-test.describe('M390/M407/M408 网点工作台产品化 + 分配候选摘要', () => {
+test.describe('M390/M407/M408/M410 网点工作台产品化 + 分配候选摘要', () => {
   test('展示 SummaryStrip、待分配表并完成分配', async ({ page }) => {
     await stubWorkbenchProduct(page)
     await loginWithLocalKeycloak(page)
@@ -219,10 +223,13 @@ test.describe('M390/M407/M408 网点工作台产品化 + 分配候选摘要', ()
     await expect(page.getByTestId('assign-candidate-open-tasks')).toContainText('开放任务 1')
     await expect(page.getByTestId('assign-candidate-qualification')).toContainText('已通过资质')
     await expect(page.getByTestId('assign-candidate-schedule')).toContainText('未完成预约')
+    await expect(page.getByTestId('assign-candidate-distance')).toContainText('同城')
     await page.getByTestId(`assign-candidate-${TECH_ID}`).click()
     await expect(page.getByTestId('assign-drawer-impact')).toContainText('网点产能可用')
     await expect(page.getByTestId('assign-drawer-impact')).toContainText('已通过资质')
     await expect(page.getByTestId('assign-drawer-impact')).toContainText('未完成预约')
+    await expect(page.getByTestId('assign-drawer-impact')).toContainText('同城')
+    await expect(page.getByTestId('assign-drawer-impact')).not.toContainText('距离读模型尚未交付')
     await page.getByTestId('assign-drawer-submit').click()
     await expect(page.getByTestId('assign-drawer-message')).toContainText('指派已生效')
 

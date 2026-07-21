@@ -358,6 +358,13 @@ export function listNetworkPortalTechnicians(networkContextId: string) {
   )
 }
 
+export type NetworkPortalAssignDistanceTier =
+  | 'SAME_DISTRICT'
+  | 'SAME_CITY'
+  | 'SAME_PROVINCE'
+  | 'OUTSIDE_COVERAGE'
+  | 'UNKNOWN'
+
 export type NetworkPortalAssignCandidateItem = {
   technicianProfileId: string
   displayName: string
@@ -370,6 +377,9 @@ export type NetworkPortalAssignCandidateItem = {
   upcomingAppointmentCount: number
   scheduleConflictSummary: string
   scheduleOverlap: boolean
+  distanceTier: NetworkPortalAssignDistanceTier
+  distanceSummary: string
+  coverageMatched: boolean
   capacityAvailableUnits: number | null
   capacityMaxUnits: number | null
   warnings: string[]
@@ -380,6 +390,7 @@ export type NetworkPortalAssignCandidatePage = {
   networkId: string
   taskId: string
   businessType: string | null
+  workOrderRegionSummary: string | null
   items: NetworkPortalAssignCandidateItem[]
   asOf: string
 }

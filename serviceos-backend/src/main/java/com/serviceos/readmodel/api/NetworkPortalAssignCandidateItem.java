@@ -7,8 +7,8 @@ import java.util.UUID;
 /**
  * Network Portal 分配师傅候选摘要。
  *
- * <p>开放任务、资质、产能与预约日程冲突来自本网点 ACTIVE 责任与预约事实；
- * 距离未建模时不返回伪造字段。</p>
+ * <p>开放任务、资质、产能、预约日程冲突与行政区距离亲和来自本网点 ACTIVE 责任与 Coverage 事实；
+ * 不返回伪造经纬度路网距离。</p>
  */
 public record NetworkPortalAssignCandidateItem(
         UUID technicianProfileId,
@@ -22,6 +22,9 @@ public record NetworkPortalAssignCandidateItem(
         int upcomingAppointmentCount,
         String scheduleConflictSummary,
         boolean scheduleOverlap,
+        String distanceTier,
+        String distanceSummary,
+        boolean coverageMatched,
         Integer capacityAvailableUnits,
         Integer capacityMaxUnits,
         List<String> warnings,
@@ -34,6 +37,8 @@ public record NetworkPortalAssignCandidateItem(
         Objects.requireNonNull(profileStatus, "profileStatus");
         Objects.requireNonNull(qualificationSummary, "qualificationSummary");
         Objects.requireNonNull(scheduleConflictSummary, "scheduleConflictSummary");
+        Objects.requireNonNull(distanceTier, "distanceTier");
+        Objects.requireNonNull(distanceSummary, "distanceSummary");
         warnings = List.copyOf(Objects.requireNonNull(warnings, "warnings"));
         if (openTaskCount < 0
                 || approvedQualificationCount < 0

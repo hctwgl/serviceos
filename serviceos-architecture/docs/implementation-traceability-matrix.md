@@ -495,7 +495,8 @@ Feature gate/authority: if applicable
 | M404 | Admin 用户详情组织任职编辑 | 415-m404-* + 398-m404-*；OpenAPI 1.0.70；PostgresIT + ArchitectureTest + Playwright | 审计时间线；树形拖拽；人工视觉批准 |
 | M405 | Admin 主体变更时间线 | 416-m405-* + 399-m405-*；OpenAPI 1.0.71；PostgresIT + ArchitectureTest + Playwright | 跨聚合时间线；操作者显示名；人工视觉批准 |
 | M406 | 车企主数据与行政区名称目录 | 417-m406-* + 400-m406-*；OpenAPI 1.0.72；Flyway V142；PostgresIT + ArchitectureTest + Playwright | 全量国标树；品牌树 UI；人工视觉批准 |
-| M407 | Network 分配师傅候选摘要 | 418-m407-* + 401-m407-*；OpenAPI 1.0.73；ArchitectureTest + Playwright | 距离/日程冲突；推荐评分；人工视觉批准 |
-| M408 | Network 分配候选预约日程冲突摘要 | 419-m408-* + 402-m408-*；OpenAPI 1.0.74；ArchitectureTest + Playwright | 距离读模型；推荐评分；人工视觉批准 |
-| M409 | Admin 关注项目待办/SLA 角标聚合 | 420-m409-* + 403-m409-*；OpenAPI 1.0.75；PostgresIT + Playwright | 距离读模型；全量国标树；人工视觉批准 |
+| M407 | Network 分配师傅候选摘要 | 418-m407-* + 401-m407-*；OpenAPI 1.0.73；ArchitectureTest + Playwright | 推荐评分；人工视觉批准（日程/距离已由 M408/M410 关闭） |
+| M408 | Network 分配候选预约日程冲突摘要 | 419-m408-* + 402-m408-*；OpenAPI 1.0.74；ArchitectureTest + Playwright | 推荐评分；人工视觉批准（距离已由 M410 关闭） |
+| M409 | Admin 关注项目待办/SLA 角标聚合 | 420-m409-* + 403-m409-*；OpenAPI 1.0.75；PostgresIT + Playwright | 全量国标树；人工视觉批准 |
+| M410 | Network 分配候选行政区距离亲和 | 421-m410-* + 404-m410-*；OpenAPI 1.0.76；单元测试 + PostgresIT + Playwright | 经纬度/路网米制距离；推荐评分；人工视觉批准 |
 

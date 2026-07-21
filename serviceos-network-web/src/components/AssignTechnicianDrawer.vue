@@ -14,6 +14,7 @@ const props = defineProps<{
   networkContextId: string
   task: NetworkPortalTaskItem | null
   candidates: NetworkPortalAssignCandidateItem[]
+  workOrderRegionSummary?: string | null
   loadingCandidates?: boolean
 }>()
 
@@ -54,11 +55,15 @@ const selected = computed(() =>
 
 const impactSummary = computed(() => {
   const parts: string[] = []
+  if (props.workOrderRegionSummary) {
+    parts.push(`工单服务区域 ${props.workOrderRegionSummary}`)
+  }
   if (selected.value) {
     parts.push(`将指派给 ${selected.value.displayName}`)
     parts.push(`当前开放任务 ${selected.value.openTaskCount} 个`)
     parts.push(selected.value.qualificationSummary)
     parts.push(selected.value.scheduleConflictSummary)
+    parts.push(selected.value.distanceSummary)
     if (
       selected.value.capacityAvailableUnits != null &&
       selected.value.capacityMaxUnits != null
@@ -73,7 +78,6 @@ const impactSummary = computed(() => {
   } else {
     parts.push('请选择一名可分配师傅')
   }
-  parts.push('距离读模型尚未交付，不在前端猜测')
   return parts
 })
 
@@ -118,6 +122,9 @@ async function submit() {
             <RouterLink :to="`/network-portal/work-orders/${task.workOrderId}`">
               打开工作区
             </RouterLink>
+            <template v-if="workOrderRegionSummary">
+              · {{ workOrderRegionSummary }}
+            </template>
           </p>
         </div>
         <button type="button" class="ghost" @click="emit('close')">关闭</button>
@@ -159,6 +166,13 @@ async function submit() {
             data-testid="assign-candidate-schedule"
           >
             {{ tech.scheduleConflictSummary }}
+          </span>
+          <span
+            class="muted"
+            :class="{ warn: tech.distanceTier === 'OUTSIDE_COVERAGE' || tech.distanceTier === 'UNKNOWN' }"
+            data-testid="assign-candidate-distance"
+          >
+            {{ tech.distanceSummary }}
           </span>
           <span
             v-if="tech.capacityAvailableUnits != null && tech.capacityMaxUnits != null"

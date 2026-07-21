@@ -416,6 +416,7 @@ title: ServiceOS 里程碑索引
 | M407 | M407 Network 分配师傅候选摘要 | [418-m407-network-assign-candidate-summary.md](../architecture/418-m407-network-assign-candidate-summary.md) | [401-m407-network-assign-candidate-acceptance.md](../testing/401-m407-network-assign-candidate-acceptance.md) |
 | M408 | M408 Network 分配候选预约日程冲突摘要 | [419-m408-network-assign-schedule-conflict.md](../architecture/419-m408-network-assign-schedule-conflict.md) | [402-m408-network-assign-schedule-conflict-acceptance.md](../testing/402-m408-network-assign-schedule-conflict-acceptance.md) |
 | M409 | M409 Admin 关注项目待办/SLA 角标聚合 | [420-m409-admin-followed-project-badges.md](../architecture/420-m409-admin-followed-project-badges.md) | [403-m409-admin-followed-project-badges-acceptance.md](../testing/403-m409-admin-followed-project-badges-acceptance.md) |
+| M410 | M410 Network 分配候选行政区距离亲和 | [421-m410-network-assign-distance-affinity.md](../architecture/421-m410-network-assign-distance-affinity.md) | [404-m410-network-assign-distance-affinity-acceptance.md](../testing/404-m410-network-assign-distance-affinity-acceptance.md) |
 
 ## 未关联里程碑的文档
 

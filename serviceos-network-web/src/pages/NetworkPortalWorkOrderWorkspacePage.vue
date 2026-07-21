@@ -24,7 +24,9 @@ const loading = ref(false)
 const assignDrawerOpen = ref(false)
 const assignTask = ref<NetworkPortalTaskItem | null>(null)
 const assignCandidates = ref<NetworkPortalAssignCandidateItem[]>([])
+const workOrderRegionSummary = ref<string | null>(null)
 const loadingCandidates = ref(false)
+const candidatesError = ref<string | null>(null)
 const showTechnicalDetails = ref(import.meta.env.DEV)
 
 function hasAppointmentWindow(item: NetworkPortalWorkspaceAppointmentSummary) {
@@ -109,14 +111,19 @@ const nextStepHint = computed(() => {
 async function loadAssignCandidates(taskId: string) {
   if (!props.networkContextId) {
     assignCandidates.value = []
+    workOrderRegionSummary.value = null
     return
   }
   loadingCandidates.value = true
   try {
     const page = await listNetworkPortalAssignCandidates(props.networkContextId, taskId)
     assignCandidates.value = page.items
-  } catch {
+    workOrderRegionSummary.value = page.workOrderRegionSummary
+    candidatesError.value = null
+  } catch (err) {
     assignCandidates.value = []
+    workOrderRegionSummary.value = null
+    candidatesError.value = safeProblemMessage(err)
   } finally {
     loadingCandidates.value = false
   }
@@ -893,12 +900,14 @@ watch(
       </section>
     </template>
 
+    <p v-if="candidatesError" class="error" data-testid="assign-candidates-error">{{ candidatesError }}</p>
     <AssignTechnicianDrawer
       v-if="networkContextId"
       :open="assignDrawerOpen"
       :network-context-id="networkContextId"
       :task="assignTask"
       :candidates="assignCandidates"
+      :work-order-region-summary="workOrderRegionSummary"
       :loading-candidates="loadingCandidates"
       @close="assignDrawerOpen = false"
       @assigned="onAssigned"

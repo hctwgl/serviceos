@@ -133,6 +133,7 @@ async function stubWorkspaceProduct(page: Page) {
         networkId: NETWORK_ID,
         taskId: TASK_ID,
         businessType: 'INSTALLATION',
+        workOrderRegionSummary: '青岛市',
         items: [
           {
             technicianProfileId: TECH_ID,
@@ -146,6 +147,9 @@ async function stubWorkspaceProduct(page: Page) {
             upcomingAppointmentCount: 0,
             scheduleConflictSummary: '无近期预约',
             scheduleOverlap: false,
+            distanceTier: 'SAME_CITY',
+            distanceSummary: '同城 · 青岛市',
+            coverageMatched: true,
             capacityAvailableUnits: 5,
             capacityMaxUnits: 8,
             warnings: [],

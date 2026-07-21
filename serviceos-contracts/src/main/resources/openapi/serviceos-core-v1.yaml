@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.75
+  version: 1.0.76
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -1829,9 +1829,10 @@ paths:
       operationId: listNetworkPortalAssignCandidates
       summary: Network Portal 任务分配师傅候选摘要
       description: |
-        M407：X-Network-Context + networkTask.read + technician.readOwnNetwork。
-        返回本网点 ACTIVE 师傅的开放任务数、资质摘要、预约日程冲突摘要、网点产能口径与可分配警告。
-        距离未建模，不返回伪造字段。任务须属于本网点 ACTIVE NETWORK 责任。
+        M407/M408/M410：X-Network-Context + networkTask.read + technician.readOwnNetwork。
+        返回本网点 ACTIVE 师傅的开放任务数、资质摘要、预约日程冲突摘要、行政区距离亲和、
+        网点产能口径与可分配警告。距离以工单省市区与网点 Coverage 亲和表达，不伪造经纬度路网距离。
+        任务须属于本网点 ACTIVE NETWORK 责任。
       parameters:
         - name: taskId
           in: path
@@ -7917,6 +7918,9 @@ components:
         - upcomingAppointmentCount
         - scheduleConflictSummary
         - scheduleOverlap
+        - distanceTier
+        - distanceSummary
+        - coverageMatched
         - warnings
         - assignable
       properties:
@@ -7931,6 +7935,19 @@ components:
         upcomingAppointmentCount: { type: integer, minimum: 0 }
         scheduleConflictSummary: { type: string, minLength: 1 }
         scheduleOverlap: { type: boolean }
+        distanceTier:
+          type: string
+          description: |
+            行政区距离亲和档位（非路网米制距离）：
+            SAME_DISTRICT / SAME_CITY / SAME_PROVINCE / OUTSIDE_COVERAGE / UNKNOWN
+          enum: [SAME_DISTRICT, SAME_CITY, SAME_PROVINCE, OUTSIDE_COVERAGE, UNKNOWN]
+        distanceSummary:
+          type: string
+          minLength: 1
+          description: 中文距离亲和摘要，可含当前任务区域提示
+        coverageMatched:
+          type: boolean
+          description: 网点 ACTIVE Coverage 是否命中工单省/市/区编码
         capacityAvailableUnits: { type: [integer, 'null'], minimum: 0 }
         capacityMaxUnits: { type: [integer, 'null'], minimum: 0 }
         warnings: { type: array, items: { type: string } }
@@ -7943,6 +7960,9 @@ components:
         networkId: { type: string, format: uuid }
         taskId: { type: string, format: uuid }
         businessType: { type: [string, 'null'] }
+        workOrderRegionSummary:
+          type: [string, 'null']
+          description: 目标工单行政区中文摘要（市·区）；无区域事实时为 null
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalAssignCandidateItem' } }
         asOf: { type: string, format: date-time }
     NetworkPortalCapacityItem:

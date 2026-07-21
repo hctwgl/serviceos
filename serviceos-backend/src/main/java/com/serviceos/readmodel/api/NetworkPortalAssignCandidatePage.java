@@ -9,6 +9,7 @@ public record NetworkPortalAssignCandidatePage(
         UUID networkId,
         UUID taskId,
         String businessType,
+        String workOrderRegionSummary,
         List<NetworkPortalAssignCandidateItem> items,
         Instant asOf
 ) {

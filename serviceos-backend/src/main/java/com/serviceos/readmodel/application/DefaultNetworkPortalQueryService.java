@@ -34,7 +34,10 @@ import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
 import com.serviceos.network.api.NetworkTechnicianMembershipView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
+import com.serviceos.network.api.ServiceNetworkCoverageQuery;
+import com.serviceos.network.api.ServiceNetworkCoverageView;
 import com.serviceos.network.api.TechnicianQualificationView;
+import com.serviceos.project.api.RegionCatalogNameQuery;
 import com.serviceos.operations.api.OperationalExceptionItem;
 import com.serviceos.operations.api.OperationalExceptionWorkbenchService;
 import com.serviceos.readmodel.api.NetworkPortalAssignCandidateItem;
@@ -147,6 +150,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final AppointmentService appointments;
     private final TechnicianScheduleAppointmentQuery scheduleAppointments;
     private final WorkOrderDirectoryHeaderQuery workOrderHeaders;
+    private final ServiceNetworkCoverageQuery coverages;
+    private final RegionCatalogNameQuery regionNames;
     private final Clock clock;
 
     DefaultNetworkPortalQueryService(
@@ -170,6 +175,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             AppointmentService appointments,
             TechnicianScheduleAppointmentQuery scheduleAppointments,
             WorkOrderDirectoryHeaderQuery workOrderHeaders,
+            ServiceNetworkCoverageQuery coverages,
+            RegionCatalogNameQuery regionNames,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -192,6 +199,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.appointments = appointments;
         this.scheduleAppointments = scheduleAppointments;
         this.workOrderHeaders = workOrderHeaders;
+        this.coverages = coverages;
+        this.regionNames = regionNames;
         this.clock = clock;
     }
 
@@ -1111,6 +1120,65 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             appointmentsByTechnician.computeIfAbsent(technicianKey, ignored -> new ArrayList<>()).add(row);
         }
 
+        // 距离：工单省市区 + 网点 Coverage 行政区亲和；再按师傅当前开放任务区域细化。
+        WorkOrderDirectoryHeader targetHeader = workOrderHeaders
+                .find(actor.tenantId(), taskAssignment.workOrderId())
+                .orElse(null);
+        Map<UUID, WorkOrderDirectoryHeader> openTaskHeadersByWorkOrder = new LinkedHashMap<>();
+        Set<UUID> openWorkOrderIds = new LinkedHashSet<>();
+        openWorkOrderIds.add(taskAssignment.workOrderId());
+        for (NetworkActiveAssignmentView row : active) {
+            openWorkOrderIds.add(row.workOrderId());
+        }
+        for (UUID workOrderId : openWorkOrderIds) {
+            workOrderHeaders.find(actor.tenantId(), workOrderId)
+                    .ifPresent(header -> openTaskHeadersByWorkOrder.put(workOrderId, header));
+        }
+        Set<String> regionCodesNeeded = new LinkedHashSet<>();
+        for (WorkOrderDirectoryHeader header : openTaskHeadersByWorkOrder.values()) {
+            if (header.provinceCode() != null && !header.provinceCode().isBlank()) {
+                regionCodesNeeded.add(header.provinceCode().trim());
+            }
+            if (header.cityCode() != null && !header.cityCode().isBlank()) {
+                regionCodesNeeded.add(header.cityCode().trim());
+            }
+            if (header.districtCode() != null && !header.districtCode().isBlank()) {
+                regionCodesNeeded.add(header.districtCode().trim());
+            }
+        }
+        Map<String, String> regionNameMap = regionNames.findNames(regionCodesNeeded);
+
+        // Coverage 与 DISPATCH 地图一致：brandCode + serviceProductCode；勿用任务 businessType 猜测。
+        String brandCode = targetHeader == null ? null : targetHeader.brandCode();
+        String coverageProduct = targetHeader == null ? null : targetHeader.serviceProductCode();
+        List<ServiceNetworkCoverageView> coverageRows = List.of();
+        if (brandCode != null && !brandCode.isBlank()
+                && coverageProduct != null && !coverageProduct.isBlank()) {
+            coverageRows = coverages.listActiveCoverage(
+                    actor.tenantId(),
+                    List.of(networkId.toString()),
+                    brandCode,
+                    coverageProduct,
+                    now);
+        }
+
+        Map<String, List<WorkOrderDirectoryHeader>> openHeadersByTechnician = new LinkedHashMap<>();
+        for (NetworkActiveAssignmentView row : active) {
+            if (row.technicianId() == null || row.technicianId().isBlank()) {
+                continue;
+            }
+            WorkOrderDirectoryHeader header = openTaskHeadersByWorkOrder.get(row.workOrderId());
+            if (header == null) {
+                continue;
+            }
+            openHeadersByTechnician
+                    .computeIfAbsent(row.technicianId(), ignored -> new ArrayList<>())
+                    .add(header);
+        }
+
+        String workOrderRegionSummary = AssignCandidateDistanceEvaluator.formatWorkOrderRegion(
+                targetHeader, regionNameMap);
+
         List<NetworkPortalAssignCandidateItem> items = new ArrayList<>();
         for (NetworkPortalTechnicianView tech : technicians.listActiveTechnicians(
                 actor.tenantId(), networkId)) {
@@ -1174,6 +1242,19 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 scheduleConflictSummary = "无近期预约";
             }
 
+            AssignCandidateDistanceEvaluator.DistanceProjection distance =
+                    AssignCandidateDistanceEvaluator.evaluate(
+                            targetHeader,
+                            coverageRows,
+                            openHeadersByTechnician.getOrDefault(
+                                    tech.technicianProfileId().toString(), List.of()),
+                            regionNameMap);
+            if (AssignCandidateDistanceEvaluator.TIER_OUTSIDE_COVERAGE.equals(distance.distanceTier())) {
+                warnings.add("网点覆盖未命中工单行政区，请确认是否允许跨区派单");
+            } else if (AssignCandidateDistanceEvaluator.TIER_UNKNOWN.equals(distance.distanceTier())) {
+                warnings.add("服务区域未知，无法给出可靠距离亲和");
+            }
+
             items.add(new NetworkPortalAssignCandidateItem(
                     tech.technicianProfileId(),
                     tech.displayName(),
@@ -1186,6 +1267,9 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     upcomingAppointments,
                     scheduleConflictSummary,
                     scheduleOverlap,
+                    distance.distanceTier(),
+                    distance.distanceSummary(),
+                    distance.coverageMatched(),
                     capacityHint == null ? null : capacityHint.availableUnits(),
                     capacityHint == null ? null : capacityHint.maxUnits(),
                     warnings,
@@ -1193,10 +1277,11 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         }
         items.sort(Comparator
                 .comparing(NetworkPortalAssignCandidateItem::assignable).reversed()
+                .thenComparing(item -> AssignCandidateDistanceEvaluator.tierRank(item.distanceTier()))
                 .thenComparing(NetworkPortalAssignCandidateItem::openTaskCount)
                 .thenComparing(NetworkPortalAssignCandidateItem::displayName));
         return new NetworkPortalAssignCandidatePage(
-                networkId, taskId, businessType, items, clock.instant());
+                networkId, taskId, businessType, workOrderRegionSummary, items, clock.instant());
     }
 
     @Override
