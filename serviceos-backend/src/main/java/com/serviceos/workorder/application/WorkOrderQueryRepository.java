@@ -11,6 +11,7 @@ import java.util.UUID;
 public interface WorkOrderQueryRepository {
     List<WorkOrderView> findPage(String tenantId, boolean tenantWide, List<UUID> authorizedProjectIds,
             String clientCode, UUID projectId, String status, String externalOrderCode,
+            String provinceCode, String cityCode, String districtCode,
             Instant cursorReceivedAt, UUID cursorId, int fetchSize);
 
     /**
@@ -19,6 +20,7 @@ public interface WorkOrderQueryRepository {
      */
     int countMatching(String tenantId, boolean tenantWide, List<UUID> authorizedProjectIds,
             String clientCode, UUID projectId, String status, String externalOrderCode,
+            String provinceCode, String cityCode, String districtCode,
             int fetchSize);
 
     Optional<WorkOrderView> findById(String tenantId, UUID workOrderId);

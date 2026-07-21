@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-21
 baselineCommit: "9a05be9b9e22be216542260f0979d85ee2cf2bab"
-latestMilestone: M436
+latestMilestone: M437
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M436
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M436 Admin 工单目录列表 total |
+| 最新实施里程碑 | M437 Admin 工单目录按区域筛选 |
 | 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（历史基线；合入 master 后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营；**M370～M377** 完成设计系统 Presenter、产品化 AppShell（ScopeBar/Freshness/诊断抽屉）、标准页模板、工单中心/详情、项目详情与主导航页壳迁移及视觉关闭；仍消费服务端 Navigation 与 allowed-actions；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
 | 数据库 | PostgreSQL + Flyway（当前版本 **146**；M435 工单 `updated_at`；M420 师傅客户端种类声明事件；M419 授权拒绝 actor 索引；M414 品牌目录/省级骨架；M406 车企/行政区目录；M403 登录事件；M402 `identity.register`；M401 关注项目） |
-| 契约 | Core OpenAPI **1.0.98** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 Admin 目录列表 total/独立 updatedAt、阶段/责任人/SLA 风险旁载、Admin/Network 目录与工作区脱敏客户联系、工作区资料预览指针、履约使用中工单摘要、师傅列表开放任务/资质摘要、CLIENT_KINDS 时间线、authorization-denials、师傅档案/服务关系/网点任职 change-timeline、跨聚合 change-timeline、主数据治理、预约日历、分配候选推荐解释、工作台今日预约时间轴、分配候选距离亲和、关注项目角标、`/project-clients`、`/region-catalog`、`org-memberships`、`recent-logins`、用户目录等既有契约） |
+| 契约 | Core OpenAPI **1.0.99** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 Admin 目录区域筛选/列表 total/独立 updatedAt、阶段/责任人/SLA 风险旁载、Admin/Network 目录与工作区脱敏客户联系、工作区资料预览指针、履约使用中工单摘要、师傅列表开放任务/资质摘要、CLIENT_KINDS 时间线、authorization-denials、师傅档案/服务关系/网点任职 change-timeline、跨聚合 change-timeline、主数据治理、预约日历、分配候选推荐解释、工作台今日预约时间轴、分配候选距离亲和、关注项目角标、`/project-clients`、`/region-catalog`、`org-memberships`、`recent-logins`、用户目录等既有契约） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -230,6 +230,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 - **M434 Implemented**：Admin 工单目录 SLA 风险旁载（OpenAPI **1.0.96**：页级 `slaRiskSummaries`；PROJECT `sla.read` soft-gate）。
 - **M435 Implemented**：Admin 工单目录独立 updatedAt（OpenAPI **1.0.97** + Flyway **V146**：`WorkOrder.updatedAt`；写路径 bump）。
 - **M436 Implemented**：Admin 工单目录列表 total（OpenAPI **1.0.98**：`totalCount`/`totalCountTruncated`；上限 100）。
+- **M437 Implemented**：Admin 工单目录按区域筛选（OpenAPI **1.0.99**：`provinceCode`/`cityCode`/`districtCode`）。
 - **M383** 长链路 test 7/8 仍未闭合，不阻塞本切片。
 
 建议下一批（按优先级）：
@@ -237,7 +238,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 1. Technician iOS 正式离线闭环（需 macOS/Xcode 环境）；
 2. 全国区县全量树 / 拼音索引 / 多级子品牌（需权威 GB 数据集与导入脚本；M414 已交治理主路径）；
 3. 失败登录/设备指纹（当前仅成功登录事实；需 IdP 失败事件）；
-4. Admin 目录筛选扩展（网点/师傅/阶段/SLA/区域；需投影与 API）。
+4. Admin 目录其余筛选扩展（网点/师傅/阶段/SLA；需跨模块投影与 API）。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 

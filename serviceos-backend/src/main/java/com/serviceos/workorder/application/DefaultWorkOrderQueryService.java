@@ -74,6 +74,10 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         String clientCode = normalizeCode(query.clientCode(), "clientCode");
         String status = normalizeStatus(query.status());
         String externalOrderCode = normalizeCode(query.externalOrderCode(), "externalOrderCode");
+        // M437：区域国标码精确匹配；非法码失败关闭，不静默忽略。
+        String provinceCode = normalizeRegionCode(query.provinceCode(), "provinceCode");
+        String cityCode = normalizeRegionCode(query.cityCode(), "cityCode");
+        String districtCode = normalizeRegionCode(query.districtCode(), "districtCode");
         AuthorizedProjectScope scope = projectScopes.require(principal, READ, "WorkOrder", correlationId);
         if (query.projectId() != null && !scope.tenantWide() && !scope.projectIds().contains(query.projectId())) {
             authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
@@ -82,12 +86,16 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         }
         String filterDigest = Sha256.digest("clientCode=" + nullable(clientCode) + "|projectId="
                 + nullable(query.projectId()) + "|status=" + nullable(status)
-                + "|externalOrderCode=" + nullable(externalOrderCode));
+                + "|externalOrderCode=" + nullable(externalOrderCode)
+                + "|provinceCode=" + nullable(provinceCode)
+                + "|cityCode=" + nullable(cityCode)
+                + "|districtCode=" + nullable(districtCode));
         Cursor cursor = decodeCursor(query.cursor(), scope.scopeDigest(), filterDigest);
         List<UUID> projectIds = scope.projectIds().stream()
                 .sorted(Comparator.comparing(UUID::toString)).toList();
         List<WorkOrderView> fetched = queries.findPage(principal.tenantId(), scope.tenantWide(), projectIds,
                 clientCode, query.projectId(), status, externalOrderCode,
+                provinceCode, cityCode, districtCode,
                 cursor == null ? null : cursor.receivedAt(),
                 cursor == null ? null : cursor.id(), query.limit() + 1);
         boolean more = fetched.size() > query.limit();
@@ -106,6 +114,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         int matched = queries.countMatching(
                 principal.tenantId(), scope.tenantWide(), projectIds,
                 clientCode, query.projectId(), status, externalOrderCode,
+                provinceCode, cityCode, districtCode,
                 WorkOrderPage.TOTAL_COUNT_LIMIT + 1);
         boolean totalTruncated = matched > WorkOrderPage.TOTAL_COUNT_LIMIT;
         int totalCount = totalTruncated ? WorkOrderPage.TOTAL_COUNT_LIMIT : matched;
@@ -357,6 +366,14 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private static String normalizeCode(String value, String field) {
         if (value == null) return null;
         if (value.isBlank() || !value.equals(value.trim()) || value.length() > 128)
+            throw new IllegalArgumentException(field + " is invalid");
+        return value;
+    }
+
+    /** M437：国标行政区码；长度与 wo_work_order 列一致（≤16）。 */
+    private static String normalizeRegionCode(String value, String field) {
+        if (value == null) return null;
+        if (value.isBlank() || !value.equals(value.trim()) || value.length() > 16)
             throw new IllegalArgumentException(field + " is invalid");
         return value;
     }

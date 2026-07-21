@@ -8,7 +8,7 @@ import ListPageLayout from '../patterns/templates/ListPageLayout.vue'
 import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
 import AsyncContent from '../components/feedback/AsyncContent.vue'
 import { listAuthorizedWorkOrders, type WorkOrderPage } from '../api/workOrders'
-import { listRegionCatalog } from '../api/projectCatalog'
+import { listRegionCatalog, type RegionCatalogItem } from '../api/projectCatalog'
 import { firstRouteQuery } from '../routeQuery'
 import { statusLabel, statusOptions } from '../product/statusLabels'
 import { toUserFacingError } from '../product/errorMessages'
@@ -35,13 +35,37 @@ const projectKeyword = ref('')
 const keyword = ref('')
 /** M431：region-catalog 编码→名称；未命中时区域列回退国标码。 */
 const regionNameByCode = ref<Map<string, string>>(new Map())
+/** M437：region-catalog 编码→级别，用于选择服务区域后映射查询参数。 */
+const regionLevelByCode = ref<Map<string, RegionCatalogItem['regionLevel']>>(new Map())
 
-/** 更多筛选：当前列表 API 未提供对应查询参数，仅展示缺口说明。 */
-const moreRegion = ref('')
+/** M437：服务区域筛选（国标码）；其余更多筛选仍为缺口。 */
+const regionFilterCode = ref<string | undefined>(undefined)
 const moreNetwork = ref('')
 const moreTechnician = ref('')
 const moreStage = ref('')
 const moreSla = ref<string | undefined>(undefined)
+
+const regionFilterOptions = computed(() =>
+  [...regionNameByCode.value.entries()].map(([code, name]) => ({
+    value: code,
+    label: `${name}（${code}）`,
+  })),
+)
+
+function regionQueryParams(): {
+  provinceCode?: string
+  cityCode?: string
+  districtCode?: string
+} {
+  const code = regionFilterCode.value?.trim()
+  if (!code) return {}
+  const level = regionLevelByCode.value.get(code)
+  if (level === 'PROVINCE') return { provinceCode: code }
+  if (level === 'CITY') return { cityCode: code }
+  if (level === 'DISTRICT') return { districtCode: code }
+  // 目录未命中时按区县精确匹配，不猜测层级。
+  return { districtCode: code }
+}
 
 function hydrateFiltersFromRoute() {
   const nextStatus = firstRouteQuery(route, 'status')
@@ -52,6 +76,13 @@ function hydrateFiltersFromRoute() {
   if (nextProjectId !== undefined) projectKeyword.value = nextProjectId
   const nextKeyword = firstRouteQuery(route, 'q')
   if (nextKeyword !== undefined) keyword.value = nextKeyword
+  const nextProvince = firstRouteQuery(route, 'provinceCode')
+  const nextCity = firstRouteQuery(route, 'cityCode')
+  const nextDistrict = firstRouteQuery(route, 'districtCode')
+  // 路由优先最细粒度；与 API AND 语义一致时 UI 只保留一个选择值。
+  if (nextDistrict) regionFilterCode.value = nextDistrict
+  else if (nextCity) regionFilterCode.value = nextCity
+  else if (nextProvince) regionFilterCode.value = nextProvince
 }
 
 function looksLikeUuid(value: string): boolean {
@@ -73,6 +104,7 @@ async function load(next?: string) {
       projectId: looksLikeUuid(projectKeyword.value)
         ? projectKeyword.value.trim()
         : undefined,
+      ...regionQueryParams(),
     })
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
@@ -92,12 +124,14 @@ function search() {
 }
 
 function currentFilters() {
+  const region = regionQueryParams()
   return {
     status: status.value || undefined,
     clientCode: clientCode.value?.trim() || undefined,
     projectId: looksLikeUuid(projectKeyword.value)
       ? projectKeyword.value.trim()
       : undefined,
+    ...region,
   }
 }
 
@@ -105,6 +139,8 @@ function applySavedView(filters: Record<string, string>) {
   status.value = filters.status || undefined
   clientCode.value = filters.clientCode || undefined
   projectKeyword.value = filters.projectId ?? ''
+  regionFilterCode.value =
+    filters.districtCode || filters.cityCode || filters.provinceCode || undefined
   return search()
 }
 
@@ -113,7 +149,7 @@ function resetFilters() {
   clientCode.value = undefined
   projectKeyword.value = ''
   keyword.value = ''
-  moreRegion.value = ''
+  regionFilterCode.value = undefined
   moreNetwork.value = ''
   moreTechnician.value = ''
   moreStage.value = ''
@@ -167,14 +203,18 @@ function regionCodesTooltip(row: Pick<Row, 'provinceCode' | 'cityCode' | 'distri
 async function loadRegionNames() {
   try {
     const page = await listRegionCatalog({ parentCode: '*', limit: 200 })
-    const next = new Map<string, string>()
+    const names = new Map<string, string>()
+    const levels = new Map<string, RegionCatalogItem['regionLevel']>()
     for (const item of page.items) {
-      next.set(item.regionCode, item.regionName)
+      names.set(item.regionCode, item.regionName)
+      levels.set(item.regionCode, item.regionLevel)
     }
-    regionNameByCode.value = next
+    regionNameByCode.value = names
+    regionLevelByCode.value = levels
   } catch {
     // 缺 project.read 或目录失败时保持码展示，不阻断工单目录主路径。
     regionNameByCode.value = new Map()
+    regionLevelByCode.value = new Map()
   }
 }
 
@@ -547,12 +587,23 @@ watch(
       <Alert
         type="info"
         show-icon
-        message="更多筛选暂不可用"
-        description="网点、师傅、阶段、SLA、创建时间等筛选条件尚未由工单目录查询 API 提供（UI_DATA_GAP）；服务区域列已展示既有国标码，但按区域筛选仍未交付。"
+        message="部分更多筛选暂不可用"
+        description="网点、师傅、阶段、SLA、创建时间等筛选条件尚未由工单目录查询 API 提供（UI_DATA_GAP）。服务区域已支持按国标码精确筛选。"
       />
       <label class="filter-field">
         <span>服务区域</span>
-        <Input v-model:value="moreRegion" disabled placeholder="暂未提供" />
+        <Select
+          v-model:value="regionFilterCode"
+          allow-clear
+          show-search
+          style="width: 240px"
+          aria-label="服务区域筛选"
+          data-testid="work-order-region-filter"
+          placeholder="按省/市/区县筛选"
+          :options="regionFilterOptions"
+          :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          @change="search"
+        />
       </label>
       <label class="filter-field">
         <span>服务网点</span>

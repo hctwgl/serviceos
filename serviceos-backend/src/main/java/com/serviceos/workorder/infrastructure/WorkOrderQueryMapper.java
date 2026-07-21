@@ -13,6 +13,8 @@ interface WorkOrderQueryMapper {
             @Param("tenantWide") boolean tenantWide, @Param("projectIds") List<String> projectIds,
             @Param("clientCode") String clientCode, @Param("projectId") UUID projectId,
             @Param("status") String status, @Param("externalOrderCode") String externalOrderCode,
+            @Param("provinceCode") String provinceCode, @Param("cityCode") String cityCode,
+            @Param("districtCode") String districtCode,
             @Param("cursorReceivedAt") Instant cursorReceivedAt,
             @Param("cursorId") UUID cursorId, @Param("fetchSize") int fetchSize);
 
@@ -20,6 +22,8 @@ interface WorkOrderQueryMapper {
             @Param("tenantWide") boolean tenantWide, @Param("projectIds") List<String> projectIds,
             @Param("clientCode") String clientCode, @Param("projectId") UUID projectId,
             @Param("status") String status, @Param("externalOrderCode") String externalOrderCode,
+            @Param("provinceCode") String provinceCode, @Param("cityCode") String cityCode,
+            @Param("districtCode") String districtCode,
             @Param("fetchSize") int fetchSize);
 
     Map<String,Object> findById(@Param("tenantId") String tenantId, @Param("workOrderId") UUID workOrderId);

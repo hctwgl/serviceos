@@ -111,6 +111,25 @@ class WorkOrderQueryPostgresIT {
   assertThat(detail.currentAssigneeDisplayName()).isEqualTo("演示师傅");
  }
 
+ @Test void listFiltersByRegionCodes(){
+  Scope a=scope("tenant-test","A");
+  UUID hangzhou=receive(a,"ORDER-HZ","3".repeat(64));
+  seedWorkOrderRow(a,"ORDER-SZ","4".repeat(64),"440000","440300","440305");
+  seedRole("reader","PROJECT",a.projectId().toString());
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var byDistrict=queries.list(reader,"corr-region-district",
+    new WorkOrderQuery(null,null,null,null,null,null,"370102",null,20));
+  assertThat(byDistrict.items()).extracting(WorkOrderView::id).containsExactly(hangzhou);
+  assertThat(byDistrict.totalCount()).isEqualTo(1);
+  var byProvince=queries.list(reader,"corr-region-province",
+    new WorkOrderQuery(null,null,null,null,"440000",null,null,null,20));
+  assertThat(byProvince.items()).extracting(WorkOrderView::externalOrderCode).containsExactly("ORDER-SZ");
+  var none=queries.list(reader,"corr-region-none",
+    new WorkOrderQuery(null,null,null,null,"110000",null,null,null,20));
+  assertThat(none.items()).isEmpty();
+  assertThat(none.totalCount()).isZero();
+ }
+
  @Test void listExposesTotalCountAcrossPagesAndCapsAtLimit(){
   Scope a=scope("tenant-test","A");
   receive(a,"ORDER-TOTAL-1","1".repeat(64));
@@ -204,8 +223,12 @@ class WorkOrderQueryPostgresIT {
   return new Scope(tenant,project,bundle,slaPolicyVersionId,slaPolicyDigest);
  }
  private UUID receive(Scope s,String external,String digest){return commands.receive(new ReceiveExternalWorkOrderCommand(s.tenant(),s.projectId(),"BYD","BYD_OCEAN","HOME_CHARGING_SURVEY_INSTALL",external,digest,s.bundle().bundleId(),s.bundle().bundleCode(),s.bundle().bundleVersion(),s.bundle().manifestDigest(),"370000","370100","370102","敏感姓名","13800000000","敏感地址","VIN123456789",LocalDateTime.of(2026,7,15,10,0),"corr","cause")).workOrderId();}
- /** M436：批量夹具，跳过命令事件路径以快速铺满封顶计数。 */
+ /** M436/M437：批量夹具，跳过命令事件路径以快速铺满封顶计数或指定区域。 */
  private void seedWorkOrderRow(Scope s,String external,String digest){
+  seedWorkOrderRow(s,external,digest,"370000","370100","370102");
+ }
+ private void seedWorkOrderRow(Scope s,String external,String digest,
+         String province,String city,String district){
   Instant receivedAt=Instant.parse("2026-07-15T03:00:00Z");
   jdbc.sql("""
    INSERT INTO wo_work_order (
@@ -219,7 +242,7 @@ class WorkOrderQueryPostgresIT {
      :id, :tenantId, :projectId, 'BYD', 'BYD_OCEAN', 'HOME_CHARGING_SURVEY_INSTALL',
      :external, :digest, 'RECEIVED',
      :bundleId, :bundleCode, :bundleVersion, :bundleDigest,
-     '370000', '370100', '370102',
+     :province, :city, :district,
      '敏感姓名', '13800000000', '敏感地址', 'VIN123456789',
      :dispatchedAt, :receivedAt, :receivedAt, 1
    )
@@ -233,6 +256,9 @@ class WorkOrderQueryPostgresIT {
    .param("bundleCode",s.bundle().bundleCode())
    .param("bundleVersion",s.bundle().bundleVersion())
    .param("bundleDigest",s.bundle().manifestDigest())
+   .param("province",province)
+   .param("city",city)
+   .param("district",district)
    .param("dispatchedAt",LocalDateTime.of(2026,7,15,10,0))
    .param("receivedAt",java.sql.Timestamp.from(receivedAt))
    .update();

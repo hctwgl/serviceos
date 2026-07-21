@@ -46,6 +46,9 @@ test.describe('M377 Admin productization visual baselines', () => {
     await expect(updatedAtCell).toContainText('2026-07-21')
     // M436：目录列表封顶总数
     await expect(page.getByTestId('list-toolbar-count')).toContainText('共 1 条')
+    // M437：更多筛选中启用服务区域
+    await page.getByRole('button', { name: '更多筛选' }).click()
+    await expect(page.getByTestId('work-order-region-filter')).toBeVisible()
     await shot(page, 'work-order-directory-productized')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-region-names-1440.png',
@@ -72,6 +75,11 @@ test.describe('M377 Admin productization visual baselines', () => {
     await page.getByTestId('list-toolbar-count').scrollIntoViewIfNeeded()
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-list-total-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-region-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-region-filter-1440.png',
       fullPage: true,
     })
   })

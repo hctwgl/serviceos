@@ -19,6 +19,9 @@
     <if test="projectId != null">AND project_id=#{projectId}</if>
     <if test="status != null">AND status=#{status}</if>
     <if test="externalOrderCode != null">AND external_order_code=#{externalOrderCode}</if>
+    <if test="provinceCode != null">AND province_code=#{provinceCode}</if>
+    <if test="cityCode != null">AND city_code=#{cityCode}</if>
+    <if test="districtCode != null">AND district_code=#{districtCode}</if>
   </sql>
   <select id="findPage" resultType="map">
     SELECT <include refid="columns"/> FROM wo_work_order

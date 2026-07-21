@@ -525,4 +525,5 @@ Feature gate/authority: if applicable
 | M434 | Admin 工单目录 SLA 风险旁载 | 445-m434-* + 428-m434-*；OpenAPI 1.0.96；页级 `slaRiskSummaries` + soft-gate + PostgresIT + Playwright | 即将超时窗口；按 SLA 筛选；人工视觉批准 |
 | M435 | Admin 工单目录独立 updatedAt | 446-m435-* + 429-m435-*；OpenAPI 1.0.97；Flyway V146；`WorkOrder.updatedAt` + 写路径 bump + PostgresIT + Playwright | 列表 total；筛选扩展；Network 独立 updatedAt；人工视觉批准 |
 | M436 | Admin 工单目录列表 total | 447-m436-* + 430-m436-*；OpenAPI 1.0.98；`totalCount`/`totalCountTruncated`（上限 100）+ PostgresIT + Playwright | 精确全量 COUNT；筛选扩展；人工视觉批准 |
+| M437 | Admin 工单目录按区域筛选 | 448-m437-* + 431-m437-*；OpenAPI 1.0.99；省市区码精确过滤 + PostgresIT + Playwright | 网点/师傅/阶段/SLA 筛选；全国区县全量树；人工视觉批准 |
 

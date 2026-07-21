@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.98
+  version: 1.0.99
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3391,10 +3391,18 @@ paths:
         有能力且本页无开放风险时返回 []；仅含 openCount>0 行。
         M436：页级 `totalCount` / `totalCountTruncated`（当前筛选、无 cursor）；
         上限 100，超出只声明 truncated，不返回精确全量 COUNT(*)。
+        M437：可选 `provinceCode` / `cityCode` / `districtCode` 国标码精确匹配（AND）；
+        写入 cursor filterDigest；不发明名称解析。
       parameters:
         - { name: clientCode, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
         - { name: projectId, in: query, schema: { type: string, format: uuid } }
         - { name: status, in: query, schema: { enum: [RECEIVED, ACTIVE, FULFILLED] } }
+        - { name: provinceCode, in: query, schema: { type: string, minLength: 1, maxLength: 16 },
+            description: M437：省国标码精确匹配 }
+        - { name: cityCode, in: query, schema: { type: string, minLength: 1, maxLength: 16 },
+            description: M437：市国标码精确匹配 }
+        - { name: districtCode, in: query, schema: { type: string, minLength: 1, maxLength: 16 },
+            description: M437：区县国标码精确匹配 }
         - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
         - $ref: '#/components/parameters/CorrelationId'
