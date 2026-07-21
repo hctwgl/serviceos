@@ -60,7 +60,7 @@ Milestone 的 `triggeredAt` 固定为计划截止时间，`detectedAt` 保存实
 验收范围见 [M61 验收矩阵](../testing/58-m61-task-elapsed-sla-clock-acceptance.md)。主要入口：
 
 - `ConfigurationAssetSchemaValidator`、`WorkflowDefinitionParser`、`DefaultTaskSchedulingService`；
-- `DefaultSlaClockService`、`TaskSlaEventHandler`、`SlaClockService`；
+- `JooqSlaClockService`、`TaskSlaEventHandler`、`SlaClockService`；
 - V061、SLA 配置 Schema、`sla.started/breached/met@v1` 事件 Schema；
 - `ConfigurationPublicationPostgresIT`、`SlaClockPostgresIT`、契约治理和 ArchitectureTest。
 
