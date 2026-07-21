@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.76
+  version: 1.0.77
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2064,6 +2064,8 @@ paths:
         unassignedTechnicianTaskCount 在基座成功时始终返回。
         M224：可选 `slaSummary`（openCount/breachedCount，语义同 M221）；需 NETWORK `sla.read`，
         缺能力时省略该属性（不得用 0 伪装无权限）；按本网点全部 ACTIVE taskIds 聚合。
+        M411：可选 `todayAppointmentCount` / `todayAppointments` 需 NETWORK `networkPortal.manageAppointment`；
+        运营日按 Asia/Shanghai；不含客户 PII。`todayTimeline` 始终返回（至少含待分配桶）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -7985,10 +7987,38 @@ components:
         networkId: { type: string, format: uuid }
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalCapacityItem' } }
         asOf: { type: string, format: date-time }
+    NetworkPortalWorkbenchAppointmentItem:
+      type: object
+      additionalProperties: false
+      required: [appointmentId, taskId, workOrderId, type, status]
+      properties:
+        appointmentId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        type: { type: string, minLength: 1 }
+        status: { type: string, minLength: 1 }
+        windowStart: { type: [string, 'null'], format: date-time }
+        windowEnd: { type: [string, 'null'], format: date-time }
+        timezone: { type: [string, 'null'] }
+        technicianId: { type: [string, 'null'] }
+        technicianDisplayName:
+          type: [string, 'null']
+          description: 需 NETWORK technician.readOwnNetwork；缺能力时为 null
+    NetworkPortalWorkbenchTimelineBucket:
+      type: object
+      additionalProperties: false
+      required: [bucketCode, label, count, summary]
+      properties:
+        bucketCode:
+          type: string
+          enum: [UNASSIGNED, AM_APPOINTMENTS, PM_APPOINTMENTS, EVENING_APPOINTMENTS, OPEN_CORRECTIONS, SLA_AT_RISK]
+        label: { type: string, minLength: 1 }
+        count: { type: integer, minimum: 0 }
+        summary: { type: string, minLength: 1 }
     NetworkPortalWorkbenchView:
       type: object
       additionalProperties: false
-      required: [networkId, activeWorkOrderCount, activeTaskCount, activeTechnicianCount, capacity, asOf]
+      required: [networkId, activeWorkOrderCount, activeTaskCount, activeTechnicianCount, capacity, asOf, todayTimeline]
       properties:
         networkId: { type: string, format: uuid }
         activeWorkOrderCount: { type: integer, minimum: 0 }
@@ -8025,6 +8055,26 @@ components:
             M224：需 NETWORK sla.read；缺能力时省略本属性；有能力且无实例时返回 0/0。
             字段语义同 NetworkPortalWorkOrderWorkspaceSlaSummary（跨本网点全部 ACTIVE taskIds）。
           $ref: '#/components/schemas/NetworkPortalWorkOrderWorkspaceSlaSummary'
+        todayAppointmentCount:
+          type: integer
+          minimum: 0
+          description: |
+            M411：Asia/Shanghai 运营日内与 ACTIVE 任务窗口重叠的 PROPOSED/CONFIRMED 预约数；
+            需 NETWORK networkPortal.manageAppointment；缺能力时省略。
+        todayAppointments:
+          type: array
+          maxItems: 50
+          description: |
+            M411：今日预约非 PII 列表（时间/任务/师傅/状态）；需 manageAppointment；缺能力时省略。
+          items: { $ref: '#/components/schemas/NetworkPortalWorkbenchAppointmentItem' }
+        todayTimeline:
+          type: array
+          minItems: 1
+          maxItems: 8
+          description: |
+            M411：当日运营节奏桶。至少含待分配；预约桶需 manageAppointment；
+            整改/SLA 桶随对应 soft-gate 出现。
+          items: { $ref: '#/components/schemas/NetworkPortalWorkbenchTimelineBucket' }
     NetworkPortalCorrectionItem:
       type: object
       additionalProperties: false

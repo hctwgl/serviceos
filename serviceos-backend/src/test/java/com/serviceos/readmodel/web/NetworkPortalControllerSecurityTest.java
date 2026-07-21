@@ -175,7 +175,8 @@ class NetworkPortalControllerSecurityTest {
         when(principals.current()).thenReturn(actor);
         when(queries.workbench(eq(actor), eq("corr-wb"), eq("NETWORK|NETWORK|" + NETWORK_ID)))
                 .thenReturn(new NetworkPortalWorkbenchView(
-                        NETWORK_ID, 1, 2, 3, List.of(), now, 0, null, null, null, null));
+                        NETWORK_ID, 1, 2, 3, List.of(), now, 0, null, null, null, null,
+                        null, null, List.of()));
 
         mvc.perform(get("/api/v1/network-portal/workbench")
                         .with(jwt().jwt(token -> token.subject("external-subject")

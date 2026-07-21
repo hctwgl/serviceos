@@ -43,6 +43,24 @@ const summaryItems = computed<SummaryStripItem[]>(() => {
       tone: (data.value.unassignedTechnicianTaskCount ?? 0) > 0 ? 'warning' : 'default',
     },
     {
+      key: 'today-appointments',
+      label: '今日预约',
+      value:
+        typeof data.value.todayAppointmentCount === 'number'
+          ? data.value.todayAppointmentCount
+          : '无权限',
+      hint:
+        typeof data.value.todayAppointmentCount === 'number'
+          ? '运营日 Asia/Shanghai'
+          : '缺少 networkPortal.manageAppointment',
+      testId: 'workbench-today-appointment-count',
+      tone:
+        typeof data.value.todayAppointmentCount === 'number' &&
+        data.value.todayAppointmentCount > 0
+          ? 'warning'
+          : 'default',
+    },
+    {
       key: 'active-wo',
       label: '进行中工单',
       value: data.value.activeWorkOrderCount,
@@ -188,6 +206,30 @@ watch(
         :as-of="formatDateTime(data.asOf)"
       />
 
+      <section class="panel" data-testid="workbench-today-timeline">
+        <header class="panel__head">
+          <h3>今日任务时间轴</h3>
+          <span class="muted">运营日 Asia/Shanghai</span>
+        </header>
+        <ol v-if="data.todayTimeline?.length" class="timeline">
+          <li
+            v-for="bucket in data.todayTimeline"
+            :key="bucket.bucketCode"
+            :data-testid="`timeline-bucket-${bucket.bucketCode}`"
+            :class="{ active: bucket.count > 0 }"
+          >
+            <strong>{{ bucket.label }}</strong>
+            <span class="count">{{ bucket.count }}</span>
+            <span class="muted">{{ bucket.summary }}</span>
+          </li>
+        </ol>
+        <PageState
+          v-else
+          kind="empty"
+          guide="暂无运营节奏摘要。"
+        />
+      </section>
+
       <div class="workbench-grid">
         <section class="panel" data-testid="workbench-unassigned-table">
           <header class="panel__head">
@@ -266,9 +308,55 @@ watch(
             kind="empty"
             guide="暂无容量计数。完成网点容量配置后将在此显示师傅负载。"
           />
-          <p class="muted gap-note">
-            分配抽屉已接入开放任务数、资质、预约日程冲突与行政区距离亲和摘要。
-          </p>
+        </section>
+
+        <section class="panel" data-testid="workbench-today-appointments">
+          <header class="panel__head">
+            <h3>今日预约</h3>
+            <span class="muted">不含客户地址等敏感字段</span>
+          </header>
+          <PageState
+            v-if="typeof data.todayAppointmentCount !== 'number'"
+            kind="forbidden"
+            description="缺少 networkPortal.manageAppointment，无法加载今日预约。"
+          />
+          <table v-else-if="data.todayAppointments?.length">
+            <thead>
+              <tr>
+                <th>时间窗口</th>
+                <th>状态</th>
+                <th>类型</th>
+                <th>师傅</th>
+                <th>工单</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="item in data.todayAppointments"
+                :key="item.appointmentId"
+                :data-testid="`today-appointment-${item.appointmentId}`"
+              >
+                <td>
+                  {{ item.windowStart ? formatDateTime(item.windowStart) : '—' }}
+                  <span class="muted">～</span>
+                  {{ item.windowEnd ? formatDateTime(item.windowEnd) : '—' }}
+                </td>
+                <td>{{ statusLabel(item.status) || item.status }}</td>
+                <td>{{ statusLabel(item.type) || item.type }}</td>
+                <td>{{ item.technicianDisplayName || (item.technicianId ? '已指派' : '待指派') }}</td>
+                <td>
+                  <RouterLink :to="`/network-portal/work-orders/${item.workOrderId}`">
+                    打开工作区
+                  </RouterLink>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <PageState
+            v-else
+            kind="empty"
+            guide="今日（Asia/Shanghai）暂无未完成预约窗口。"
+          />
         </section>
       </div>
 
@@ -326,9 +414,34 @@ watch(
 }
 .workbench-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: start;
+}
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.timeline li {
+  border: 1px solid var(--sos-color-border-light);
+  border-radius: var(--sos-radius-md);
+  background: var(--sos-color-surface-subtle);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+.timeline li.active {
+  border-color: var(--sos-primary-600);
+  background: var(--sos-primary-100);
+}
+.timeline .count {
+  font-size: 22px;
+  font-weight: 650;
+  color: var(--sos-color-text-primary);
 }
 .panel {
   border: 1px solid var(--sos-color-border-default);

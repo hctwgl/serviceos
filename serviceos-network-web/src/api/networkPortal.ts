@@ -133,6 +133,32 @@ export type NetworkPortalCapacityItem = {
   updatedAt: string
 }
 
+export type NetworkPortalWorkbenchAppointmentItem = {
+  appointmentId: string
+  taskId: string
+  workOrderId: string
+  type: string
+  status: string
+  windowStart: string | null
+  windowEnd: string | null
+  timezone: string | null
+  technicianId: string | null
+  technicianDisplayName: string | null
+}
+
+export type NetworkPortalWorkbenchTimelineBucket = {
+  bucketCode:
+    | 'UNASSIGNED'
+    | 'AM_APPOINTMENTS'
+    | 'PM_APPOINTMENTS'
+    | 'EVENING_APPOINTMENTS'
+    | 'OPEN_CORRECTIONS'
+    | 'SLA_AT_RISK'
+  label: string
+  count: number
+  summary: string
+}
+
 export type NetworkPortalWorkbench = {
   networkId: string
   activeWorkOrderCount: number
@@ -150,6 +176,11 @@ export type NetworkPortalWorkbench = {
   pendingQualificationCount?: number
   /** Soft-gated；缺 NETWORK `sla.read` 时省略，不得用 0 伪装无权限。 */
   slaSummary?: NetworkPortalWorkOrderWorkspaceSlaSummary
+  /** Soft-gated；缺 NETWORK `networkPortal.manageAppointment` 时省略。 */
+  todayAppointmentCount?: number
+  todayAppointments?: NetworkPortalWorkbenchAppointmentItem[]
+  /** 始终返回；至少含待分配桶。 */
+  todayTimeline: NetworkPortalWorkbenchTimelineBucket[]
 }
 
 function networkHeaders(networkContextId: string): Record<string, string> {

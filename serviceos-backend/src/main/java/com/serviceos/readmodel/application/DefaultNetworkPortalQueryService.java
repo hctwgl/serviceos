@@ -52,6 +52,8 @@ import com.serviceos.readmodel.api.NetworkPortalQualificationItem;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalTaskItem;
 import com.serviceos.readmodel.api.NetworkPortalTechnicianItem;
+import com.serviceos.readmodel.api.NetworkPortalWorkbenchAppointmentItem;
+import com.serviceos.readmodel.api.NetworkPortalWorkbenchTimelineBucket;
 import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
@@ -83,6 +85,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -128,6 +132,9 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int WORKSPACE_EXCEPTION_LIMIT = 100;
     private static final int WORKSPACE_APPOINTMENT_LIMIT = 100;
     private static final int WORKSPACE_CONTACT_LIMIT = 100;
+    private static final int WORKBENCH_TODAY_APPOINTMENT_LIMIT = 50;
+    /** Network 工作台运营日边界；现场履约首批区域为中国时区，不得按浏览器本地日猜测。 */
+    private static final ZoneId NETWORK_OPERATIONAL_ZONE = ZoneId.of("Asia/Shanghai");
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
 
     private final PrincipalNetworkAffiliationQuery affiliations;
@@ -1339,6 +1346,21 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     actor, correlationId, networkId, workOrders, activeTaskIds);
         }
 
+        Integer todayAppointmentCount = null;
+        List<NetworkPortalWorkbenchAppointmentItem> todayAppointments = null;
+        Map<UUID, String> technicianNames = Map.of();
+        if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
+            if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
+                technicianNames = loadTechnicianDisplayNames(actor.tenantId(), networkId);
+            }
+            todayAppointments = loadWorkbenchTodayAppointments(
+                    actor.tenantId(), active, asOf, technicianNames);
+            todayAppointmentCount = todayAppointments.size();
+        }
+
+        List<NetworkPortalWorkbenchTimelineBucket> todayTimeline = buildWorkbenchTodayTimeline(
+                unassigned, todayAppointments, openCorrectionCaseCount, slaSummary);
+
         return new NetworkPortalWorkbenchView(
                 networkId,
                 workOrders.size(),
@@ -1350,7 +1372,151 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 openCorrectionCaseCount,
                 openOperationalExceptionCount,
                 pendingQualificationCount,
-                slaSummary);
+                slaSummary,
+                todayAppointmentCount,
+                todayAppointments,
+                todayTimeline);
+    }
+
+    /**
+     * M411：本网点 ACTIVE 任务上 PROPOSED/CONFIRMED 预约，按 Asia/Shanghai 运营日过滤窗口重叠。
+     */
+    private List<NetworkPortalWorkbenchAppointmentItem> loadWorkbenchTodayAppointments(
+            String tenantId,
+            List<NetworkActiveAssignmentView> active,
+            Instant asOf,
+            Map<UUID, String> technicianNames
+    ) {
+        if (active.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, String> taskTechnician = new LinkedHashMap<>();
+        Set<UUID> taskIds = new LinkedHashSet<>();
+        for (NetworkActiveAssignmentView row : active) {
+            taskIds.add(row.taskId());
+            if (row.technicianId() != null && !row.technicianId().isBlank()) {
+                taskTechnician.put(row.taskId(), row.technicianId());
+            }
+        }
+        LocalDate today = asOf.atZone(NETWORK_OPERATIONAL_ZONE).toLocalDate();
+        Instant dayStart = today.atStartOfDay(NETWORK_OPERATIONAL_ZONE).toInstant();
+        Instant dayEnd = today.plusDays(1).atStartOfDay(NETWORK_OPERATIONAL_ZONE).toInstant();
+        List<NetworkPortalWorkbenchAppointmentItem> items = new ArrayList<>();
+        for (TechnicianScheduleAppointmentView row : scheduleAppointments.listForTasks(tenantId, taskIds)) {
+            if (row.windowStart() == null || row.windowEnd() == null) {
+                continue;
+            }
+            boolean overlapsToday = row.windowStart().isBefore(dayEnd) && row.windowEnd().isAfter(dayStart);
+            if (!overlapsToday) {
+                continue;
+            }
+            String technicianId = taskTechnician.get(row.taskId());
+            String displayName = null;
+            if (technicianId != null) {
+                try {
+                    displayName = technicianNames.get(UUID.fromString(technicianId));
+                } catch (IllegalArgumentException ignored) {
+                    displayName = null;
+                }
+            }
+            items.add(new NetworkPortalWorkbenchAppointmentItem(
+                    row.appointmentId(),
+                    row.taskId(),
+                    row.workOrderId(),
+                    row.type(),
+                    row.status(),
+                    row.windowStart(),
+                    row.windowEnd(),
+                    row.timezone(),
+                    technicianId,
+                    displayName));
+            if (items.size() >= WORKBENCH_TODAY_APPOINTMENT_LIMIT) {
+                break;
+            }
+        }
+        items.sort(Comparator
+                .comparing(NetworkPortalWorkbenchAppointmentItem::windowStart,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(NetworkPortalWorkbenchAppointmentItem::appointmentId));
+        return List.copyOf(items);
+    }
+
+    private Map<UUID, String> loadTechnicianDisplayNames(String tenantId, UUID networkId) {
+        Map<UUID, String> names = new LinkedHashMap<>();
+        for (NetworkPortalTechnicianView tech : technicians.listActiveTechnicians(tenantId, networkId)) {
+            names.put(tech.technicianProfileId(), tech.displayName());
+        }
+        return names;
+    }
+
+    private static List<NetworkPortalWorkbenchTimelineBucket> buildWorkbenchTodayTimeline(
+            int unassigned,
+            List<NetworkPortalWorkbenchAppointmentItem> todayAppointments,
+            Integer openCorrectionCaseCount,
+            NetworkPortalWorkOrderWorkspaceSlaSummary slaSummary
+    ) {
+        List<NetworkPortalWorkbenchTimelineBucket> buckets = new ArrayList<>();
+        buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                NetworkPortalWorkbenchTimelineBucket.UNASSIGNED,
+                "待分配",
+                unassigned,
+                unassigned == 0 ? "暂无待指派师傅任务" : "待指派师傅任务 " + unassigned + " 个"));
+
+        if (todayAppointments != null) {
+            int am = 0;
+            int pm = 0;
+            int evening = 0;
+            for (NetworkPortalWorkbenchAppointmentItem item : todayAppointments) {
+                if (item.windowStart() == null) {
+                    continue;
+                }
+                int hour = item.windowStart().atZone(NETWORK_OPERATIONAL_ZONE).getHour();
+                if (hour < 12) {
+                    am++;
+                } else if (hour < 18) {
+                    pm++;
+                } else {
+                    evening++;
+                }
+            }
+            buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                    NetworkPortalWorkbenchTimelineBucket.AM_APPOINTMENTS,
+                    "上午预约",
+                    am,
+                    am == 0 ? "上午无预约窗口" : "上午预约 " + am + " 个"));
+            buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                    NetworkPortalWorkbenchTimelineBucket.PM_APPOINTMENTS,
+                    "下午预约",
+                    pm,
+                    pm == 0 ? "下午无预约窗口" : "下午预约 " + pm + " 个"));
+            buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                    NetworkPortalWorkbenchTimelineBucket.EVENING_APPOINTMENTS,
+                    "晚间预约",
+                    evening,
+                    evening == 0 ? "晚间无预约窗口" : "晚间预约 " + evening + " 个"));
+        }
+
+        if (openCorrectionCaseCount != null) {
+            buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                    NetworkPortalWorkbenchTimelineBucket.OPEN_CORRECTIONS,
+                    "资料整改",
+                    openCorrectionCaseCount,
+                    openCorrectionCaseCount == 0
+                            ? "无开放整改"
+                            : "开放整改 " + openCorrectionCaseCount + " 件"));
+        }
+        if (slaSummary != null) {
+            int atRisk = slaSummary.openCount();
+            buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                    NetworkPortalWorkbenchTimelineBucket.SLA_AT_RISK,
+                    "SLA 风险",
+                    atRisk,
+                    atRisk == 0
+                            ? "无运行中/已超时 SLA"
+                            : "SLA 风险 " + atRisk + " 项（已超时 "
+                                    + slaSummary.breachedCount() + "）"));
+        }
+        return List.copyOf(buckets);
     }
 
     /**

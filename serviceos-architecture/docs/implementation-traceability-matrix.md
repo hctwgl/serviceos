@@ -499,4 +499,5 @@ Feature gate/authority: if applicable
 | M408 | Network 分配候选预约日程冲突摘要 | 419-m408-* + 402-m408-*；OpenAPI 1.0.74；ArchitectureTest + Playwright | 推荐评分；人工视觉批准（距离已由 M410 关闭） |
 | M409 | Admin 关注项目待办/SLA 角标聚合 | 420-m409-* + 403-m409-*；OpenAPI 1.0.75；PostgresIT + Playwright | 全量国标树；人工视觉批准 |
 | M410 | Network 分配候选行政区距离亲和 | 421-m410-* + 404-m410-*；OpenAPI 1.0.76；单元测试 + PostgresIT + Playwright | 经纬度/路网米制距离；推荐评分；人工视觉批准 |
+| M411 | Network 工作台今日预约时间轴 | 422-m411-* + 405-m411-*；OpenAPI 1.0.77；PostgresIT + Playwright | 客户脱敏 PII；完整预约日历；推荐评分；人工视觉批准 |
 

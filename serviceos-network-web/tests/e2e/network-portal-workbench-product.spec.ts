@@ -49,6 +49,7 @@ async function stubWorkbenchProduct(page: Page) {
           'networkTask.read',
           'technician.readOwnNetwork',
           'networkPortal.assignTechnician',
+          'networkPortal.manageAppointment',
           'sla.read',
           'evidence.read',
           'operations.exception.read',
@@ -89,6 +90,29 @@ async function stubWorkbenchProduct(page: Page) {
         openCorrectionCaseCount: 0,
         openOperationalExceptionCount: 0,
         slaSummary: { openCount: 1, breachedCount: 0 },
+        todayAppointmentCount: 1,
+        todayAppointments: [
+          {
+            appointmentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            taskId: TASK_ID,
+            workOrderId: WO_ID,
+            type: 'INSTALLATION',
+            status: 'CONFIRMED',
+            windowStart: '2026-07-21T02:00:00Z',
+            windowEnd: '2026-07-21T03:00:00Z',
+            timezone: 'Asia/Shanghai',
+            technicianId: TECH_ID,
+            technicianDisplayName: '张师傅',
+          },
+        ],
+        todayTimeline: [
+          { bucketCode: 'UNASSIGNED', label: '待分配', count: 1, summary: '待指派师傅任务 1 个' },
+          { bucketCode: 'AM_APPOINTMENTS', label: '上午预约', count: 1, summary: '上午预约 1 个' },
+          { bucketCode: 'PM_APPOINTMENTS', label: '下午预约', count: 0, summary: '下午无预约窗口' },
+          { bucketCode: 'EVENING_APPOINTMENTS', label: '晚间预约', count: 0, summary: '晚间无预约窗口' },
+          { bucketCode: 'OPEN_CORRECTIONS', label: '资料整改', count: 0, summary: '无开放整改' },
+          { bucketCode: 'SLA_AT_RISK', label: 'SLA 风险', count: 1, summary: 'SLA 风险 1 项（已超时 0）' },
+        ],
         capacity: [
           {
             capacityCounterId: 'cap-1',
@@ -205,8 +229,8 @@ async function stubWorkbenchProduct(page: Page) {
   })
 }
 
-test.describe('M390/M407/M408/M410 网点工作台产品化 + 分配候选摘要', () => {
-  test('展示 SummaryStrip、待分配表并完成分配', async ({ page }) => {
+test.describe('M390/M407/M408/M410/M411 网点工作台产品化 + 分配候选 + 今日预约', () => {
+  test('展示 SummaryStrip、今日时间轴/预约、待分配表并完成分配', async ({ page }) => {
     await stubWorkbenchProduct(page)
     await loginWithLocalKeycloak(page)
     await navigateNetwork(page, '/network-portal/workbench')
@@ -214,6 +238,11 @@ test.describe('M390/M407/M408/M410 网点工作台产品化 + 分配候选摘要
     await expect(page.getByTestId('network-portal-workbench')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByTestId('network-summary-strip')).toBeVisible()
     await expect(page.getByTestId('workbench-unassigned-count')).toContainText('1')
+    await expect(page.getByTestId('workbench-today-appointment-count')).toContainText('1')
+    await expect(page.getByTestId('workbench-today-timeline')).toBeVisible()
+    await expect(page.getByTestId('timeline-bucket-UNASSIGNED')).toContainText('待分配')
+    await expect(page.getByTestId('timeline-bucket-AM_APPOINTMENTS')).toContainText('上午预约')
+    await expect(page.getByTestId('workbench-today-appointments')).toContainText('张师傅')
     await expect(page.getByTestId('workbench-unassigned-table')).toBeVisible()
     await expect(page.getByTestId(`assign-open-${TASK_ID}`)).toBeVisible()
 

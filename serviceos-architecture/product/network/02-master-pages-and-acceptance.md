@@ -619,7 +619,7 @@ qualityStatus:
 productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 推荐解释读模型未就绪（开放任务/资质已由 M407、预约日程冲突已由 M408、行政区距离亲和已由 M410 关闭）
-  - CONTENT_GAP: 今日预约时间轴产品块未交付
+  - CONTENT_GAP: 完整预约日历视图未交付（今日预约时间轴/列表已由 M411 交付）
 ```
 
 ```yaml
