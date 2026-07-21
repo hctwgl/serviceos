@@ -42,7 +42,8 @@ test.describe('M377 Admin productization visual baselines', () => {
     // M434：目录 SLA 风险旁载
     await expect(page.getByTestId('work-order-sla-risk')).toContainText('开放 1 / 超时 0')
     // M435：目录独立 updatedAt（非 receivedAt MVP 映射）
-    await expect(page.getByTestId('work-order-updated-at')).toContainText('2026-07-21')
+    const updatedAtCell = page.getByTestId('work-order-updated-at')
+    await expect(updatedAtCell).toContainText('2026-07-21')
     await shot(page, 'work-order-directory-productized')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-region-names-1440.png',
@@ -56,10 +57,12 @@ test.describe('M377 Admin productization visual baselines', () => {
       path: 'tests/e2e/__screenshots__/work-order-directory-current-assignee-1440.png',
       fullPage: true,
     })
+    await page.getByTestId('work-order-sla-risk').scrollIntoViewIfNeeded()
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-sla-risk-1440.png',
       fullPage: true,
     })
+    await updatedAtCell.scrollIntoViewIfNeeded()
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-updated-at-1440.png',
       fullPage: true,
