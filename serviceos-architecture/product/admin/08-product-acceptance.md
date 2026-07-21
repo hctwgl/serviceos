@@ -742,6 +742,23 @@ knownGaps:
   - UI_DATA_GAP: 异常摘要列未交付（当前任务列已由 M449 关闭主路径）
 ```
 
+### 9.44 M450 记录（工单目录异常摘要列）
+
+```yaml
+pageId: ADMIN.WORKORDER.LIST
+route: /work-orders
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps: []
+```
+
 ### 9.3 M397 记录（用户管理）
 
 ```yaml

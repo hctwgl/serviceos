@@ -189,6 +189,14 @@ export async function mockProductizationApis(
                 breachedCount: 0,
               },
             ],
+        exceptionSummaries: options.workOrdersEmpty
+          ? []
+          : [
+              {
+                workOrderId: '11111111-1111-4111-8111-111111111111',
+                openCount: 2,
+              },
+            ],
       })
       return
     }

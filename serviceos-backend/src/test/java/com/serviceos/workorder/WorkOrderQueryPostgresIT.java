@@ -75,6 +75,8 @@ class WorkOrderQueryPostgresIT {
   assertThat(detail.updatedAt()).isEqualTo(detail.receivedAt());
   // M434：无 sla.read 时页级旁载省略（null），不伪造 []/0。
   assertThat(page.slaRiskSummaries()).isNull();
+  // M450：无 operations.exception.read 时页级旁载省略（null），不伪造 []/0。
+  assertThat(page.exceptionSummaries()).isNull();
   // M436：同筛选总数；本页仅 A 项目 1 条（status=RECEIVED）。
   assertThat(page.totalCount()).isEqualTo(1);
   assertThat(page.totalCountTruncated()).isFalse();
@@ -463,6 +465,34 @@ class WorkOrderQueryPostgresIT {
   assertThat(page.slaRiskSummaries().getFirst().breachedCount()).isEqualTo(0);
  }
 
+ @Test void listExposesExceptionSummariesWhenExceptionReadGranted(){
+  Scope a=scope("tenant-test","A");
+  UUID wa=receive(a,"ORDER-EXC","1".repeat(64));
+  UUID none=receive(a,"ORDER-EXC-NONE","2".repeat(64));
+  UUID taskId=seedActiveTask(a,wa,"SURVEY",null,null);
+  seedOpenException(a,wa,taskId,"m450-a");
+  seedOpenException(a,wa,taskId,"m450-b");
+  seedRole("reader","PROJECT",a.projectId().toString(),"workOrder.read","operations.exception.read");
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var page=queries.list(reader,"corr-exc-list",new WorkOrderQuery(null,null,null,null,20));
+  assertThat(page.exceptionSummaries()).isNotNull();
+  assertThat(page.exceptionSummaries()).hasSize(1);
+  assertThat(page.exceptionSummaries().getFirst().workOrderId()).isEqualTo(wa);
+  assertThat(page.exceptionSummaries().getFirst().openCount()).isEqualTo(2);
+  assertThat(page.items()).extracting(WorkOrderView::id).contains(wa,none);
+ }
+
+ @Test void listOmitsExceptionSummariesWithoutExceptionRead(){
+  Scope a=scope("tenant-test","A");
+  UUID wa=receive(a,"ORDER-EXC-DENY","3".repeat(64));
+  UUID taskId=seedActiveTask(a,wa,"SURVEY",null,null);
+  seedOpenException(a,wa,taskId,"m450-deny");
+  seedRole("reader","PROJECT",a.projectId().toString(),"workOrder.read");
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var page=queries.list(reader,"corr-exc-deny",new WorkOrderQuery(null,null,null,null,20));
+  assertThat(page.exceptionSummaries()).isNull();
+ }
+
  @Test void crossTenantIsHiddenAndMigrationIsCurrent(){
   Scope a=scope("tenant-test","A"); UUID id=receive(a,"ORDER-A","c".repeat(64)); seedRole("reader","TENANT","tenant-test");
   assertThatThrownBy(()->queries.get(principal("reader","tenant-other"),"corr-cross",id))
@@ -772,6 +802,33 @@ class WorkOrderQueryPostgresIT {
  private void seedRunningSla(Scope s,UUID workOrderId,UUID taskId){
   Instant now=Instant.parse("2026-07-15T04:00:00Z");
   seedSla(s,workOrderId,taskId,"RUNNING",now,now.plusSeconds(3600));
+ }
+ /** M450：OPEN 运营异常夹具；project_id 使用工单所属项目。 */
+ private void seedOpenException(Scope s,UUID workOrderId,UUID taskId,String marker){
+  Instant openedAt=Instant.parse("2026-07-15T05:00:00Z");
+  jdbc.sql("""
+   INSERT INTO ops_operational_exception (
+     exception_id, tenant_id, project_id, source_type, source_id, source_attempt_id,
+     source_task_type, category_code, severity_code, error_code, status,
+     work_order_id, task_id, occurrence_count, correlation_id,
+     opened_at, last_detected_at, aggregate_version
+   ) VALUES (
+     :id, :tenant, :projectId, 'TEST', :sourceId, :attemptId,
+     'operations.test', 'AUTOMATION_FINAL_FAILURE', 'P2', 'TEST_FAILURE', 'OPEN',
+     :workOrderId, :taskId, 1, :corr,
+     :openedAt, :openedAt, 1
+   )
+   """)
+   .param("id",UUID.randomUUID())
+   .param("tenant",s.tenant())
+   .param("projectId",s.projectId())
+   .param("sourceId","m450-"+marker)
+   .param("attemptId",UUID.randomUUID())
+   .param("workOrderId",workOrderId)
+   .param("taskId",taskId)
+   .param("corr","corr-m450-"+marker)
+   .param("openedAt",java.sql.Timestamp.from(openedAt))
+   .update();
  }
  private void seedBreachedSla(Scope s,UUID workOrderId,UUID taskId){
   Instant now=Instant.parse("2026-07-15T04:00:00Z");

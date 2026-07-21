@@ -433,10 +433,29 @@ function slaRiskLabel(workOrderId: string) {
   }
 }
 
+function exceptionSummaryLabel(workOrderId: string) {
+  const summaries = page.value?.exceptionSummaries
+  if (summaries === undefined || summaries === null) {
+    return {
+      text: presentEmptyValue('not_provided'),
+      tooltip: '无 operations.exception.read 或异常旁载未返回（soft-omit）',
+    }
+  }
+  const matched = summaries.find((row) => row.workOrderId === workOrderId)
+  if (!matched) {
+    return { text: '暂无', tooltip: '本页无 OPEN 运营异常' }
+  }
+  return {
+    text: `待处理 ${matched.openCount}`,
+    tooltip: `openCount=${matched.openCount}`,
+  }
+}
+
 const columns = computed((): TableColumnsType<Row> => {
-  // 依赖 region-catalog 映射与 SLA 旁载，避免异步加载完成后列不刷新。
+  // 依赖 region-catalog 映射与 SLA/异常旁载，避免异步加载完成后列不刷新。
   void regionNameByCode.value
   void page.value?.slaRiskSummaries
+  void page.value?.exceptionSummaries
   return [
   {
     title: '工单编号',
@@ -684,6 +703,20 @@ const columns = computed((): TableColumnsType<Row> => {
         Tooltip,
         { title: presentation.tooltip },
         () => h('span', { 'data-testid': 'work-order-sla-risk' }, presentation.text),
+      )
+    },
+  },
+  {
+    title: '异常摘要',
+    key: 'exception',
+    width: 110,
+    customRender: ({ record }: { record: Row }) => {
+      const presentation = exceptionSummaryLabel(record.id)
+      return h(
+        Tooltip,
+        { title: presentation.tooltip },
+        () =>
+          h('span', { 'data-testid': 'work-order-exception-summary' }, presentation.text),
       )
     },
   },

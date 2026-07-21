@@ -47,6 +47,12 @@ export type WorkOrderDirectorySlaRiskSummary = {
   breachedCount: number
 }
 
+/** M450：页级 OPEN 异常摘要；缺 operations.exception.read 时响应省略本字段。 */
+export type WorkOrderDirectoryExceptionSummary = {
+  workOrderId: string
+  openCount: number
+}
+
 export type WorkOrderPage = {
   items: WorkOrder[]
   nextCursor: string | null
@@ -57,6 +63,8 @@ export type WorkOrderPage = {
   totalCountTruncated: boolean
   /** soft-omit：缺 PROJECT sla.read 时为 undefined */
   slaRiskSummaries?: WorkOrderDirectorySlaRiskSummary[] | null
+  /** soft-omit：缺 PROJECT operations.exception.read 时为 undefined */
+  exceptionSummaries?: WorkOrderDirectoryExceptionSummary[] | null
 }
 
 export function listAuthorizedWorkOrders(query: Record<string, string | undefined> = {}) {

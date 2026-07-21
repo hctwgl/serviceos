@@ -30,6 +30,6 @@ openapiVersion: "1.0.111"
 
 ## 4. 明确未实现
 
-- 异常摘要列
+- 异常摘要列（已由 **M450** 关闭）
 - 按 taskType 筛选、任务深链
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）

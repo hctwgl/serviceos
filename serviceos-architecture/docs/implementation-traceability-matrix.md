@@ -538,4 +538,5 @@ Feature gate/authority: if applicable
 | M447 | Admin 工单目录审核/整改状态筛选 | 458-m447-* + 441-m447-*；OpenAPI 1.0.109；`reviewCorrectionStatus` + evidence SPI + evidence.read soft-gate + PostgresIT + Playwright | 服务端关键词；旁载列；人工视觉批准 |
 | M448 | Admin 工单目录服务端关键词检索 | 459-m448-* + 442-m448-*；OpenAPI 1.0.110；`q` + ILIKE/后四位 + PostgresIT + Playwright | 当前任务名/类型列；异常摘要列；人工视觉批准 |
 | M449 | Admin 工单目录当前任务列 | 460-m449-* + 443-m449-*；OpenAPI 1.0.111；`currentTaskType` + task SPI sidecar + PostgresIT + Playwright | 异常摘要列；人工视觉批准 |
+| M450 | Admin 工单目录异常摘要列 | 461-m450-* + 444-m450-*；OpenAPI 1.0.112；页级 `exceptionSummaries` + soft-gate + PostgresIT + Playwright | 异常筛选；人工视觉批准 |
 

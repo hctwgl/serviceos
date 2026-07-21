@@ -48,6 +48,8 @@ test.describe('M377 Admin productization visual baselines', () => {
     await expect(page.getByTestId('work-order-network-technician')).toContainText('现场师傅甲')
     // M434：目录 SLA 风险旁载
     await expect(page.getByTestId('work-order-sla-risk')).toContainText('开放 1 / 超时 0')
+    // M450：目录 OPEN 异常摘要旁载
+    await expect(page.getByTestId('work-order-exception-summary')).toContainText('待处理 2')
     // M435：目录独立 updatedAt（非 receivedAt MVP 映射）
     const updatedAtCell = page.getByTestId('work-order-updated-at')
     await expect(updatedAtCell).toContainText('2026-07-21')

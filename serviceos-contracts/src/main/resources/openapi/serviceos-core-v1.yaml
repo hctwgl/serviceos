@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.111
+  version: 1.0.112
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3389,6 +3389,8 @@ paths:
         `maskedServiceAddress`（随基座返回，不 soft-omit；无原文）。
         M434：可选页级 `slaRiskSummaries`；需 PROJECT `sla.read` soft-gate，缺能力时省略属性；
         有能力且本页无开放风险时返回 []；仅含 openCount>0 行。
+        M450：可选页级 `exceptionSummaries`；需 PROJECT `operations.exception.read` soft-gate，
+        缺能力时省略属性；有能力且本页无 OPEN 异常时返回 []；仅含 openCount>0 行。
         M436/M444：页级 `totalCount` / `totalCountTruncated`（当前筛选、无 cursor）；
         M444 起 `totalCount` 为精确全量 COUNT(*)，`totalCountTruncated` 恒为 false。
         M437：可选 `provinceCode` / `cityCode` / `districtCode` 国标码精确匹配（AND）；
@@ -9851,6 +9853,13 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/WorkOrderDirectorySlaRiskSummary' }
+        exceptionSummaries:
+          description: |
+            M450：需 PROJECT operations.exception.read；缺能力时省略本属性；有能力且无 OPEN 异常时返回 []。
+            按本页工单聚合 status=OPEN；仅含 openCount>0 行。不伪造 0 伪装无权限。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderDirectoryExceptionSummary' }
     WorkOrderDirectorySlaRiskSummary:
       type: object
       additionalProperties: false
@@ -9865,6 +9874,16 @@ components:
           type: integer
           minimum: 0
           description: BREACHED 实例数（⊆ openCount）
+    WorkOrderDirectoryExceptionSummary:
+      type: object
+      additionalProperties: false
+      required: [workOrderId, openCount]
+      properties:
+        workOrderId: { type: string, format: uuid }
+        openCount:
+          type: integer
+          minimum: 1
+          description: OPEN 运营异常数（仅 >0 行出现在旁载中）
     WorkOrderDetail:
       type: object
       additionalProperties: false
