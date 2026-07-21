@@ -341,7 +341,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 跨聚合业务时间线与操作者显示名（主体变更时间线已由 M405 关闭主路径）
+  - UI_DATA_GAP: 跨聚合业务时间线与操作者显示名（主体范围 M405；任职/RoleGrant/显示名已由 M415 关闭主路径）
 ```
 
 ### 9.4 M398 记录（项目管理 / 工作台）
@@ -519,7 +519,26 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 跨聚合业务时间线与操作者显示名
+  - UI_DATA_GAP: 跨聚合业务时间线与操作者显示名（已由 M415 关闭主路径）
+```
+
+### 9.14 M415 记录（跨聚合变更时间线）
+
+```yaml
+pageId: ADMIN.USER.DETAIL
+route: /users/:id
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 网点任职并入主体时间线
+  - UI_DATA_GAP: 通用 AUTHORIZATION_DENIED 作为主体活动流
 ```
 
 ### 9.12 M406 记录（车企/行政区目录）

@@ -5,10 +5,12 @@ import com.serviceos.audit.api.AuditRecordView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.IdentityAuthorizationPort;
 import com.serviceos.identity.api.IdentityLinkView;
+import com.serviceos.identity.api.PrincipalChangeTimelineContributor;
 import com.serviceos.identity.api.PrincipalChangeTimelineItem;
 import com.serviceos.identity.api.PrincipalChangeTimelinePage;
 import com.serviceos.identity.api.PrincipalLoginEventPage;
 import com.serviceos.identity.api.PrincipalLoginEventView;
+import com.serviceos.identity.api.PrincipalPersonaQuery;
 import com.serviceos.identity.api.SecurityPrincipalDetail;
 import com.serviceos.identity.api.SecurityPrincipalPage;
 import com.serviceos.identity.api.SecurityPrincipalQueryService;
@@ -24,7 +26,9 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -36,6 +40,8 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
     private final IdentityDirectoryQueryRepository queries;
     private final IdentityAuthorizationPort authorization;
     private final AuditQueryService audits;
+    private final PrincipalPersonaQuery personas;
+    private final List<PrincipalChangeTimelineContributor> timelineContributors;
     private final Clock clock;
 
     DefaultSecurityPrincipalQueryService(
@@ -43,12 +49,16 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
             IdentityDirectoryQueryRepository queries,
             IdentityAuthorizationPort authorization,
             AuditQueryService audits,
+            PrincipalPersonaQuery personas,
+            List<PrincipalChangeTimelineContributor> timelineContributors,
             Clock clock
     ) {
         this.directory = directory;
         this.queries = queries;
         this.authorization = authorization;
         this.audits = audits;
+        this.personas = personas;
+        this.timelineContributors = List.copyOf(timelineContributors);
         this.clock = clock;
     }
 
@@ -124,9 +134,10 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
         }
         int fetch = Math.min(100, effective * 2);
         List<PrincipalChangeTimelineItem> merged = new ArrayList<>();
+        List<String> omittedSources = new ArrayList<>();
         for (IdentityDirectoryRepository.LifecycleEventRecord event : directory.listLifecycleEvents(
                 actor.tenantId(), principalId, fetch)) {
-            merged.add(new PrincipalChangeTimelineItem(
+            merged.add(PrincipalChangeTimelineItem.of(
                     "LIFECYCLE",
                     event.eventType(),
                     lifecycleSummary(event.eventType(), event.reason()),
@@ -143,7 +154,7 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
             if (isRedundantAudit(audit.actionName())) {
                 continue;
             }
-            merged.add(new PrincipalChangeTimelineItem(
+            merged.add(PrincipalChangeTimelineItem.of(
                     "AUDIT",
                     audit.actionName(),
                     auditSummary(audit),
@@ -156,7 +167,7 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
         }
         for (PrincipalLoginEventView login : directory.listLoginEvents(
                 actor.tenantId(), principalId, fetch)) {
-            merged.add(new PrincipalChangeTimelineItem(
+            merged.add(PrincipalChangeTimelineItem.of(
                     "LOGIN",
                     "LOGIN_SUCCEEDED",
                     "OIDC 登录成功 · 客户端 " + login.clientId(),
@@ -167,13 +178,52 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
                     login.occurredAt(),
                     login.loginEventId()));
         }
+        // 跨聚合贡献源：缺权 soft-omit，不因缺 organization/authorization 读权而失败关闭整页。
+        for (PrincipalChangeTimelineContributor contributor : timelineContributors) {
+            if (!authorization.allowsTenantCapability(
+                    actor, contributor.requiredCapability(), principalId.toString(), correlationId)) {
+                omittedSources.add(contributor.source());
+                continue;
+            }
+            merged.addAll(contributor.listForPrincipal(actor.tenantId(), principalId, fetch));
+        }
         merged.sort(Comparator
                 .comparing(PrincipalChangeTimelineItem::occurredAt).reversed()
                 .thenComparing(item -> item.refId().toString()));
         if (merged.size() > effective) {
-            merged = merged.subList(0, effective);
+            merged = new ArrayList<>(merged.subList(0, effective));
         }
-        return new PrincipalChangeTimelinePage(merged, clock.instant());
+        return new PrincipalChangeTimelinePage(
+                resolveActorDisplayNames(actor.tenantId(), merged),
+                omittedSources.stream().distinct().sorted().toList(),
+                clock.instant());
+    }
+
+    private List<PrincipalChangeTimelineItem> resolveActorDisplayNames(
+            String tenantId, List<PrincipalChangeTimelineItem> items
+    ) {
+        Set<UUID> actorIds = new HashSet<>();
+        for (PrincipalChangeTimelineItem item : items) {
+            parseUuid(item.actorId()).ifPresent(actorIds::add);
+        }
+        Map<UUID, String> names = personas.displayNames(tenantId, actorIds);
+        List<PrincipalChangeTimelineItem> resolved = new ArrayList<>(items.size());
+        for (PrincipalChangeTimelineItem item : items) {
+            String display = parseUuid(item.actorId()).map(names::get).orElse(null);
+            resolved.add(item.withActorDisplayName(display));
+        }
+        return resolved;
+    }
+
+    private static java.util.Optional<UUID> parseUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        try {
+            return java.util.Optional.of(UUID.fromString(value.trim()));
+        } catch (IllegalArgumentException ignored) {
+            return java.util.Optional.empty();
+        }
     }
 
     private static boolean isRedundantAudit(String actionName) {

@@ -24,4 +24,14 @@ final class IdentityAuthorizationAdapter implements IdentityAuthorizationPort {
                 capability, principal.tenantId(), "SecurityPrincipal", resourceId), correlationId);
         return new IdentityAuthorizationEvidence(decision.matchedGrantIds(), decision.policyVersion());
     }
+
+    @Override
+    public boolean allowsTenantCapability(
+            CurrentPrincipal principal, String capability, String resourceId, String correlationId
+    ) {
+        // soft-gate：仅判定，不写拒绝审计，避免时间线加载污染审计流。
+        var decision = authorization.authorize(principal, AuthorizationRequest.tenantCapability(
+                capability, principal.tenantId(), "SecurityPrincipal", resourceId), correlationId);
+        return decision.effect() == com.serviceos.authorization.api.AuthorizationDecision.Effect.ALLOW;
+    }
 }

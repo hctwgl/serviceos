@@ -53,6 +53,7 @@ const identities = ref<IdentityLink[] | null>(null)
 const recentLogins = ref<PrincipalLoginEvent[] | null>(null)
 const recentLoginsError = ref<string | null>(null)
 const changeTimeline = ref<PrincipalChangeTimelineItem[]>([])
+const changeTimelineOmitted = ref<Array<'MEMBERSHIP' | 'ROLE_GRANT'>>([])
 const changeTimelineError = ref<string | null>(null)
 const grants = ref<RoleGrant[]>([])
 const reassignments = ref<ReassignmentWorkItem[]>([])
@@ -138,9 +139,11 @@ async function load() {
     try {
       const timeline = await listPrincipalChangeTimeline(principalId.value, 50)
       changeTimeline.value = timeline.items
+      changeTimelineOmitted.value = timeline.omittedSources ?? []
       changeTimelineError.value = null
     } catch (err) {
       changeTimeline.value = []
+      changeTimelineOmitted.value = []
       changeTimelineError.value = safeAccessDeniedMessage(err)
     }
     try {
@@ -394,10 +397,19 @@ async function useStaleVersionForTest() {
 function sourceLabel(source: PrincipalChangeTimelineItem['source']) {
   if (source === 'LIFECYCLE') return '生命周期'
   if (source === 'LOGIN') return '登录'
+  if (source === 'MEMBERSHIP') return '任职'
+  if (source === 'ROLE_GRANT') return '角色授权'
   return '审计'
 }
 
-function presentActor(actorId: string) {
+function omittedSourceLabel(source: 'MEMBERSHIP' | 'ROLE_GRANT') {
+  if (source === 'MEMBERSHIP') return '任职（需 organization.read）'
+  return '角色授权（需 authorization.read）'
+}
+
+function presentActor(item: PrincipalChangeTimelineItem) {
+  if (item.actorDisplayName?.trim()) return item.actorDisplayName.trim()
+  const actorId = item.actorId
   if (!actorId) return '—'
   if (actorId === 'jit-registration') return '系统登记'
   if (actorId.length > 12) return `${actorId.slice(0, 8)}…`
@@ -691,22 +703,32 @@ onMounted(() => {
               :message="changeTimelineError"
               style="margin-bottom: 12px"
             />
-            <ol v-else-if="changeTimeline.length" class="timeline" data-testid="user-change-timeline">
-              <li v-for="item in changeTimeline" :key="item.refId">
-                <div class="timeline__time">{{ formatDateTimeDisplay(item.occurredAt) }}</div>
-                <div class="timeline__body">
-                  <strong>{{ item.summary }}</strong>
-                  <p class="muted">
-                    {{ sourceLabel(item.source) }}
-                    · {{ item.eventCode }}
-                    · 结果 {{ statusLabel(item.result) }}
-                    <span v-if="item.principalVersion"> · v{{ item.principalVersion }}</span>
-                    · 操作者 {{ presentActor(item.actorId) }}
-                  </p>
-                </div>
-              </li>
-            </ol>
-            <p v-else class="muted">暂无变更记录</p>
+            <template v-else>
+              <Alert
+                v-if="changeTimelineOmitted.length"
+                type="info"
+                show-icon
+                data-testid="change-timeline-omitted"
+                :message="`以下来源因缺权未合并：${changeTimelineOmitted.map(omittedSourceLabel).join('、')}`"
+                style="margin-bottom: 12px"
+              />
+              <ol v-if="changeTimeline.length" class="timeline" data-testid="user-change-timeline">
+                <li v-for="item in changeTimeline" :key="item.refId">
+                  <div class="timeline__time">{{ formatDateTimeDisplay(item.occurredAt) }}</div>
+                  <div class="timeline__body">
+                    <strong>{{ item.summary }}</strong>
+                    <p class="muted">
+                      {{ sourceLabel(item.source) }}
+                      · {{ item.eventCode }}
+                      · 结果 {{ statusLabel(item.result) }}
+                      <span v-if="item.principalVersion"> · v{{ item.principalVersion }}</span>
+                      · 操作者 {{ presentActor(item) }}
+                    </p>
+                  </div>
+                </li>
+              </ol>
+              <p v-else class="muted">暂无变更记录</p>
+            </template>
           </article>
 
           <article class="card" data-testid="section-reassignment">

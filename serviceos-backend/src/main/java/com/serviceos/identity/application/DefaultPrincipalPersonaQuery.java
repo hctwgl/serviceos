@@ -7,7 +7,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,6 +45,28 @@ final class DefaultPrincipalPersonaQuery implements PrincipalPersonaQuery {
                         """)
                 .param("tenant", tenantId).param("principalId", principalId)
                 .query(String.class).optional();
+    }
+
+    @Override
+    public Map<UUID, String> displayNames(String tenantId, Collection<UUID> principalIds) {
+        if (principalIds == null || principalIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> names = new HashMap<>();
+        jdbc.sql("""
+                SELECT principal_id, display_name
+                  FROM idn_person_profile
+                 WHERE tenant_id = :tenant
+                   AND principal_id IN (:ids)
+                """)
+                .param("tenant", tenantId)
+                .param("ids", principalIds)
+                .query((rs, rowNum) -> {
+                    names.put(rs.getObject("principal_id", UUID.class), rs.getString("display_name"));
+                    return null;
+                })
+                .list();
+        return names;
     }
 
     @Override

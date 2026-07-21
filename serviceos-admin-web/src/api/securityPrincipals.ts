@@ -113,10 +113,11 @@ export function listPrincipalRecentLogins(principalId: string, limit = 20) {
 }
 
 export type PrincipalChangeTimelineItem = {
-  source: 'LIFECYCLE' | 'AUDIT' | 'LOGIN'
+  source: 'LIFECYCLE' | 'AUDIT' | 'LOGIN' | 'MEMBERSHIP' | 'ROLE_GRANT'
   eventCode: string
   summary: string
   actorId: string
+  actorDisplayName: string | null
   result: string
   correlationId: string
   principalVersion: number | null
@@ -126,6 +127,7 @@ export type PrincipalChangeTimelineItem = {
 
 export type PrincipalChangeTimelinePage = {
   items: PrincipalChangeTimelineItem[]
+  omittedSources: Array<'MEMBERSHIP' | 'ROLE_GRANT'>
   asOf: string
 }
 

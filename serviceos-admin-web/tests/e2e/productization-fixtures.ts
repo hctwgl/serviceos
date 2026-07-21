@@ -802,10 +802,35 @@ export async function mockProductizationApis(
       await fulfillJson(route, {
         items: [
           {
+            source: 'ROLE_GRANT',
+            eventCode: 'ROLE_GRANT_APPROVED',
+            summary: '角色授权已批准 · OPS · ALLOW · TENANT=tenant-demo',
+            actorId: '77777777-7777-4777-8777-777777777777',
+            actorDisplayName: '审批运营',
+            result: 'SUCCEEDED',
+            correlationId: 'corr-grant',
+            principalVersion: 2,
+            occurredAt: '2026-07-20T03:40:00Z',
+            refId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          },
+          {
+            source: 'MEMBERSHIP',
+            eventCode: 'MEMBERSHIP_CREATED',
+            summary: '任职已创建 · 演示组织 / 运营部',
+            actorId: '77777777-7777-4777-8777-777777777777',
+            actorDisplayName: '审批运营',
+            result: 'SUCCEEDED',
+            correlationId: 'corr-membership',
+            principalVersion: 1,
+            occurredAt: '2026-07-20T03:35:00Z',
+            refId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          },
+          {
             source: 'LOGIN',
             eventCode: 'LOGIN_SUCCEEDED',
             summary: 'OIDC 登录成功 · 客户端 admin-web',
             actorId: '66666666-6666-4666-8666-666666666666',
+            actorDisplayName: '演示用户',
             result: 'SUCCEEDED',
             correlationId: 'corr-login',
             principalVersion: null,
@@ -817,6 +842,7 @@ export async function mockProductizationApis(
             eventCode: 'REGISTERED',
             summary: '主体已登记 · OIDC_JIT',
             actorId: 'jit-registration',
+            actorDisplayName: null,
             result: 'SUCCEEDED',
             correlationId: 'corr-register',
             principalVersion: 1,
@@ -824,6 +850,7 @@ export async function mockProductizationApis(
             refId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
           },
         ],
+        omittedSources: [],
         asOf: '2026-07-20T04:00:00Z',
       })
       return

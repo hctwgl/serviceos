@@ -1,11 +1,13 @@
 package com.serviceos.identity;
 
 import com.serviceos.ServiceOsApplication;
+import com.serviceos.authorization.api.AuthorizationGovernanceCommandService;
 import com.serviceos.identity.api.AuthenticatedIdentity;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.PrincipalAuthenticationService;
 import com.serviceos.identity.api.SecurityPrincipalCommandService;
 import com.serviceos.identity.api.SecurityPrincipalQueryService;
+import com.serviceos.organization.api.OrganizationCommandService;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
@@ -70,15 +72,24 @@ class IdentityDirectoryPostgresIT {
     SecurityPrincipalQueryService queries;
 
     @Autowired
+    OrganizationCommandService organizations;
+
+    @Autowired
+    AuthorizationGovernanceCommandService authorizationGovernance;
+
+    @Autowired
     JdbcClient jdbc;
 
     @BeforeEach
     void cleanAndAuthorizeActor() {
         jdbc.sql("""
-                TRUNCATE TABLE idn_principal_login_event, idn_principal_lifecycle_event, idn_principal_persona,
+                TRUNCATE TABLE org_structure_event, org_reassignment_work_item,
+                    org_directory_sync_item, org_directory_sync_batch,
+                    org_membership, org_unit_closure, org_unit, org_organization,
+                    idn_principal_login_event, idn_principal_lifecycle_event, idn_principal_persona,
                     idn_identity_link, idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record,
-                    auth_role_grant, auth_role_capability, auth_role CASCADE
+                    auth_role_grant_event, auth_role_grant, auth_role_capability, auth_role CASCADE
                 """).update();
         UUID roleId = UUID.randomUUID();
         jdbc.sql("""
@@ -87,7 +98,10 @@ class IdentityDirectoryPostgresIT {
                 """).param("roleId", roleId).param("tenant", TENANT).update();
         for (String capability : List.of(
                 "identity.read", "identity.readSensitive", "identity.manageLinks",
-                "identity.manageLifecycle", "identity.manageProfile", "identity.register")) {
+                "identity.manageLifecycle", "identity.manageProfile", "identity.register",
+                "organization.read", "organization.manageStructure", "organization.manageMembership",
+                "authorization.read", "authorization.manageRoles", "authorization.requestGrant",
+                "authorization.approveGrant")) {
             jdbc.sql("""
                     INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                     VALUES (:roleId, :capability, now())
@@ -201,6 +215,89 @@ class IdentityDirectoryPostgresIT {
                 "PRINCIPAL_REGISTERED".equals(item.eventCode())
                         || "PRINCIPAL_LOGIN_SUCCEEDED".equals(item.eventCode()));
         assertThat(timeline.items().getFirst().summary()).isNotBlank();
+        assertThat(timeline.omittedSources()).isEmpty();
+        assertThat(timeline.items()).filteredOn(item -> "LOGIN_SUCCEEDED".equals(item.eventCode()))
+                .isNotEmpty()
+                .allSatisfy(item -> assertThat(item.actorDisplayName()).isEqualTo("时间线用户"));
+    }
+
+    @Test
+    void changeTimelineMergesMembershipAndRoleGrantWithSoftOmit() {
+        UUID principalId = UUID.fromString(authentication.resolveOrRegister(
+                identity("subject-cross", "跨聚合用户"), "corr-cross-1"));
+        commands.updateProfile(actor(), metadata("cross-profile"), principalId, 1, "跨聚合用户", "EMP-CROSS-1");
+        seedApprover("grant-approver");
+
+        var org = organizations.createOrganization(
+                actor(), metadata("cross-org"), "CROSS", "跨聚合组织", "LOCAL", null, null);
+        var unit = organizations.createUnit(
+                actor(), metadata("cross-unit"), org.id(), org.version(), null, "OPS", "运营部");
+        organizations.createMembership(
+                actor(), metadata("cross-membership"), org.id(), unit.id(),
+                principalId, "PRIMARY", Instant.now().minusSeconds(60));
+
+        var role = authorizationGovernance.createRole(
+                actor(), metadata("cross-role"), "CROSS-READER", "跨聚合读者", null,
+                List.of("identity.read"));
+        var pending = authorizationGovernance.requestRoleGrant(
+                actor(), metadata("cross-grant-req"), principalId.toString(), role.roleId(),
+                "TENANT", TENANT, "ALLOW", Instant.now().minusSeconds(60), null, "业务需要");
+        authorizationGovernance.decideRoleGrant(
+                approver(), metadata("cross-grant-approve"), pending.grantId(), pending.version(),
+                "APPROVE", "批准");
+
+        var timeline = queries.changeTimeline(actor(), "corr-cross-timeline", principalId, 50);
+        assertThat(timeline.omittedSources()).isEmpty();
+        assertThat(timeline.items()).extracting(item -> item.source())
+                .contains("LIFECYCLE", "MEMBERSHIP", "ROLE_GRANT");
+        assertThat(timeline.items()).extracting(item -> item.eventCode())
+                .contains("MEMBERSHIP_CREATED", "ROLE_GRANT_REQUESTED", "ROLE_GRANT_APPROVED");
+        assertThat(timeline.items()).filteredOn(item -> "MEMBERSHIP_CREATED".equals(item.eventCode()))
+                .singleElement()
+                .satisfies(item -> assertThat(item.summary()).contains("跨聚合组织").contains("运营部"));
+
+        jdbc.sql("""
+                DELETE FROM auth_role_capability
+                 WHERE capability_code IN ('organization.read', 'authorization.read')
+                   AND role_id IN (
+                     SELECT role_id FROM auth_role
+                      WHERE tenant_id = :tenant AND role_code = 'identity-admin'
+                   )
+                """).param("tenant", TENANT).update();
+        var omitted = queries.changeTimeline(actor(), "corr-cross-omit", principalId, 50);
+        assertThat(omitted.omittedSources()).containsExactly("MEMBERSHIP", "ROLE_GRANT");
+        assertThat(omitted.items()).noneMatch(item ->
+                "MEMBERSHIP".equals(item.source()) || "ROLE_GRANT".equals(item.source()));
+        assertThat(omitted.items()).extracting(item -> item.source())
+                .contains("LIFECYCLE");
+    }
+
+    private void seedApprover(String principalId) {
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
+                VALUES (:roleId, :tenant, 'grant-approver', 'Grant Approver', 'ACTIVE', now())
+                """).param("roleId", roleId).param("tenant", TENANT).update();
+        for (String capability : List.of("authorization.approveGrant", "authorization.read")) {
+            jdbc.sql("""
+                    INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                    VALUES (:roleId, :capability, now())
+                    """).param("roleId", roleId).param("capability", capability).update();
+        }
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at
+                ) VALUES (
+                    :grantId, :tenant, :actor, :roleId, 'TENANT', :tenant,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'm415-approver', now()
+                )
+                """).param("grantId", UUID.randomUUID()).param("tenant", TENANT)
+                .param("actor", principalId).param("roleId", roleId).update();
+    }
+
+    private static CurrentPrincipal approver() {
+        return new CurrentPrincipal("grant-approver", TENANT, CurrentPrincipal.PrincipalType.USER, CLIENT, Set.of());
     }
 
     @Test
