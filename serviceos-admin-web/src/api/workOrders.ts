@@ -20,6 +20,10 @@ export type WorkOrder = {
   maskedServiceAddress: string | null
   /** M432：当前阶段码；无 ACTIVE 任务时为 null。 */
   currentStageCode: string | null
+  /** M433：当前 ACTIVE 任务认领主体；未认领为 null。 */
+  currentClaimedBy: string | null
+  /** M433：Persona 显示名；无档案为 null，不发明名称。 */
+  currentAssigneeDisplayName: string | null
 }
 
 export type WorkOrderPage = {

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.94
+  version: 1.0.95
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -9682,7 +9682,7 @@ components:
         status, configurationBundleId, configurationBundleCode, configurationBundleVersion,
         configurationBundleDigest, provinceCode, cityCode, districtCode, externalDispatchedAt,
         receivedAt, version, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress,
-        currentStageCode]
+        currentStageCode, currentClaimedBy, currentAssigneeDisplayName]
       properties:
         id: { type: string, format: uuid }
         tenantId: { type: string }
@@ -9723,6 +9723,16 @@ components:
             M432：当前阶段码，与工作区 currentTaskSummary.stageCode 同口径
             （首个 ACTIVE 任务：READY/PENDING/CLAIMED/RUNNING/RETRY_WAIT/MANUAL_INTERVENTION）。
             无 ACTIVE 任务时为 null；不发明阶段名。
+        currentClaimedBy:
+          type: [string, 'null']
+          maxLength: 128
+          description: >
+            M433：当前 ACTIVE 任务认领主体 ID（tsk_task.claimed_by）；未认领或无 ACTIVE 任务时为 null。
+        currentAssigneeDisplayName:
+          type: [string, 'null']
+          maxLength: 128
+          description: >
+            M433：认领主体 Persona 显示名；无认领或无 PersonProfile 时为 null，不发明名称。
     WorkOrderPage:
       type: object
       additionalProperties: false

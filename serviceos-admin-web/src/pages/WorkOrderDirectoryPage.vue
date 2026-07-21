@@ -136,6 +136,8 @@ type Row = {
   maskedCustomerPhone: string | null
   maskedServiceAddress: string | null
   currentStageCode: string | null
+  currentClaimedBy: string | null
+  currentAssigneeDisplayName: string | null
 }
 
 /** M430/M431：优先展示目录中文名，未命中则回退国标码（不发明名称）。 */
@@ -209,6 +211,8 @@ const rows = computed((): Row[] => {
       maskedCustomerPhone: item.maskedCustomerPhone,
       maskedServiceAddress: item.maskedServiceAddress,
       currentStageCode: item.currentStageCode,
+      currentClaimedBy: item.currentClaimedBy,
+      currentAssigneeDisplayName: item.currentAssigneeDisplayName,
     }))
 })
 
@@ -345,10 +349,34 @@ const columns = computed((): TableColumnsType<Row> => {
     title: '当前责任人',
     key: 'assignee',
     width: 110,
-    customRender: () =>
-      h(Tooltip, { title: '目录投影未提供责任人（UI_DATA_GAP）' }, () =>
-        presentEmptyValue('not_provided'),
-      ),
+    customRender: ({ record }: { record: Row }) => {
+      const name = record.currentAssigneeDisplayName?.trim()
+      if (name) {
+        return h(
+          Tooltip,
+          {
+            title: record.currentClaimedBy
+              ? `责任主体：${record.currentClaimedBy}`
+              : '当前认领责任人',
+          },
+          () => h('span', { 'data-testid': 'work-order-current-assignee' }, name),
+        )
+      }
+      return h(
+        Tooltip,
+        {
+          title: record.currentClaimedBy
+            ? `已认领但无显示名（主体：${record.currentClaimedBy}）`
+            : '无 ACTIVE 任务认领人',
+        },
+        () =>
+          h(
+            'span',
+            { 'data-testid': 'work-order-current-assignee' },
+            presentEmptyValue('not_provided'),
+          ),
+      )
+    },
   },
   {
     title: 'SLA',

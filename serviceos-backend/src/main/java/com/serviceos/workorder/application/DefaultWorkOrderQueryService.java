@@ -5,10 +5,12 @@ import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.authorization.api.AuthorizedProjectScope;
 import com.serviceos.authorization.api.ProjectScopeAuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.identity.api.PrincipalPersonaQuery;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.workorder.api.WorkOrderDetail;
+import com.serviceos.workorder.api.WorkOrderDirectoryAssigneeQuery;
 import com.serviceos.workorder.api.WorkOrderDirectoryStageQuery;
 import com.serviceos.workorder.api.WorkOrderMaskedContactView;
 import com.serviceos.workorder.api.WorkOrderPage;
@@ -22,8 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -41,13 +45,18 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private final AuthorizationService authorization;
     private final ProjectScopeAuthorizationService projectScopes;
     private final ObjectProvider<WorkOrderDirectoryStageQuery> stageQuery;
+    private final ObjectProvider<WorkOrderDirectoryAssigneeQuery> assigneeQuery;
+    private final PrincipalPersonaQuery personas;
     private final Clock clock;
 
     DefaultWorkOrderQueryService(WorkOrderQueryRepository queries, AuthorizationService authorization,
             ProjectScopeAuthorizationService projectScopes,
-            ObjectProvider<WorkOrderDirectoryStageQuery> stageQuery, Clock clock) {
+            ObjectProvider<WorkOrderDirectoryStageQuery> stageQuery,
+            ObjectProvider<WorkOrderDirectoryAssigneeQuery> assigneeQuery,
+            PrincipalPersonaQuery personas, Clock clock) {
         this.queries = queries; this.authorization = authorization;
-        this.projectScopes = projectScopes; this.stageQuery = stageQuery; this.clock = clock;
+        this.projectScopes = projectScopes; this.stageQuery = stageQuery;
+        this.assigneeQuery = assigneeQuery; this.personas = personas; this.clock = clock;
     }
 
     @Override @Transactional(readOnly = true)
@@ -75,12 +84,11 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 cursor == null ? null : cursor.id(), query.limit() + 1);
         boolean more = fetched.size() > query.limit();
         List<WorkOrderView> selected = more ? fetched.subList(0, query.limit()) : fetched;
-        // M429/M432：列表项已通过项目范围授权；补齐脱敏联系与当前阶段码（阶段由 task SPI 旁载）。
-        Map<UUID, String> stages = loadCurrentStageCodes(
-                principal.tenantId(), selected.stream().map(WorkOrderView::id).toList());
+        // M429/M432/M433：列表项已授权；补齐脱敏联系、阶段码与当前责任人（task SPI + Persona）。
+        List<UUID> ids = selected.stream().map(WorkOrderView::id).toList();
+        DirectorySideCars sideCars = loadDirectorySideCars(principal.tenantId(), ids);
         List<WorkOrderView> enriched = selected.stream()
-                .map(item -> withDirectoryEnrichment(
-                        principal.tenantId(), item, stages.get(item.id())))
+                .map(item -> withDirectoryEnrichment(principal.tenantId(), item, sideCars.forWorkOrder(item.id())))
                 .toList();
         WorkOrderView last = more ? enriched.getLast() : null;
         return new WorkOrderPage(enriched, last == null ? null : encodeCursor(scope.scopeDigest(),
@@ -94,10 +102,10 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "工单不存在"));
         authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
                 "WorkOrder", workOrder.id().toString(), workOrder.projectId().toString()), correlationId);
-        // M429/M432：详情与目录契约对齐，返回脱敏联系与当前阶段码、不含原文。
-        Map<UUID, String> stages = loadCurrentStageCodes(principal.tenantId(), List.of(workOrderId));
+        // M429/M432/M433：详情与目录契约对齐，返回脱敏联系、阶段与责任人、不含原文。
+        DirectorySideCars sideCars = loadDirectorySideCars(principal.tenantId(), List.of(workOrderId));
         return new WorkOrderDetail(
-                withDirectoryEnrichment(principal.tenantId(), workOrder, stages.get(workOrderId)),
+                withDirectoryEnrichment(principal.tenantId(), workOrder, sideCars.forWorkOrder(workOrderId)),
                 clock.instant());
     }
 
@@ -144,11 +152,11 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     }
 
     /**
-     * M429/M432：在已授权的 WorkOrderView 上附着脱敏联系与当前阶段码；原文不进入视图。
-     * 阶段码由调用方批量查询后传入，缺任务时保持 null。
+     * M429/M432/M433：在已授权的 WorkOrderView 上附着脱敏联系、阶段与责任人；原文不进入视图。
+     * 旁载字段由调用方批量查询后传入，缺任务/认领/档案时保持 null。
      */
     private WorkOrderView withDirectoryEnrichment(
-            String tenantId, WorkOrderView view, String currentStageCode
+            String tenantId, WorkOrderView view, DirectoryEnrichment enrichment
     ) {
         WorkOrderMaskedContactView contact = maskRawContact(tenantId, view.id());
         return new WorkOrderView(
@@ -175,15 +183,73 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 contact.maskedCustomerName(),
                 contact.maskedCustomerPhone(),
                 contact.maskedServiceAddress(),
-                currentStageCode);
+                enrichment.currentStageCode(),
+                enrichment.currentClaimedBy(),
+                enrichment.currentAssigneeDisplayName());
     }
 
-    private Map<UUID, String> loadCurrentStageCodes(String tenantId, List<UUID> workOrderIds) {
-        WorkOrderDirectoryStageQuery query = stageQuery.getIfAvailable();
-        if (query == null || workOrderIds.isEmpty()) {
-            return Map.of();
+    private DirectorySideCars loadDirectorySideCars(String tenantId, List<UUID> workOrderIds) {
+        if (workOrderIds.isEmpty()) {
+            return DirectorySideCars.empty();
         }
-        return query.findCurrentStageCodes(tenantId, workOrderIds);
+        Map<UUID, String> stages = Map.of();
+        WorkOrderDirectoryStageQuery stagesPort = stageQuery.getIfAvailable();
+        if (stagesPort != null) {
+            stages = stagesPort.findCurrentStageCodes(tenantId, workOrderIds);
+        }
+        Map<UUID, String> claimedBy = Map.of();
+        WorkOrderDirectoryAssigneeQuery assigneesPort = assigneeQuery.getIfAvailable();
+        if (assigneesPort != null) {
+            claimedBy = assigneesPort.findCurrentClaimedBy(tenantId, workOrderIds);
+        }
+        Set<UUID> principalIds = new HashSet<>();
+        for (String raw : claimedBy.values()) {
+            UUID parsed = tryParseUuid(raw);
+            if (parsed != null) {
+                principalIds.add(parsed);
+            }
+        }
+        Map<UUID, String> displayNames = principalIds.isEmpty()
+                ? Map.of()
+                : personas.displayNames(tenantId, new ArrayList<>(principalIds));
+        return new DirectorySideCars(stages, claimedBy, displayNames);
+    }
+
+    private static UUID tryParseUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private record DirectoryEnrichment(
+            String currentStageCode,
+            String currentClaimedBy,
+            String currentAssigneeDisplayName
+    ) {}
+
+    private record DirectorySideCars(
+            Map<UUID, String> stages,
+            Map<UUID, String> claimedBy,
+            Map<UUID, String> displayNames
+    ) {
+        static DirectorySideCars empty() {
+            return new DirectorySideCars(Map.of(), Map.of(), Map.of());
+        }
+
+        DirectoryEnrichment forWorkOrder(UUID workOrderId) {
+            String claimed = claimedBy.get(workOrderId);
+            String displayName = null;
+            UUID principalId = tryParseUuid(claimed);
+            if (principalId != null) {
+                displayName = displayNames.get(principalId);
+            }
+            return new DirectoryEnrichment(stages.get(workOrderId), claimed, displayName);
+        }
     }
 
     /** 姓名仅保留首字，其余以 * 代替。 */

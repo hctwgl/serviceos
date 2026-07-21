@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-21
 baselineCommit: "9a05be9b9e22be216542260f0979d85ee2cf2bab"
-latestMilestone: M432
+latestMilestone: M433
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M432
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M432 Admin 工单目录当前阶段列 |
+| 最新实施里程碑 | M433 Admin 工单目录当前责任人列 |
 | 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（历史基线；合入 master 后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营；**M370～M377** 完成设计系统 Presenter、产品化 AppShell（ScopeBar/Freshness/诊断抽屉）、标准页模板、工单中心/详情、项目详情与主导航页壳迁移及视觉关闭；仍消费服务端 Navigation 与 allowed-actions；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
 | 数据库 | PostgreSQL + Flyway（当前版本 **145**；M420 师傅客户端种类声明事件；M419 授权拒绝 actor 索引；M414 品牌目录/省级骨架；M406 车企/行政区目录；M403 登录事件；M402 `identity.register`；M401 关注项目） |
-| 契约 | Core OpenAPI **1.0.94** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 Admin 目录当前阶段码、Admin/Network 目录与工作区脱敏客户联系、工作区资料预览指针、履约使用中工单摘要、师傅列表开放任务/资质摘要、CLIENT_KINDS 时间线、authorization-denials、师傅档案/服务关系/网点任职 change-timeline、跨聚合 change-timeline、主数据治理、预约日历、分配候选推荐解释、工作台今日预约时间轴、分配候选距离亲和、关注项目角标、`/project-clients`、`/region-catalog`、`org-memberships`、`recent-logins`、用户目录等既有契约） |
+| 契约 | Core OpenAPI **1.0.95** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 Admin 目录当前阶段/责任人、Admin/Network 目录与工作区脱敏客户联系、工作区资料预览指针、履约使用中工单摘要、师傅列表开放任务/资质摘要、CLIENT_KINDS 时间线、authorization-denials、师傅档案/服务关系/网点任职 change-timeline、跨聚合 change-timeline、主数据治理、预约日历、分配候选推荐解释、工作台今日预约时间轴、分配候选距离亲和、关注项目角标、`/project-clients`、`/region-catalog`、`org-memberships`、`recent-logins`、用户目录等既有契约） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -162,7 +162,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 通知 | 通知策略运行时与投递 | `PARTIAL` | **M307** 冻结 Bundle `NotificationRuntime`；**M326** `task.created`/`task.completed` 自动订阅 → Inbox + RoleGrant 收件人 → resolveAndDispatch → Intent/Delivery/Attempt 持久化；LocalReference SENT 本地 ACK，UNKNOWN/FAILED 人工接管 | 模板渲染、真实短信/邮件/Push 供应商、Admin 投递工作台、网络 I/O 移出事务与业务重试 Task 时钟 | M307、M326、`architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PARTIAL` | **M309** `PricingRuntime`；**M327** `workorder.fulfilled` → 最小履约事实 + SHADOW `CalculationSnapshot`（不落账） | 完整 FactDefinition/CalculationRun、应收/应付双轨、对账结算、Admin 计价工作台、AUTHORITATIVE | M309、M327、M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器；M101～M193 运营基线；**M328** UNKNOWN；**M351** 终审；**M370～M377** 设计系统；**M384～M389** 配置四核与工单详情；**M397～M406** 用户管理、项目选择器主数据、关注项目；**M409** 关注项目待办/SLA 角标；**M414** 主数据治理台；**M415～M420** 主体变更时间线与授权拒绝安全活动流；**M422** 履约使用中工单摘要；**M423** 工单工作区脱敏客户联系；**M425** 工作区完整审核决策记录；**M426** 表单资料授权预览；**M429** 工单目录脱敏客户联系；**M430～M431** 工单目录服务区域码与中文名；**M432** 工单目录当前阶段列（`READY_FOR_REVIEW`） | 全国区县全量树/拼音索引/多级子品牌、失败登录/设备指纹、正式企业 OIDC/BFF；不得宣称 PRODUCT_ACCEPTED | M7 设计、M101～M193、M284～M296、M328、M351、M370～M377、M384～M389、M397～M406、M409、M414～M420、M422～M423、M425～M426、M429～M432、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器；M101～M193 运营基线；**M328** UNKNOWN；**M351** 终审；**M370～M377** 设计系统；**M384～M389** 配置四核与工单详情；**M397～M406** 用户管理、项目选择器主数据、关注项目；**M409** 关注项目待办/SLA 角标；**M414** 主数据治理台；**M415～M420** 主体变更时间线与授权拒绝安全活动流；**M422** 履约使用中工单摘要；**M423** 工单工作区脱敏客户联系；**M425** 工作区完整审核决策记录；**M426** 表单资料授权预览；**M429** 工单目录脱敏客户联系；**M430～M431** 工单目录服务区域码与中文名；**M432～M433** 工单目录当前阶段与责任人列（`READY_FOR_REVIEW`） | 全国区县全量树/拼音索引/多级子品牌、失败登录/设备指纹、正式企业 OIDC/BFF；不得宣称 PRODUCT_ACCEPTED | M7 设计、M101～M193、M284～M296、M328、M351、M370～M377、M384～M389、M397～M406、M409、M414～M420、M422～M423、M425～M426、M429～M433、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PARTIAL` | M194～M242 读写切片；M256 独立 `serviceos-network-web`；**M390～M392** 工作台/工作区/整改异常；**M396** 师傅与产能；**M407～M413** 分配候选/距离亲和/推荐解释/今日时间轴/预约日历；**M421** 师傅列表开放任务/资质摘要；**M424** 工作区脱敏客户联系；**M427** 工作区资料授权预览；**M428** 目录页脱敏客户联系（`READY_FOR_REVIEW`） | 技能 taxonomy/服务区域/最近同步/资质到期、经纬度/路网距离、数值推荐评分、月视图拖拽改约、非图片内联预览、产能申请写、Portal ACK/resolve/decide、notifications、生产 IdP | M7 设计、M194～M242、M255～M256、M390～M392、M396、M407～M413、M421、M424、M427、M428 |
 | Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立 H5；M258～M261 iOS 基础；M262 在线 Visit；M263 冻结基础表单；**M349/M350** H5 条件执行器 + 工单/区域权威头 + validationRules；M264 Evidence 采集上传；M265 Snapshot 与 Task 完成；M266 在线整改；**M357～M363** 运行时能力拒单、定向目标外拒单、Feed/详情头预检、整改路径门禁、列表预检与领取/启动硬拒 | 联系/预约、完整表单草稿、editableWhen/默认值（未接受）、iOS 共用执行器、真实 operationRefs 签退；弱网/后台/Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M266、M349、M350、M357～M363 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -226,11 +226,12 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 - **M430 Implemented**：Admin 工单目录服务区域列（复用既有省市区码；无契约 bump）。
 - **M431 Implemented**：Admin 工单目录服务区域中文名（`/region-catalog` 客户端解析；无契约 bump）。
 - **M432 Implemented**：Admin 工单目录当前阶段列（OpenAPI **1.0.94**：`WorkOrder.currentStageCode`；task SPI 旁载）。
+- **M433 Implemented**：Admin 工单目录当前责任人列（OpenAPI **1.0.95**：`currentClaimedBy` / `currentAssigneeDisplayName`）。
 - **M383** 长链路 test 7/8 仍未闭合，不阻塞本切片。
 
 建议下一批（按优先级）：
 
-1. Admin 工单目录责任人或 SLA 列（需列表投影扩展 / sla.read soft-gate，R2）；
+1. Admin 工单目录 SLA 列（页级 sidecar / `sla.read` soft-gate，R2）；
 2. Technician iOS 正式离线闭环（需 macOS/Xcode 环境）；
 3. 全国区县全量树 / 拼音索引 / 多级子品牌（需权威 GB 数据集与导入脚本；M414 已交治理主路径）；
 4. 失败登录/设备指纹（当前仅成功登录事实；需 IdP 失败事件）。

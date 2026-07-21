@@ -435,7 +435,25 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 责任人/SLA 列、按阶段筛选、独立 updatedAt、列表 total 未交付
+  - UI_DATA_GAP: 责任人/SLA 列、按阶段筛选、独立 updatedAt、列表 total 未交付（责任人已由 M433 关闭主路径）
+```
+
+### 9.27 M433 记录（工单目录当前责任人列）
+
+```yaml
+pageId: ADMIN.WORKORDER.LIST
+route: /work-orders
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: SLA 列、网点/师傅列、按责任人筛选、独立 updatedAt、列表 total 未交付
 ```
 
 ### 9.3 M397 记录（用户管理）

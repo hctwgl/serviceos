@@ -439,6 +439,7 @@ title: ServiceOS 里程碑索引
 | M430 | M430 Admin 工单目录服务区域列 | [441-m430-admin-work-order-directory-service-region.md](../architecture/441-m430-admin-work-order-directory-service-region.md) | [424-m430-admin-work-order-directory-service-region-acceptance.md](../testing/424-m430-admin-work-order-directory-service-region-acceptance.md) |
 | M431 | M431 Admin 工单目录服务区域中文名 | [442-m431-admin-work-order-directory-region-names.md](../architecture/442-m431-admin-work-order-directory-region-names.md) | [425-m431-admin-work-order-directory-region-names-acceptance.md](../testing/425-m431-admin-work-order-directory-region-names-acceptance.md) |
 | M432 | M432 Admin 工单目录当前阶段列 | [443-m432-admin-work-order-directory-current-stage.md](../architecture/443-m432-admin-work-order-directory-current-stage.md) | [426-m432-admin-work-order-directory-current-stage-acceptance.md](../testing/426-m432-admin-work-order-directory-current-stage-acceptance.md) |
+| M433 | M433 Admin 工单目录当前责任人列 | [444-m433-admin-work-order-directory-assignee.md](../architecture/444-m433-admin-work-order-directory-assignee.md) | [427-m433-admin-work-order-directory-assignee-acceptance.md](../testing/427-m433-admin-work-order-directory-assignee-acceptance.md) |
 
 ## 未关联里程碑的文档
 

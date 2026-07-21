@@ -37,6 +37,8 @@ test.describe('M377 Admin productization visual baselines', () => {
     })
     // M432：目录当前阶段（currentStageCode → statusLabel）
     await expect(page.getByTestId('work-order-current-stage')).toContainText('勘测')
+    // M433：目录当前责任人（Persona 显示名）
+    await expect(page.getByTestId('work-order-current-assignee')).toContainText('演示师傅')
     await shot(page, 'work-order-directory-productized')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-region-names-1440.png',
@@ -44,6 +46,10 @@ test.describe('M377 Admin productization visual baselines', () => {
     })
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-current-stage-1440.png',
+      fullPage: true,
+    })
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-current-assignee-1440.png',
       fullPage: true,
     })
   })
