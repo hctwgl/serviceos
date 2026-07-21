@@ -125,10 +125,21 @@ type Row = {
   status: string
   clientCode: string
   projectId: string
+  provinceCode: string
+  cityCode: string
+  districtCode: string
   receivedAt: string
   maskedCustomerName: string | null
   maskedCustomerPhone: string | null
   maskedServiceAddress: string | null
+}
+
+/** M430：目录服务区域以既有国标码拼接展示（与 Network 目录口径一致）。 */
+function regionLabel(row: Pick<Row, 'provinceCode' | 'cityCode' | 'districtCode'>) {
+  const parts = [row.provinceCode, row.cityCode, row.districtCode].filter(
+    (part) => part != null && String(part).trim() !== '',
+  )
+  return parts.length ? parts.join('/') : '—'
 }
 
 const rows = computed((): Row[] => {
@@ -137,7 +148,7 @@ const rows = computed((): Row[] => {
   return (page.value?.items ?? [])
     .filter((item) => {
       if (q) {
-        const hay = `${item.externalOrderCode} ${item.clientCode} ${item.maskedCustomerName ?? ''} ${item.maskedCustomerPhone ?? ''}`.toLowerCase()
+        const hay = `${item.externalOrderCode} ${item.clientCode} ${item.maskedCustomerName ?? ''} ${item.maskedCustomerPhone ?? ''} ${item.provinceCode} ${item.cityCode} ${item.districtCode}`.toLowerCase()
         if (!hay.includes(q)) return false
       }
       if (project && !looksLikeUuid(projectKeyword.value)) {
@@ -157,6 +168,9 @@ const rows = computed((): Row[] => {
       status: item.status,
       clientCode: item.clientCode,
       projectId: item.projectId,
+      provinceCode: item.provinceCode,
+      cityCode: item.cityCode,
+      districtCode: item.districtCode,
       receivedAt: item.receivedAt,
       maskedCustomerName: item.maskedCustomerName,
       maskedCustomerPhone: item.maskedCustomerPhone,
@@ -268,11 +282,9 @@ const columns = computed((): TableColumnsType<Row> => [
   {
     title: '服务区域',
     key: 'region',
-    width: 100,
-    customRender: () =>
-      h(Tooltip, { title: '目录投影未提供服务区域（UI_DATA_GAP）' }, () =>
-        presentEmptyValue('not_provided'),
-      ),
+    width: 140,
+    customRender: ({ record }: { record: Row }) =>
+      h('span', { 'data-testid': 'work-order-region' }, regionLabel(record)),
   },
   {
     title: '当前责任人',
@@ -420,7 +432,7 @@ watch(
         type="info"
         show-icon
         message="更多筛选暂不可用"
-        description="服务区域、网点、师傅、阶段、SLA、创建时间等条件尚未由工单目录查询 API 提供（UI_DATA_GAP），不会假装可筛。"
+        description="网点、师傅、阶段、SLA、创建时间等筛选条件尚未由工单目录查询 API 提供（UI_DATA_GAP）；服务区域列已展示既有国标码，但按区域筛选仍未交付。"
       />
       <label class="filter-field">
         <span>服务区域</span>

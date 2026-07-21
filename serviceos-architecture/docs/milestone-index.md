@@ -436,6 +436,7 @@ title: ServiceOS 里程碑索引
 | M427 | M427 Network 工单工作区表单资料授权预览 | [438-m427-network-work-order-workspace-evidence-preview.md](../architecture/438-m427-network-work-order-workspace-evidence-preview.md) | [421-m427-network-work-order-workspace-evidence-preview-acceptance.md](../testing/421-m427-network-work-order-workspace-evidence-preview-acceptance.md) |
 | M428 | M428 Network Portal 目录页脱敏客户联系 | [439-m428-network-portal-directory-masked-contact.md](../architecture/439-m428-network-portal-directory-masked-contact.md) | [422-m428-network-portal-directory-masked-contact-acceptance.md](../testing/422-m428-network-portal-directory-masked-contact-acceptance.md) |
 | M429 | M429 Admin 工单目录脱敏客户联系 | [440-m429-admin-work-order-directory-masked-contact.md](../architecture/440-m429-admin-work-order-directory-masked-contact.md) | [423-m429-admin-work-order-directory-masked-contact-acceptance.md](../testing/423-m429-admin-work-order-directory-masked-contact-acceptance.md) |
+| M430 | M430 Admin 工单目录服务区域列 | [441-m430-admin-work-order-directory-service-region.md](../architecture/441-m430-admin-work-order-directory-service-region.md) | [424-m430-admin-work-order-directory-service-region-acceptance.md](../testing/424-m430-admin-work-order-directory-service-region-acceptance.md) |
 
 ## 未关联里程碑的文档
 

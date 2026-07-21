@@ -31,9 +31,11 @@ test.describe('M377 Admin productization visual baselines', () => {
       '杭州市西湖区***',
     )
     await expect(page.getByTestId('work-order-masked-customer-phone')).not.toContainText('138')
+    // M430：目录服务区域（既有国标码）
+    await expect(page.getByTestId('work-order-region')).toContainText('330000/330100/330106')
     await shot(page, 'work-order-directory-productized')
     await page.screenshot({
-      path: 'tests/e2e/__screenshots__/work-order-directory-masked-contact-1440.png',
+      path: 'tests/e2e/__screenshots__/work-order-directory-service-region-1440.png',
       fullPage: true,
     })
   })

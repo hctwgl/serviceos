@@ -8,6 +8,10 @@ export type WorkOrder = {
   serviceProductCode: string
   externalOrderCode: string
   status: 'RECEIVED' | 'ACTIVE' | 'FULFILLED'
+  /** M430：服务区域国标码（目录列展示；名称解析仍可后续增强）。 */
+  provinceCode: string
+  cityCode: string
+  districtCode: string
   receivedAt: string
   version: number
   /** M429：服务端脱敏客户联系。 */

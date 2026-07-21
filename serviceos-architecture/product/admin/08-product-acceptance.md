@@ -380,7 +380,26 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 阶段/责任人/SLA/独立 updatedAt、服务端客户关键词检索未交付
+  - UI_DATA_GAP: 服务区域列（已由 M430 关闭码展示主路径）；阶段/责任人/SLA/独立 updatedAt、服务端客户关键词检索未交付
+```
+
+### 9.24 M430 记录（工单目录服务区域列）
+
+```yaml
+pageId: ADMIN.WORKORDER.LIST
+route: /work-orders
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - CONTENT_GAP: 行政区中文名解析未交付（当前展示国标码）
+  - UI_DATA_GAP: 阶段/责任人/SLA/独立 updatedAt、按区域筛选 API 未交付
 ```
 
 ### 9.3 M397 记录（用户管理）
