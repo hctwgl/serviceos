@@ -5,6 +5,7 @@
         displayName = "Authorization",
         allowedDependencies = {
                 "shared",
+                "jooq",
                 "identity::api",
                 "audit::api",
                 "organization :: api",

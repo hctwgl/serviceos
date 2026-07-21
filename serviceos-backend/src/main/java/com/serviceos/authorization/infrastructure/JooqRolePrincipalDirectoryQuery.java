@@ -1,7 +1,9 @@
 package com.serviceos.authorization.infrastructure;
 
 import com.serviceos.authorization.api.RolePrincipalDirectoryQuery;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.serviceos.jooq.generated.tables.AuthRole;
+import com.serviceos.jooq.generated.tables.AuthRoleGrant;
+import org.jooq.DSLContext;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -13,7 +15,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+import static com.serviceos.jooq.generated.tables.AuthRole.AUTH_ROLE;
+import static com.serviceos.jooq.generated.tables.AuthRoleGrant.AUTH_ROLE_GRANT;
 
 /**
  * RoleGrant → roleCode 主体目录。
@@ -22,11 +25,11 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
  * 同一主体若存在同角色 DENY 有效授予，则从 ALLOW 结果中排除。</p>
  */
 @Component
-final class JdbcRolePrincipalDirectoryQuery implements RolePrincipalDirectoryQuery {
-    private final JdbcClient jdbc;
+final class JooqRolePrincipalDirectoryQuery implements RolePrincipalDirectoryQuery {
+    private final DSLContext dsl;
 
-    JdbcRolePrincipalDirectoryQuery(JdbcClient jdbc) {
-        this.jdbc = jdbc;
+    JooqRolePrincipalDirectoryQuery(DSLContext dsl) {
+        this.dsl = dsl;
     }
 
     @Override
@@ -39,33 +42,20 @@ final class JdbcRolePrincipalDirectoryQuery implements RolePrincipalDirectoryQue
         Objects.requireNonNull(projectId, "projectId");
         Instant evaluatedAt = Objects.requireNonNull(asOf, "asOf");
 
-        List<Row> rows = jdbc.sql("""
-                SELECT r.role_code AS role_code,
-                       g.principal_id AS principal_id,
-                       g.grant_effect AS grant_effect
-                  FROM auth_role_grant g
-                  JOIN auth_role r
-                    ON r.role_id = g.role_id
-                   AND r.tenant_id = g.tenant_id
-                 WHERE g.tenant_id = :tenantId
-                   AND g.grant_status = 'ACTIVE'
-                   AND g.revoked_at IS NULL
-                   AND g.valid_from <= :asOf
-                   AND (g.valid_to IS NULL OR g.valid_to > :asOf)
-                   AND (
-                        (g.scope_type = 'TENANT' AND g.scope_ref = :tenantId)
-                     OR (g.scope_type = 'PROJECT' AND g.scope_ref = :projectId)
-                   )
-                 ORDER BY r.role_code ASC, g.principal_id ASC, g.created_at ASC
-                """)
-                .param("tenantId", safeTenant)
-                .param("projectId", projectId.toString())
-                .param("asOf", timestamptz(evaluatedAt))
-                .query((rs, rowNum) -> new Row(
-                        rs.getString("role_code"),
-                        rs.getString("principal_id"),
-                        rs.getString("grant_effect")))
-                .list();
+        AuthRoleGrant g = AUTH_ROLE_GRANT.as("g");
+        AuthRole r = AUTH_ROLE.as("r");
+        List<Row> rows = dsl.select(r.ROLE_CODE, g.PRINCIPAL_ID, g.GRANT_EFFECT)
+                .from(g)
+                .join(r).on(r.ROLE_ID.eq(g.ROLE_ID).and(r.TENANT_ID.eq(g.TENANT_ID)))
+                .where(g.TENANT_ID.eq(safeTenant))
+                .and(g.GRANT_STATUS.eq("ACTIVE"))
+                .and(g.REVOKED_AT.isNull())
+                .and(g.VALID_FROM.le(evaluatedAt))
+                .and(g.VALID_TO.isNull().or(g.VALID_TO.gt(evaluatedAt)))
+                .and(g.SCOPE_TYPE.eq("TENANT").and(g.SCOPE_REF.eq(safeTenant))
+                        .or(g.SCOPE_TYPE.eq("PROJECT").and(g.SCOPE_REF.eq(projectId.toString()))))
+                .orderBy(r.ROLE_CODE.asc(), g.PRINCIPAL_ID.asc(), g.CREATED_AT.asc())
+                .fetch(row -> new Row(row.value1(), row.value2(), row.value3()));
 
         Map<String, Set<String>> denied = new LinkedHashMap<>();
         Map<String, LinkedHashSet<String>> allowed = new LinkedHashMap<>();
