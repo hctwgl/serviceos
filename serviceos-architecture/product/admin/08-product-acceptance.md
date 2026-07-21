@@ -362,7 +362,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - CONTENT_GAP: Network Portal 资料缩略图 UI、非图片内联预览器未交付
+  - CONTENT_GAP: Network Portal 资料缩略图 UI（已由 M427 关闭）、非图片内联预览器未交付
 ```
 
 ### 9.3 M397 记录（用户管理）

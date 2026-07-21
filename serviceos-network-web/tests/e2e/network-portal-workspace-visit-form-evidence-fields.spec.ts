@@ -172,6 +172,8 @@ async function stubWorkspaceFields(page: Page) {
               revisionCount: 1,
               latestRevisionNumber: 1,
               latestRevisionStatus: 'VALIDATED',
+              latestRevisionId: null,
+              latestMimeType: null,
             },
           ],
         }),

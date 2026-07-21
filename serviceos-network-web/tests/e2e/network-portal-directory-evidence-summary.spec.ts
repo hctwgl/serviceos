@@ -110,6 +110,8 @@ const evidenceItem = {
   revisionCount: 0,
   latestRevisionNumber: null,
   latestRevisionStatus: null,
+  latestRevisionId: null,
+  latestMimeType: null,
 }
 
 test.describe('M235 Network Portal 目录页资料 Evidence 服务端摘要', () => {

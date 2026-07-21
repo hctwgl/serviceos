@@ -5,12 +5,14 @@ import { RouterLink, useRoute } from 'vue-router'
 import { safeProblemMessage } from '@serviceos/web-core'
 
 import {
+  authorizeEvidenceRevisionDownload,
   getNetworkPortalWorkOrderWorkspace,
   listNetworkPortalAssignCandidates,
   type NetworkPortalTaskItem,
   type NetworkPortalAssignCandidateItem,
   type NetworkPortalWorkOrderWorkspace,
   type NetworkPortalWorkspaceAppointmentSummary,
+  type NetworkPortalWorkspaceEvidenceItemSummary,
 } from '../api/networkPortal'
 import AssignTechnicianDrawer from '../components/AssignTechnicianDrawer.vue'
 import AppointmentCollaborationPanel from '../components/AppointmentCollaborationPanel.vue'
@@ -30,9 +32,58 @@ const assignEmptyReason = ref<string | null>(null)
 const loadingCandidates = ref(false)
 const candidatesError = ref<string | null>(null)
 const showTechnicalDetails = ref(import.meta.env.DEV)
+/** M427：图片资料短时授权预览 URL（purpose=WORKSPACE_EVIDENCE_PREVIEW）。 */
+const evidencePreviewUrls = ref<Record<string, string>>({})
+const evidencePreviewErrors = ref<Record<string, string>>({})
+const evidencePreviewLoading = ref(false)
 
 function hasAppointmentWindow(item: NetworkPortalWorkspaceAppointmentSummary) {
   return item.windowStart != null && item.windowEnd != null
+}
+
+function isImageEvidenceItem(item: NetworkPortalWorkspaceEvidenceItemSummary) {
+  return (
+    item.latestRevisionId != null &&
+    item.latestMimeType != null &&
+    item.latestMimeType.startsWith('image/')
+  )
+}
+
+async function loadEvidencePreviews(items: NetworkPortalWorkspaceEvidenceItemSummary[] | null | undefined) {
+  evidencePreviewUrls.value = {}
+  evidencePreviewErrors.value = {}
+  const imageItems = (items ?? []).filter(isImageEvidenceItem)
+  if (imageItems.length === 0) {
+    evidencePreviewLoading.value = false
+    return
+  }
+  evidencePreviewLoading.value = true
+  try {
+    await Promise.all(
+      imageItems.map(async (item) => {
+        const revisionId = item.latestRevisionId
+        if (!revisionId) return
+        try {
+          const auth = await authorizeEvidenceRevisionDownload(
+            revisionId,
+            'WORKSPACE_EVIDENCE_PREVIEW',
+          )
+          evidencePreviewUrls.value = {
+            ...evidencePreviewUrls.value,
+            [item.evidenceItemId]: auth.downloadUrl,
+          }
+        } catch (err) {
+          evidencePreviewErrors.value = {
+            ...evidencePreviewErrors.value,
+            [item.evidenceItemId]:
+              err instanceof Error ? err.message : '预览授权失败',
+          }
+        }
+      }),
+    )
+  } finally {
+    evidencePreviewLoading.value = false
+  }
 }
 
 function resolveTechnician(technicianId: string | null | undefined) {
@@ -168,9 +219,12 @@ async function load() {
       workOrderId.value,
     )
     error.value = null
+    void loadEvidencePreviews(detail.value.evidenceItems)
   } catch (err) {
     detail.value = null
     error.value = safeProblemMessage(err)
+    evidencePreviewUrls.value = {}
+    evidencePreviewErrors.value = {}
   } finally {
     loading.value = false
   }
@@ -511,33 +565,66 @@ watch(
         aria-label="Evidence item summaries"
       >
         <h3>资料项摘要</h3>
-        <ul v-if="detail.evidenceItems.length">
-          <li
+        <div v-if="detail.evidenceItems.length" class="evidence-preview-grid">
+          <article
             v-for="item in detail.evidenceItems"
             :key="item.evidenceItemId"
+            class="evidence-preview-card"
             :data-testid="`workspace-evidence-item-${item.evidenceItemId}`"
           >
-            <strong>{{ item.evidenceItemId }}</strong>
-            <span class="muted">
-              （slot {{ item.evidenceSlotId }} · #{{ item.itemOrdinal }} · {{ item.status ? statusLabel(item.status) : '—' }} ·
-              rev {{ item.revisionCount }}
+            <header class="evidence-preview-card__head">
+              <strong>
+                #{{ item.itemOrdinal }} · {{ item.status ? statusLabel(item.status) : '—' }}
+              </strong>
+              <span class="muted" data-testid="workspace-evidence-item-project">
+                project {{ item.projectId }}
+              </span>
+            </header>
+            <p class="muted">
+              slot {{ item.evidenceSlotId }} · rev {{ item.revisionCount }}
               <template v-if="item.latestRevisionNumber != null">
                 / #{{ item.latestRevisionNumber }}
               </template>
               <template v-if="item.latestRevisionStatus">
                 / {{ statusLabel(item.latestRevisionStatus) }}
               </template>
-              ）
-            </span>
-            <span class="muted" data-testid="workspace-evidence-item-project">
-              · project {{ item.projectId }}
-            </span>
-          </li>
-        </ul>
+            </p>
+            <template v-if="isImageEvidenceItem(item)">
+              <p
+                v-if="evidencePreviewLoading && !evidencePreviewUrls[item.evidenceItemId]"
+                class="muted"
+              >
+                预览授权中…
+              </p>
+              <p
+                v-else-if="evidencePreviewErrors[item.evidenceItemId]"
+                class="error"
+                data-testid="workspace-evidence-preview-error"
+              >
+                {{ evidencePreviewErrors[item.evidenceItemId] }}
+              </p>
+              <img
+                v-else-if="evidencePreviewUrls[item.evidenceItemId]"
+                class="evidence-preview-card__thumb"
+                data-testid="workspace-evidence-preview-image"
+                :src="evidencePreviewUrls[item.evidenceItemId]"
+                :alt="`资料预览 ${item.itemOrdinal}`"
+              />
+              <p v-else class="muted">暂无预览</p>
+            </template>
+            <p v-else class="muted" data-testid="workspace-evidence-preview-non-image">
+              {{
+                item.latestMimeType
+                  ? `非图片类型（${item.latestMimeType}）`
+                  : '尚无最新修订'
+              }}
+            </p>
+          </article>
+        </div>
         <p v-else data-testid="workspace-evidence-items-empty">暂无资料项</p>
         <p class="hint">
-          需 NETWORK <code>evidence.read</code>。展示 Accepted 非 PII 资料项摘要；不含
-          Revision 图/file/captureMetadata。
+          需 NETWORK <code>evidence.read</code> 与 <code>file.download</code>。图片经短时授权预览
+          （purpose=<code>WORKSPACE_EVIDENCE_PREVIEW</code>）；不含 fileObjectId/永久 URL/captureMetadata。
         </p>
       </section>
 
@@ -1126,5 +1213,37 @@ td {
   margin-top: 0.2rem;
   color: #374151;
   font-size: 0.8rem;
+}
+.evidence-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+.evidence-preview-card {
+  border: 1px solid var(--sos-color-border-default, #d9dee7);
+  border-radius: var(--sos-radius-md, 8px);
+  background: var(--sos-color-surface-card, #fff);
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+.evidence-preview-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.evidence-preview-card__thumb {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  background: var(--sos-color-surface-subtle, #f5f7fa);
+  border-radius: 6px;
+}
+.error {
+  color: var(--sos-color-status-critical-fg, #b42318);
+  font-size: 0.85rem;
 }
 </style>

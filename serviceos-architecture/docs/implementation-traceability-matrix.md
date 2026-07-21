@@ -514,5 +514,6 @@ Feature gate/authority: if applicable
 | M423 | Admin 工单工作区脱敏客户联系摘要 | 434-m423-* + 417-m423-*；OpenAPI 1.0.89；workspace masked* + PostgresIT + Playwright | Network 脱敏联系（M424）；表单缩略图/完整审核记录；人工视觉批准 |
 | M424 | Network 工单工作区脱敏客户联系摘要 | 435-m424-* + 418-m424-*；OpenAPI 1.0.90；NP workspace masked* + PostgresIT + Playwright | 目录客户字段；表单缩略图；人工视觉批准 |
 | M425 | Admin 工单工作区完整审核决策记录产品化 | 436-m425-* + 419-m425-*；OpenAPI 1.0.90（无 bump）；REVIEWS_CORRECTIONS decisions UI + Playwright | 表单资料缩略图/revision 预览（M426）；人工视觉批准 |
-| M426 | Admin 工单工作区表单资料授权预览 | 437-m426-* + 420-m426-*；OpenAPI 1.0.91；latestRevisionId/mimeType + PostgresIT + Playwright | Network 资料缩略图 UI；非图片内联预览；人工视觉批准 |
+| M426 | Admin 工单工作区表单资料授权预览 | 437-m426-* + 420-m426-*；OpenAPI 1.0.91；latestRevisionId/mimeType + PostgresIT + Playwright | Network 资料缩略图 UI（M427）；非图片内联预览；人工视觉批准 |
+| M427 | Network 工单工作区表单资料授权预览 | 438-m427-* + 421-m427-*；OpenAPI 1.0.91（无 bump）；NP workspace 图片短时授权预览 + Playwright | 非图片内联预览；目录缩略图列；人工视觉批准 |
 

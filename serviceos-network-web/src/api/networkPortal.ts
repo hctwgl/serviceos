@@ -277,6 +277,27 @@ export type NetworkPortalWorkspaceEvidenceItemSummary = {
   revisionCount: number
   latestRevisionNumber: number | null
   latestRevisionStatus: string | null
+  /** M426/M427：最新 revision 指针，供短时授权预览。 */
+  latestRevisionId: string | null
+  latestMimeType: string | null
+}
+
+export type DownloadAuthorization = {
+  authorizationId: string
+  fileId: string
+  method: string
+  downloadUrl: string
+  requiredHeaders: Record<string, string>
+  expiresAt: string
+}
+
+/** M427：申请资料版本短时下载授权（工作区预览 purpose=WORKSPACE_EVIDENCE_PREVIEW）。 */
+export async function authorizeEvidenceRevisionDownload(revisionId: string, purpose: string) {
+  const result = await apiPost<DownloadAuthorization>(
+    `/evidence-revisions/${revisionId}/download-authorizations`,
+    { body: { purpose } },
+  )
+  return result.data
 }
 
 /** M225：字段对齐 Admin WorkOrderWorkspaceCorrectionResubmissionSummary。 */

@@ -20,7 +20,7 @@ openapiVersion: "1.0.91"
 |---|---|
 | OpenAPI | **1.0.91** `WorkOrderWorkspaceEvidenceItemSummary` 增加 required nullable `latestRevisionId` / `latestMimeType`；下载授权说明补充 `WORKSPACE_EVIDENCE_PREVIEW` |
 | Evidence | `listItemSummaries` LATERAL 选出最新 revision id/mime；摘要仍禁止 `fileObjectId`/digest/URL |
-| ReadModel | Admin/NP DTO 对齐透传；本切片不交付 Network UI |
+| ReadModel | Admin/NP DTO 对齐透传；Network UI 由 **M427** 交付 |
 | Admin Web | 表单资料页签图片缩略预览（purpose=`WORKSPACE_EVIDENCE_PREVIEW`） |
 | 证据 | `WorkOrderWorkspacePostgresIT` + Playwright |
 
@@ -32,6 +32,6 @@ openapiVersion: "1.0.91"
 
 ## 4. 明确未实现
 
-- Network Portal 资料缩略图 UI
+- Network Portal 资料缩略图 UI（已由 **M427** 交付）
 - 非图片类型内联预览器
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）

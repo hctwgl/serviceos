@@ -655,6 +655,25 @@ productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 客户/地址脱敏读模型未就绪（已由 M424 关闭主路径；师傅日程冲突已由 M408、事实型推荐解释已由 M412 在分配抽屉交付）
   - CONTENT_GAP: 月视图拖拽改约未交付（预约日历列表已由 M413 交付）
+  - UI_DATA_GAP: 工作区资料缩略图未就绪（已由 M427 关闭主路径；非图片内联预览器仍未交付）
+```
+
+## 46.1 M427 验收记录（工单工作区资料授权预览）
+
+```yaml
+pageId: NETWORK.WORKORDER.WORKSPACE
+route: /network-portal/work-orders/:id
+visualProfile: CLASSIC_PROFESSIONAL_COLLABORATION
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - CONTENT_GAP: 非图片类型内联预览器、目录列表缩略图列未交付
 ```
 
 ## 47. M392 验收记录（资料整改 + 异常中心）
