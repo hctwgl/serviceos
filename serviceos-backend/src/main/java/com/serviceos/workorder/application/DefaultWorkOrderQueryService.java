@@ -8,6 +8,7 @@ import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
+import com.serviceos.shared.SystemRedactionPolicy;
 import com.serviceos.workorder.api.WorkOrderDetail;
 import com.serviceos.workorder.api.WorkOrderMaskedContactView;
 import com.serviceos.workorder.api.WorkOrderPage;
@@ -105,40 +106,19 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 maskAddress(raw.serviceAddress()));
     }
 
-    /** 姓名仅保留首字，其余以 * 代替。 */
+    /** 字段值遵循系统级业务数据脱敏开关。 */
     static String maskName(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String trimmed = value.trim();
-        if (trimmed.length() == 1) {
-            return "*";
-        }
-        return trimmed.charAt(0) + "*".repeat(Math.min(trimmed.length() - 1, 3));
+        return SystemRedactionPolicy.personName(value);
     }
 
-    /** 手机号保留后四位。 */
+    /** 字段值遵循系统级业务数据脱敏开关。 */
     static String maskPhone(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String digits = value.trim();
-        if (digits.length() <= 4) {
-            return "****";
-        }
-        return "*".repeat(Math.min(digits.length() - 4, 7)) + digits.substring(digits.length() - 4);
+        return SystemRedactionPolicy.phone(value);
     }
 
-    /** 地址仅保留前 6 个可见字符。 */
+    /** 字段值遵循系统级业务数据脱敏开关。 */
     static String maskAddress(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String trimmed = value.trim();
-        if (trimmed.length() <= 6) {
-            return trimmed.charAt(0) + "***";
-        }
-        return trimmed.substring(0, 6) + "***";
+        return SystemRedactionPolicy.address(value);
     }
 
     private static String normalizeCode(String value, String field) {
