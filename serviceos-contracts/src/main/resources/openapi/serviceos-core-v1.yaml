@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.88
+  version: 1.0.89
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3543,7 +3543,9 @@ paths:
       summary: 查询工单工作区顶层组合快照
       description: >-
         复用 workOrder.read 实时鉴权，组合 Task/时间线 freshness、可选 SLA/异常摘要，
-        以及 APPOINTMENTS_VISITS 等 sectionAvailability。不含客户 PII；大区块按需加载见
+        以及 APPOINTMENTS_VISITS 等 sectionAvailability。
+        M423：含服务端脱敏客户联系字段（maskedCustomerName/Phone/ServiceAddress），
+        不含完整手机号或完整地址原文；大区块按需加载见
         workspace/sections（M87～M94：TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS/FORMS_EVIDENCE/
         REVIEWS_CORRECTIONS/INTEGRATION）。
       parameters:
@@ -9992,7 +9994,7 @@ components:
       additionalProperties: false
       required: [header, currentTaskSummary, sectionAvailability, allowedActionLink,
         serviceAssignmentSummary, slaSummary, exceptionSummary, timelineFreshnessStatus,
-        sourceVersions, meta]
+        sourceVersions, meta, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress]
       properties:
         header: { $ref: '#/components/schemas/WorkOrder' }
         currentTaskSummary:
@@ -10019,6 +10021,18 @@ components:
         timelineFreshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
         sourceVersions: { $ref: '#/components/schemas/WorkOrderWorkspaceSourceVersions' }
         meta: { $ref: '#/components/schemas/WorkOrderWorkspaceMeta' }
+        maskedCustomerName:
+          type: [string, 'null']
+          maxLength: 64
+          description: M423：服务端脱敏客户姓名；不得返回原文
+        maskedCustomerPhone:
+          type: [string, 'null']
+          maxLength: 32
+          description: M423：服务端脱敏手机号；不得返回完整号码
+        maskedServiceAddress:
+          type: [string, 'null']
+          maxLength: 200
+          description: M423：服务端脱敏服务地址；不得返回完整地址
     WorkOrderWorkspaceTasksSectionData:
       type: object
       additionalProperties: false

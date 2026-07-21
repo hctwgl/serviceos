@@ -8,6 +8,7 @@ import BusinessProgress, { type BusinessProgressStep } from '../patterns/Busines
 import AllowedActionBar, { type AllowedActionItem } from '../patterns/AllowedActionBar.vue'
 import RightContextRail from '../patterns/RightContextRail.vue'
 import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
+import SensitiveText from '../components/business/SensitiveText.vue'
 import { presentWorkOrderStatus } from '../presentation/work-order-status.presenter'
 import { presentPricingStatus } from '../presentation/pricing-status.presenter'
 import { labelClientCode, labelServiceProduct } from '../presentation/enum-labels'
@@ -1181,9 +1182,27 @@ onMounted(() => {
             {{ projectPresentation.label }}
           </RouterLink>
         </Descriptions.Item>
-        <Descriptions.Item label="客户">{{ presentEmptyValue('not_provided') }}</Descriptions.Item>
-        <Descriptions.Item label="手机号">{{ presentEmptyValue('not_provided') }}</Descriptions.Item>
-        <Descriptions.Item label="地址">{{ presentEmptyValue('not_provided') }}</Descriptions.Item>
+        <Descriptions.Item label="客户">
+          <SensitiveText
+            data-testid="workspace-masked-customer-name"
+            :value="workspace.maskedCustomerName"
+            :empty-text="presentEmptyValue('not_provided')"
+          />
+        </Descriptions.Item>
+        <Descriptions.Item label="手机号">
+          <SensitiveText
+            data-testid="workspace-masked-customer-phone"
+            :value="workspace.maskedCustomerPhone"
+            :empty-text="presentEmptyValue('not_provided')"
+          />
+        </Descriptions.Item>
+        <Descriptions.Item label="地址">
+          <SensitiveText
+            data-testid="workspace-masked-service-address"
+            :value="workspace.maskedServiceAddress"
+            :empty-text="presentEmptyValue('not_provided')"
+          />
+        </Descriptions.Item>
         <Descriptions.Item label="服务网点">
           <template v-if="workspace.serviceAssignmentSummary">
             {{ presentEntityName({ id: String(workspace.serviceAssignmentSummary.networkId ?? ''), loaded: true }).label }}

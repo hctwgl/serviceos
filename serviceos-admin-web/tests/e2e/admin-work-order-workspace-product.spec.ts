@@ -20,6 +20,10 @@ test.describe('M389 工单详情统一履约工作区', () => {
     await expect(page.getByRole('tab', { name: '基本信息' })).toBeVisible()
     await expect(page.getByRole('tab', { name: '表单资料' })).toBeVisible()
     await expect(page.getByRole('tab', { name: '外部回传' })).toBeVisible()
+    await expect(page.getByTestId('workspace-masked-customer-name')).toContainText('王*')
+    await expect(page.getByTestId('workspace-masked-customer-phone')).toContainText('*******5678')
+    await expect(page.getByTestId('workspace-masked-service-address')).toContainText('杭州市西湖区***')
+    await expect(page.getByTestId('workspace-masked-customer-phone')).not.toContainText('138')
 
     await page.setViewportSize({ width: 1440, height: 1024 })
     await page.screenshot({

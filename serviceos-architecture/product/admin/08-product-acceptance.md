@@ -306,8 +306,27 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 客户/地址/联系方式正式脱敏读模型仍缺
   - UI_DATA_GAP: 表单资料缩略图与完整审核记录产品化未完成
+  # 客户/地址/联系方式脱敏摘要已由 M423 交付
+```
+
+### 9.20 M423 记录（工单工作区脱敏客户联系）
+
+```yaml
+pageId: ADMIN.WORKORDER.WORKSPACE
+route: /work-orders/:id
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 表单资料缩略图与完整审核记录产品化未完成
+  - CONTENT_GAP: Network 工作区脱敏客户联系与工单目录客户字段未交付
 ```
 
 ### 9.3 M397 记录（用户管理）

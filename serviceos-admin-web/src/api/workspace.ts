@@ -35,6 +35,12 @@ export type WorkOrderWorkspace = {
     freshnessStatus?: string
     queryId?: string
   }
+  /** M423：服务端脱敏客户姓名 */
+  maskedCustomerName: string | null
+  /** M423：服务端脱敏手机号 */
+  maskedCustomerPhone: string | null
+  /** M423：服务端脱敏服务地址 */
+  maskedServiceAddress: string | null
 }
 
 export type WorkOrderWorkspaceSection = {

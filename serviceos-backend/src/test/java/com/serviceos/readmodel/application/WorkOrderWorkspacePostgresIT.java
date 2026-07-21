@@ -160,9 +160,17 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(workspace.meta().freshnessStatus()).isEqualTo("UNKNOWN");
         assertThat(workspace.meta().projectionCheckpoint()).startsWith("work-order-core-timeline.v1:gen:");
         assertThat(workspace.sourceVersions().workOrderVersion()).isEqualTo(1);
+        // M423：顶层脱敏联系字段；不得夹带原文手机号/完整地址
+        assertThat(workspace.maskedCustomerName()).isNotBlank();
+        assertThat(workspace.maskedCustomerPhone()).isNotBlank();
+        assertThat(workspace.maskedCustomerPhone()).doesNotContain("138");
+        assertThat(workspace.maskedServiceAddress()).isNotBlank();
+        assertThat(workspace.maskedServiceAddress()).endsWith("***");
 
         String json = workspace.toString();
-        assertThat(json).doesNotContain("customerName", "customerMobile", "serviceAddress", "vehicleVin");
+        assertThat(json).doesNotContain("vehicleVin");
+        assertThat(json).doesNotContain("13800000000");
+        assertThat(json).doesNotContain("山东省济南市历下区测试路1号");
     }
 
     @Test

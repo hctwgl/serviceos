@@ -98,7 +98,10 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 null,
                 "UNKNOWN",
                 new WorkOrderWorkspaceSourceVersions(3),
-                new WorkOrderWorkspaceMeta(now, "work-order-core-timeline.v1:gen:1", "UNKNOWN", "q-1"));
+                new WorkOrderWorkspaceMeta(now, "work-order-core-timeline.v1:gen:1", "UNKNOWN", "q-1"),
+                "王*",
+                "*******5678",
+                "山东省济南市***");
         when(principals.current()).thenReturn(principal);
         when(workspaces.get(principal, "corr-m85", workOrderId)).thenReturn(workspace);
 
@@ -118,7 +121,10 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 .andExpect(jsonPath("$.header.customerName").doesNotExist())
                 .andExpect(jsonPath("$.header.customerMobile").doesNotExist())
                 .andExpect(jsonPath("$.header.serviceAddress").doesNotExist())
-                .andExpect(jsonPath("$.header.vehicleVin").doesNotExist());
+                .andExpect(jsonPath("$.header.vehicleVin").doesNotExist())
+                .andExpect(jsonPath("$.maskedCustomerName").value("王*"))
+                .andExpect(jsonPath("$.maskedCustomerPhone").value("*******5678"))
+                .andExpect(jsonPath("$.maskedServiceAddress").value("山东省济南市***"));
         verify(workspaces).get(principal, "corr-m85", workOrderId);
     }
 

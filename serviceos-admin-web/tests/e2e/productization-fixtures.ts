@@ -1081,6 +1081,9 @@ export async function mockProductizationApis(
           INTEGRATION: 'EMPTY',
         },
         meta: { asOf: '2026-07-20T04:00:00Z' },
+        maskedCustomerName: '王*',
+        maskedCustomerPhone: '*******5678',
+        maskedServiceAddress: '杭州市西湖区***',
       })
       return
     }
