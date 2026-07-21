@@ -52,7 +52,7 @@ files
 │   ├── ObjectStorageGateway
 │   └── FileContentScanner
 └── infrastructure
-    ├── JdbcFileLifecycleStore
+    ├── JooqFileLifecycleStore
     ├── LocalPrivateObjectStorageGateway
     └── LocalContentScanner
 ```

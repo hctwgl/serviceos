@@ -4,7 +4,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Application Read Model",
         allowedDependencies = {
-                "shared", "identity::api", "authorization::api", "audit::api",
+                "shared", "jooq", "identity::api", "authorization::api", "audit::api",
                 "reliability::api", "reliability::spi",
                 "workorder::api", "workflow::api", "task::api", "integration::api",
                 "operations::api", "evidence::api", "sla::api",

@@ -4,7 +4,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Secure Files",
         allowedDependencies = {
-                "shared", "identity::api", "authorization::api", "audit::api",
+                "shared", "jooq", "identity::api", "authorization::api", "audit::api",
                 "reliability::api", "task::api", "task::spi"
         }
 )
