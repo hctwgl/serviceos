@@ -131,8 +131,11 @@ class FollowedProjectPostgresIT {
         assertThat(item.activeWorkOrderCount()).isZero();
         assertThat(item.activeWorkOrderCountTruncated()).isFalse();
         assertThat(item.openReviewCount()).isZero();
+        assertThat(item.openReviewCountTruncated()).isFalse();
         assertThat(item.openCorrectionCount()).isZero();
+        assertThat(item.openCorrectionCountTruncated()).isFalse();
         assertThat(item.slaBreachedCount()).isZero();
+        assertThat(item.slaBreachedCountTruncated()).isFalse();
         assertThat(item.openTodoCount()).isZero();
     }
 

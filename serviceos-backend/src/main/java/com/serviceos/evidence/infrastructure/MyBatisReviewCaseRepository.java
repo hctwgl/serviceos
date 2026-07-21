@@ -178,6 +178,24 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
     }
 
     @Override
+    public int countQueue(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            String status,
+            String origin,
+            UUID taskId
+    ) {
+        return mapper.countQueue(
+                tenantId,
+                tenantWide,
+                projectIds.stream().map(UUID::toString).toList(),
+                status,
+                origin,
+                taskId == null ? null : taskId.toString());
+    }
+
+    @Override
     public Optional<ReviewCaseTimelineIdentity> findTimelineIdentity(String tenantId, UUID reviewCaseId) {
         Map<String, Object> row = mapper.findTimelineIdentity(tenantId, reviewCaseId.toString());
         if (row == null) {

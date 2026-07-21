@@ -77,6 +77,20 @@ final class DefaultSlaQueryService implements SlaQueryService {
 
     @Override
     @Transactional(readOnly = true)
+    public int count(
+            CurrentPrincipal principal, String correlationId, SlaInstanceQuery query
+    ) {
+        Objects.requireNonNull(query, "query must not be null");
+        String status = normalizeStatus(query.status());
+        QueryScope scope = query.projectId() == null
+                ? collectionScope(principal, correlationId)
+                : projectScope(principal, correlationId, query.projectId(), "collection");
+        return repository.countPage(
+                principal.tenantId(), scope.tenantWide(), scope.projectIds(), null, status);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public SlaInstancePage listForWorkOrder(
             CurrentPrincipal principal,
             String correlationId,

@@ -85,6 +85,22 @@ final class DefaultReviewCaseQueryService implements ReviewCaseQueryService {
                 clock.instant());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public int count(
+            CurrentPrincipal principal, String correlationId, ReviewCaseQueueQuery query
+    ) {
+        Objects.requireNonNull(query, "query must not be null");
+        String status = normalize(query.status(), STATUSES, "status", "OPEN");
+        String origin = normalize(query.origin(), ORIGINS, "origin", null);
+        QueryScope scope = query.projectId() == null
+                ? collectionScope(principal, correlationId)
+                : projectScope(principal, correlationId, query.projectId());
+        return reviews.countQueue(
+                principal.tenantId(), scope.tenantWide(), scope.projectIds(),
+                status, origin, query.taskId());
+    }
+
     private QueryScope projectScope(
             CurrentPrincipal principal, String correlationId, UUID projectId
     ) {

@@ -913,7 +913,24 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 超过 100 条时的精确全量 COUNT（当前 *Truncated）
+  - UI_DATA_GAP: 超过 100 条时的精确全量 COUNT（当前 *Truncated；已由 M452 关闭主路径）
+```
+
+### 9.46 M452 记录（关注项目角标精确 COUNT）
+
+```yaml
+pageId: ADMIN.WORKBENCH
+route: /workbench
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps: []
 ```
 
 ### 9.8 M402 记录（用户登记与目录摘要）

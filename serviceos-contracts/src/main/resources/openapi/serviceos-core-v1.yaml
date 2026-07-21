@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.112
+  version: 1.0.113
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -1620,6 +1620,8 @@ paths:
       description: |
         M401：仅 Portal=ADMIN。任意已认证主体可读自己的关注项目；不要求新 capability。
         服务端对每项经 project.read 重新鉴权，失权项省略并清理；不整列表 403。
+        M409：可选角标计数字段 soft-gate。
+        M452：角标改为精确 COUNT；具备能力时 `*Truncated` 恒为 false。
       parameters:
         - name: portal
           in: query
@@ -7839,25 +7841,33 @@ components:
         activeWorkOrderCount:
           type: [integer, 'null']
           minimum: 0
-          description: ACTIVE 工单数；缺 workOrder.read 时为 null
+          description: ACTIVE 工单精确数；缺 workOrder.read 时为 null
         activeWorkOrderCountTruncated:
           type: [boolean, 'null']
-          description: true 表示至少 activeWorkOrderCount，仍有下一页
+          description: >
+            M452：具备能力时恒为 false（精确 COUNT；字段保留兼容）。
+            缺能力时与 count 一并省略。
         openReviewCount:
           type: [integer, 'null']
           minimum: 0
-          description: OPEN 审核案例数；缺审核读能力时为 null
-        openReviewCountTruncated: { type: [boolean, 'null'] }
+          description: OPEN 审核案例精确数；缺审核读能力时为 null
+        openReviewCountTruncated:
+          type: [boolean, 'null']
+          description: M452：具备能力时恒为 false（精确 COUNT；字段保留兼容）
         openCorrectionCount:
           type: [integer, 'null']
           minimum: 0
-          description: OPEN 整改案例数；缺整改读能力时为 null
-        openCorrectionCountTruncated: { type: [boolean, 'null'] }
+          description: OPEN 整改案例精确数；缺整改读能力时为 null
+        openCorrectionCountTruncated:
+          type: [boolean, 'null']
+          description: M452：具备能力时恒为 false（精确 COUNT；字段保留兼容）
         slaBreachedCount:
           type: [integer, 'null']
           minimum: 0
-          description: BREACHED SLA 实例数；缺 sla.read 时为 null
-        slaBreachedCountTruncated: { type: [boolean, 'null'] }
+          description: BREACHED SLA 实例精确数；缺 sla.read 时为 null
+        slaBreachedCountTruncated:
+          type: [boolean, 'null']
+          description: M452：具备能力时恒为 false（精确 COUNT；字段保留兼容）
         openTodoCount:
           type: [integer, 'null']
           minimum: 0

@@ -64,6 +64,14 @@ interface CorrectionCaseMapper {
             @Param("cursorId") String cursorId,
             @Param("fetchSize") int fetchSize);
 
+    int countQueue(
+            @Param("tenantId") String tenantId,
+            @Param("tenantWide") boolean tenantWide,
+            @Param("projectIds") List<String> projectIds,
+            @Param("status") String status,
+            @Param("taskId") String taskId,
+            @Param("sourceReviewCaseId") String sourceReviewCaseId);
+
     String findCaseIdBySourceDecision(
             @Param("tenantId") String tenantId, @Param("reviewDecisionId") String reviewDecisionId);
 

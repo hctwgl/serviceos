@@ -7,8 +7,8 @@ import java.util.UUID;
 /**
  * Admin 个人关注项目列表项。
  *
- * <p>角标计数字段 soft-gate：缺对应读能力时为 null；有下一页时 {@code *Truncated=true}
- * 表示至少该数量。</p>
+ * <p>角标计数字段 soft-gate：缺对应读能力时为 null。
+ * M452 起具备能力时计数为精确全量，{@code *Truncated} 恒为 false（字段保留兼容）。</p>
  */
 public record FollowedProjectItem(
         UUID projectId,

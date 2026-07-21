@@ -29,12 +29,12 @@ import java.util.UUID;
  * 关注项目列表：逐项按 project.read 重新鉴权；失权/不存在项省略并删除。
  * <p>
  * 角标计数 soft-gate：缺 workOrder/evidence/sla 读能力时对应字段为 null，不拖垮整页。
+ * M452：角标改为精确 COUNT（*Truncated 恒 false），不再用 limit=100 页投影猜测。
  * 不包外层事务，避免嵌套授权查询抛 BusinessProblem 污染编排层事务。
  */
 @Service
 class DefaultFollowedProjectQueryService implements FollowedProjectQueryService {
     private static final Logger log = LoggerFactory.getLogger(DefaultFollowedProjectQueryService.class);
-    private static final int BADGE_LIMIT = 100;
 
     private final FollowedProjectRepository repository;
     private final ProjectQueryService projects;
@@ -135,13 +135,14 @@ class DefaultFollowedProjectQueryService implements FollowedProjectQueryService 
                 .isPresent();
     }
 
+    /** M452：使用 WorkOrderPage.totalCount 精确全量；*Truncated 恒 false。 */
     private CountBadge countActiveWorkOrders(CurrentPrincipal actor, String correlationId, UUID projectId) {
         try {
             var page = workOrders.list(
                     actor,
                     correlationId,
-                    new WorkOrderQuery(null, projectId, "ACTIVE", null, BADGE_LIMIT));
-            return new CountBadge(page.items().size(), page.nextCursor() != null);
+                    new WorkOrderQuery(null, projectId, "ACTIVE", null, 1));
+            return new CountBadge(page.totalCount(), false);
         } catch (BusinessProblem problem) {
             if (problem.code() == ProblemCode.ACCESS_DENIED) {
                 return null;
@@ -150,13 +151,14 @@ class DefaultFollowedProjectQueryService implements FollowedProjectQueryService 
         }
     }
 
+    /** M452：精确 COUNT；*Truncated 恒 false。 */
     private CountBadge countOpenReviews(CurrentPrincipal actor, String correlationId, UUID projectId) {
         try {
-            var page = reviews.list(
+            int count = reviews.count(
                     actor,
                     correlationId,
-                    new ReviewCaseQueueQuery(projectId, "OPEN", null, null, null, BADGE_LIMIT));
-            return new CountBadge(page.items().size(), page.nextCursor() != null);
+                    new ReviewCaseQueueQuery(projectId, "OPEN", null, null, null, 1));
+            return new CountBadge(count, false);
         } catch (BusinessProblem problem) {
             if (problem.code() == ProblemCode.ACCESS_DENIED) {
                 return null;
@@ -165,13 +167,14 @@ class DefaultFollowedProjectQueryService implements FollowedProjectQueryService 
         }
     }
 
+    /** M452：精确 COUNT；*Truncated 恒 false。 */
     private CountBadge countOpenCorrections(CurrentPrincipal actor, String correlationId, UUID projectId) {
         try {
-            var page = corrections.list(
+            int count = corrections.count(
                     actor,
                     correlationId,
-                    new CorrectionCaseQueueQuery(projectId, "OPEN", null, null, null, BADGE_LIMIT));
-            return new CountBadge(page.items().size(), page.nextCursor() != null);
+                    new CorrectionCaseQueueQuery(projectId, "OPEN", null, null, null, 1));
+            return new CountBadge(count, false);
         } catch (BusinessProblem problem) {
             if (problem.code() == ProblemCode.ACCESS_DENIED) {
                 return null;
@@ -180,13 +183,14 @@ class DefaultFollowedProjectQueryService implements FollowedProjectQueryService 
         }
     }
 
+    /** M452：精确 COUNT；*Truncated 恒 false。 */
     private CountBadge countSlaBreached(CurrentPrincipal actor, String correlationId, UUID projectId) {
         try {
-            var page = sla.list(
+            int count = sla.count(
                     actor,
                     correlationId,
-                    new SlaInstanceQuery(projectId, "BREACHED", null, BADGE_LIMIT));
-            return new CountBadge(page.items().size(), page.nextCursor() != null);
+                    new SlaInstanceQuery(projectId, "BREACHED", null, 1));
+            return new CountBadge(count, false);
         } catch (BusinessProblem problem) {
             if (problem.code() == ProblemCode.ACCESS_DENIED) {
                 return null;

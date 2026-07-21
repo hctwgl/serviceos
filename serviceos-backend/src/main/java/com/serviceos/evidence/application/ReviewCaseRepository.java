@@ -57,6 +57,15 @@ public interface ReviewCaseRepository {
             UUID cursorId,
             int fetchSize);
 
+    /** M452：与 findQueuePage 同筛选口径的精确 COUNT（无 cursor）。 */
+    int countQueue(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            String status,
+            String origin,
+            UUID taskId);
+
     /** 时间线专用：只读 reviewCaseId/projectId/taskId，不加载决定。 */
     Optional<ReviewCaseTimelineIdentity> findTimelineIdentity(String tenantId, UUID reviewCaseId);
 

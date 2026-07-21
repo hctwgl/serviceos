@@ -163,6 +163,32 @@
          LIMIT #{fetchSize}
     </select>
 
+    <select id="countQueue" resultType="int">
+        SELECT COUNT(*)::int
+          FROM evd_review_case review
+         WHERE review.tenant_id = #{tenantId}
+           AND review.status = #{status}
+        <if test="!tenantWide">
+            <choose>
+                <when test="projectIds != null and !projectIds.isEmpty()">
+                    AND review.project_id IN
+                    <foreach collection="projectIds" item="projectId" open="(" separator="," close=")">
+                        CAST(#{projectId} AS uuid)
+                    </foreach>
+                </when>
+                <otherwise>
+                    AND 1 = 0
+                </otherwise>
+            </choose>
+        </if>
+        <if test="origin != null">
+            AND review.origin = #{origin}
+        </if>
+        <if test="taskId != null">
+            AND review.task_id = CAST(#{taskId} AS uuid)
+        </if>
+    </select>
+
     <select id="findTimelineIdentity" resultType="map">
         SELECT review_case_id::text AS "reviewCaseId",
                project_id::text AS "projectId",

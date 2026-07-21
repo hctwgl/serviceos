@@ -540,4 +540,5 @@ Feature gate/authority: if applicable
 | M449 | Admin 工单目录当前任务列 | 460-m449-* + 443-m449-*；OpenAPI 1.0.111；`currentTaskType` + task SPI sidecar + PostgresIT + Playwright | 异常摘要列；人工视觉批准 |
 | M450 | Admin 工单目录异常摘要列 | 461-m450-* + 444-m450-*；OpenAPI 1.0.112；页级 `exceptionSummaries` + soft-gate + PostgresIT + Playwright | 异常筛选；人工视觉批准 |
 | M451 | Admin 工单目录异常摘要深链 | 462-m451-* + 445-m451-*；OpenAPI 仍 1.0.112；列链接 → 异常队列 query 水合 + Playwright | 异常筛选；单异常详情直达；人工视觉批准 |
+| M452 | Admin 关注项目角标精确 COUNT | 463-m452-* + 446-m452-*；OpenAPI 1.0.113；精确 COUNT + `*Truncated=false` + PostgresIT | 履约使用中摘要精确 COUNT；人工视觉批准 |
 

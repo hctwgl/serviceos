@@ -11,6 +11,10 @@ public interface SlaQueryRepository {
             String tenantId, boolean tenantWide, List<UUID> projectIds, UUID workOrderId, String status,
             Instant cursorDeadlineAt, UUID cursorId, int fetchSize);
 
+    /** M452：与 findPage 同筛选口径的精确 COUNT（无 cursor）。 */
+    int countPage(
+            String tenantId, boolean tenantWide, List<UUID> projectIds, UUID workOrderId, String status);
+
     Optional<SlaStoredInstance> findById(String tenantId, UUID slaInstanceId);
 
     List<SlaStoredSegment> findSegments(String tenantId, UUID slaInstanceId);

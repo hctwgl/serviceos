@@ -458,6 +458,7 @@ title: ServiceOS 里程碑索引
 | M449 | M449 Admin 工单目录当前任务列 | [460-m449-admin-work-order-directory-current-task-type.md](../architecture/460-m449-admin-work-order-directory-current-task-type.md) | [443-m449-admin-work-order-directory-current-task-type-acceptance.md](../testing/443-m449-admin-work-order-directory-current-task-type-acceptance.md) |
 | M450 | M450 Admin 工单目录异常摘要列 | [461-m450-admin-work-order-directory-exception-summary.md](../architecture/461-m450-admin-work-order-directory-exception-summary.md) | [444-m450-admin-work-order-directory-exception-summary-acceptance.md](../testing/444-m450-admin-work-order-directory-exception-summary-acceptance.md) |
 | M451 | M451 Admin 工单目录异常摘要深链 | [462-m451-admin-work-order-directory-exception-queue-deeplink.md](../architecture/462-m451-admin-work-order-directory-exception-queue-deeplink.md) | [445-m451-admin-work-order-directory-exception-queue-deeplink-acceptance.md](../testing/445-m451-admin-work-order-directory-exception-queue-deeplink-acceptance.md) |
+| M452 | M452 Admin 关注项目角标精确 COUNT | [463-m452-admin-followed-project-badge-exact-count.md](../architecture/463-m452-admin-followed-project-badge-exact-count.md) | [446-m452-admin-followed-project-badge-exact-count-acceptance.md](../testing/446-m452-admin-followed-project-badge-exact-count-acceptance.md) |
 
 ## 未关联里程碑的文档
 
@@ -486,6 +487,7 @@ title: ServiceOS 里程碑索引
 - `serviceos-architecture/architecture/20-transaction-messaging-concurrency-blueprint.md`
 - `serviceos-architecture/architecture/21-security-nfr-deployment-blueprint.md`
 - `serviceos-architecture/architecture/36-persistence-engineering-guideline.md`
+- `serviceos-architecture/architecture/system-wide-redaction-switch.md`
 - `serviceos-architecture/testing/README.md`
 - `serviceos-architecture/testing/admin-pilot-readiness-acceptance.md`
 - `serviceos-architecture/testing/identity-organization-governance-program-acceptance.md`

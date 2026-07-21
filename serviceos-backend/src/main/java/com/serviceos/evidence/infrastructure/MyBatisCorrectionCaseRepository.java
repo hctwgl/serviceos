@@ -176,6 +176,24 @@ final class MyBatisCorrectionCaseRepository implements CorrectionCaseRepository 
     }
 
     @Override
+    public int countQueue(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            String status,
+            UUID taskId,
+            UUID sourceReviewCaseId
+    ) {
+        return mapper.countQueue(
+                tenantId,
+                tenantWide,
+                projectIds.stream().map(UUID::toString).toList(),
+                status,
+                taskId == null ? null : taskId.toString(),
+                sourceReviewCaseId == null ? null : sourceReviewCaseId.toString());
+    }
+
+    @Override
     public Optional<UUID> findBySourceDecision(String tenantId, UUID reviewDecisionId) {
         String id = mapper.findCaseIdBySourceDecision(tenantId, reviewDecisionId.toString());
         return id == null ? Optional.empty() : Optional.of(UUID.fromString(id));
