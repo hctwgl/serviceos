@@ -9,11 +9,15 @@ import com.serviceos.configuration.api.BundleChannelActivationService;
 import com.serviceos.configuration.api.BundleChannelActivationView;
 import com.serviceos.configuration.api.DeactivateBundleChannelCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.CfgBundleChannelActivation;
+import com.serviceos.jooq.generated.tables.CfgConfigurationBundle;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
-import com.serviceos.shared.infrastructure.PostgresJdbcParameters;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.impl.DSL;
+import org.jooq.DSLContext;
+import org.jooq.Record;
+import org.jooq.Record15;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,26 +28,29 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
+import static com.serviceos.jooq.generated.tables.CfgBundleChannelActivation.CFG_BUNDLE_CHANNEL_ACTIVATION;
+import static com.serviceos.jooq.generated.tables.CfgConfigurationBundle.CFG_CONFIGURATION_BUNDLE;
+
 /**
- * Bundle 通道激活服务（含多槽位 CANARY 与满量自动晋级）。
+ * Bundle 通道激活服务（含多槽位 CANARY 与满量自动晋级）（jOOQ）。
  *
  * <p>事务边界：supersede/插入/流量调整/晋级同事务。发布 Bundle 内容永不修改。</p>
  */
 @Service
-final class DefaultBundleChannelActivationService implements BundleChannelActivationService {
+final class JooqBundleChannelActivationService implements BundleChannelActivationService {
     private static final String MANAGE = "configuration.release.manage";
     private static final String RESOURCE = "BundleChannelActivation";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final AuthorizationService authorization;
     private final Clock clock;
 
-    DefaultBundleChannelActivationService(
-            JdbcClient jdbc,
+    JooqBundleChannelActivationService(
+            DSLContext dsl,
             AuthorizationService authorization,
             Clock clock
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.authorization = authorization;
         this.clock = clock;
     }
@@ -114,21 +121,16 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
         }
 
         Instant now = clock.instant();
-        int updated = jdbc.sql("""
-                        UPDATE cfg_bundle_channel_activation
-                           SET traffic_percent = :trafficPercent,
-                               aggregate_version = aggregate_version + 1
-                         WHERE tenant_id = :tenantId
-                           AND activation_id = :activationId
-                           AND aggregate_version = :expectedVersion
-                           AND status = 'ACTIVE'
-                           AND channel = 'CANARY'
-                        """)
-                .param("trafficPercent", command.trafficPercent())
-                .param("tenantId", principal.tenantId())
-                .param("activationId", command.activationId())
-                .param("expectedVersion", command.expectedVersion())
-                .update();
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        int updated = dsl.update(a)
+                .set(a.TRAFFIC_PERCENT, command.trafficPercent())
+                .set(a.AGGREGATE_VERSION, a.AGGREGATE_VERSION.plus(1))
+                .where(a.TENANT_ID.eq(principal.tenantId()))
+                .and(a.ACTIVATION_ID.eq(command.activationId()))
+                .and(a.AGGREGATE_VERSION.eq(command.expectedVersion()))
+                .and(a.STATUS.eq("ACTIVE"))
+                .and(a.CHANNEL.eq("CANARY"))
+                .execute();
         if (updated != 1) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "CANARY 流量调整版本冲突");
         }
@@ -226,23 +228,17 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
                 current.projectId().toString()), metadata.correlationId());
 
         Instant now = clock.instant();
-        int updated = jdbc.sql("""
-                        UPDATE cfg_bundle_channel_activation
-                           SET status = 'SUPERSEDED',
-                               superseded_at = :now,
-                               approval_ref = :approvalRef,
-                               aggregate_version = aggregate_version + 1
-                         WHERE tenant_id = :tenantId
-                           AND activation_id = :activationId
-                           AND status = 'ACTIVE'
-                           AND aggregate_version = :expectedVersion
-                        """)
-                .param("now", PostgresJdbcParameters.timestamptz(now))
-                .param("approvalRef", normalizedApproval)
-                .param("tenantId", principal.tenantId())
-                .param("activationId", command.activationId())
-                .param("expectedVersion", command.expectedVersion())
-                .update();
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        int updated = dsl.update(a)
+                .set(a.STATUS, "SUPERSEDED")
+                .set(a.SUPERSEDED_AT, now)
+                .set(a.APPROVAL_REF, normalizedApproval)
+                .set(a.AGGREGATE_VERSION, a.AGGREGATE_VERSION.plus(1))
+                .where(a.TENANT_ID.eq(principal.tenantId()))
+                .and(a.ACTIVATION_ID.eq(command.activationId()))
+                .and(a.STATUS.eq("ACTIVE"))
+                .and(a.AGGREGATE_VERSION.eq(command.expectedVersion()))
+                .execute();
         if (updated != 1) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "通道激活已变更，无法停用");
         }
@@ -260,35 +256,24 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
         authorization.require(principal, AuthorizationRequest.projectCapability(
                 MANAGE, principal.tenantId(), RESOURCE, projectId.toString(),
                 projectId.toString()), correlationId);
-        return jdbc.sql("""
-                        SELECT a.*, b.bundle_code, b.bundle_version
-                          FROM cfg_bundle_channel_activation a
-                          JOIN cfg_configuration_bundle b
-                            ON b.tenant_id = a.tenant_id AND b.bundle_id = a.bundle_id
-                         WHERE a.tenant_id = :tenantId AND a.project_id = :projectId
-                         ORDER BY a.activated_at DESC
-                         LIMIT 100
-                        """)
-                .param("tenantId", principal.tenantId())
-                .param("projectId", projectId)
-                .query((rs, rowNum) -> map(rs))
-                .list();
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        CfgConfigurationBundle b = CFG_CONFIGURATION_BUNDLE;
+        return viewQuery(a, b)
+                .where(a.TENANT_ID.eq(principal.tenantId()))
+                .and(a.PROJECT_ID.eq(projectId))
+                .orderBy(a.ACTIVATED_AT.desc())
+                .limit(100)
+                .fetch(this::map);
     }
 
     private void requirePublishedBundle(String tenantId, UUID projectId, UUID bundleId) {
-        Integer count = jdbc.sql("""
-                        SELECT COUNT(1) FROM cfg_configuration_bundle
-                         WHERE tenant_id = :tenantId
-                           AND project_id = :projectId
-                           AND bundle_id = :bundleId
-                           AND status = 'PUBLISHED'
-                        """)
-                .param("tenantId", tenantId)
-                .param("projectId", projectId)
-                .param("bundleId", bundleId)
-                .query(Integer.class)
-                .single();
-        if (count == null || count != 1) {
+        CfgConfigurationBundle b = CFG_CONFIGURATION_BUNDLE;
+        int count = dsl.fetchCount(b,
+                b.TENANT_ID.eq(tenantId),
+                b.PROJECT_ID.eq(projectId),
+                b.BUNDLE_ID.eq(bundleId),
+                b.STATUS.eq("PUBLISHED"));
+        if (count != 1) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
                     "通道激活必须引用同项目已发布 Bundle");
         }
@@ -300,20 +285,16 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
             String slotCode,
             int trafficPercent
     ) {
-        Integer others = jdbc.sql("""
-                        SELECT COALESCE(SUM(traffic_percent), 0)
-                          FROM cfg_bundle_channel_activation
-                         WHERE tenant_id = :tenantId
-                           AND project_id = :projectId
-                           AND channel = 'CANARY'
-                           AND status = 'ACTIVE'
-                           AND slot_code <> :slotCode
-                        """)
-                .param("tenantId", tenantId)
-                .param("projectId", projectId)
-                .param("slotCode", slotCode)
-                .query(Integer.class)
-                .single();
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        // 其它槽位流量合计；无 ACTIVE CANARY 时 SUM 为 NULL，按 0 处理（与旧 COALESCE 一致）。
+        Integer others = dsl.select(DSL.coalesce(DSL.sum(a.TRAFFIC_PERCENT), 0))
+                .from(a)
+                .where(a.TENANT_ID.eq(tenantId))
+                .and(a.PROJECT_ID.eq(projectId))
+                .and(a.CHANNEL.eq("CANARY"))
+                .and(a.STATUS.eq("ACTIVE"))
+                .and(a.SLOT_CODE.ne(slotCode))
+                .fetchSingleInto(Integer.class);
         int total = (others == null ? 0 : others) + trafficPercent;
         if (total > 100) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
@@ -327,37 +308,29 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
             BundleChannel channel,
             String slotCode
     ) {
-        return jdbc.sql("""
-                        SELECT activation_id FROM cfg_bundle_channel_activation
-                         WHERE tenant_id = :tenantId
-                           AND project_id = :projectId
-                           AND channel = :channel
-                           AND slot_code = :slotCode
-                           AND status = 'ACTIVE'
-                        """)
-                .param("tenantId", tenantId)
-                .param("projectId", projectId)
-                .param("channel", channel.name())
-                .param("slotCode", slotCode)
-                .query(UUID.class)
-                .optional()
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        return dsl.select(a.ACTIVATION_ID)
+                .from(a)
+                .where(a.TENANT_ID.eq(tenantId))
+                .and(a.PROJECT_ID.eq(projectId))
+                .and(a.CHANNEL.eq(channel.name()))
+                .and(a.SLOT_CODE.eq(slotCode))
+                .and(a.STATUS.eq("ACTIVE"))
+                .fetchOptional(a.ACTIVATION_ID)
                 .orElse(null);
     }
 
     private void supersede(String tenantId, UUID activationId, Instant now) {
-        int updated = jdbc.sql("""
-                        UPDATE cfg_bundle_channel_activation
-                           SET status = 'SUPERSEDED',
-                               superseded_at = :now,
-                               aggregate_version = aggregate_version + 1
-                         WHERE tenant_id = :tenantId
-                           AND activation_id = :activationId
-                           AND status = 'ACTIVE'
-                        """)
-                .param("now", PostgresJdbcParameters.timestamptz(now))
-                .param("tenantId", tenantId)
-                .param("activationId", activationId)
-                .update();
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        // 带状态条件的迁移：只允许 ACTIVE -> SUPERSEDED，影响行数不为 1 说明前置状态被破坏。
+        int updated = dsl.update(a)
+                .set(a.STATUS, "SUPERSEDED")
+                .set(a.SUPERSEDED_AT, now)
+                .set(a.AGGREGATE_VERSION, a.AGGREGATE_VERSION.plus(1))
+                .where(a.TENANT_ID.eq(tenantId))
+                .and(a.ACTIVATION_ID.eq(activationId))
+                .and(a.STATUS.eq("ACTIVE"))
+                .execute();
         if (updated != 1) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "通道激活已变更，无法 supersede");
         }
@@ -369,22 +342,17 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
             UUID keepActivationId,
             Instant now
     ) {
-        jdbc.sql("""
-                        UPDATE cfg_bundle_channel_activation
-                           SET status = 'SUPERSEDED',
-                               superseded_at = :now,
-                               aggregate_version = aggregate_version + 1
-                         WHERE tenant_id = :tenantId
-                           AND project_id = :projectId
-                           AND channel = 'CANARY'
-                           AND status = 'ACTIVE'
-                           AND activation_id <> :keepId
-                        """)
-                .param("now", PostgresJdbcParameters.timestamptz(now))
-                .param("tenantId", tenantId)
-                .param("projectId", projectId)
-                .param("keepId", keepActivationId)
-                .update();
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        dsl.update(a)
+                .set(a.STATUS, "SUPERSEDED")
+                .set(a.SUPERSEDED_AT, now)
+                .set(a.AGGREGATE_VERSION, a.AGGREGATE_VERSION.plus(1))
+                .where(a.TENANT_ID.eq(tenantId))
+                .and(a.PROJECT_ID.eq(projectId))
+                .and(a.CHANNEL.eq("CANARY"))
+                .and(a.STATUS.eq("ACTIVE"))
+                .and(a.ACTIVATION_ID.ne(keepActivationId))
+                .execute();
     }
 
     private void insertActive(
@@ -400,29 +368,22 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
             String actor,
             Instant now
     ) {
-        jdbc.sql("""
-                        INSERT INTO cfg_bundle_channel_activation (
-                            activation_id, tenant_id, project_id, channel, slot_code, bundle_id,
-                            previous_activation_id, status, approval_ref, traffic_percent,
-                            activated_by, activated_at, superseded_at, aggregate_version
-                        ) VALUES (
-                            :activationId, :tenantId, :projectId, :channel, :slotCode, :bundleId,
-                            :previousId, 'ACTIVE', :approvalRef, :trafficPercent,
-                            :actor, :now, NULL, 1
-                        )
-                        """)
-                .param("activationId", activationId)
-                .param("tenantId", tenantId)
-                .param("projectId", projectId)
-                .param("channel", channel.name())
-                .param("slotCode", slotCode)
-                .param("bundleId", bundleId)
-                .param("previousId", previousActivationId)
-                .param("approvalRef", approvalRef)
-                .param("trafficPercent", trafficPercent)
-                .param("actor", actor)
-                .param("now", PostgresJdbcParameters.timestamptz(now))
-                .update();
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        dsl.insertInto(a)
+                .set(a.ACTIVATION_ID, activationId)
+                .set(a.TENANT_ID, tenantId)
+                .set(a.PROJECT_ID, projectId)
+                .set(a.CHANNEL, channel.name())
+                .set(a.SLOT_CODE, slotCode)
+                .set(a.BUNDLE_ID, bundleId)
+                .set(a.PREVIOUS_ACTIVATION_ID, previousActivationId)
+                .set(a.STATUS, "ACTIVE")
+                .set(a.APPROVAL_REF, approvalRef)
+                .set(a.TRAFFIC_PERCENT, trafficPercent)
+                .set(a.ACTIVATED_BY, actor)
+                .set(a.ACTIVATED_AT, now)
+                .set(a.AGGREGATE_VERSION, 1L)
+                .execute();
     }
 
     private static int resolveTrafficPercent(BundleChannel channel, Integer trafficPercent) {
@@ -451,38 +412,50 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
     }
 
     private BundleChannelActivationView requireView(String tenantId, UUID activationId) {
-        return jdbc.sql("""
-                        SELECT a.*, b.bundle_code, b.bundle_version
-                          FROM cfg_bundle_channel_activation a
-                          JOIN cfg_configuration_bundle b
-                            ON b.tenant_id = a.tenant_id AND b.bundle_id = a.bundle_id
-                         WHERE a.tenant_id = :tenantId AND a.activation_id = :activationId
-                        """)
-                .param("tenantId", tenantId)
-                .param("activationId", activationId)
-                .query((rs, rowNum) -> map(rs))
-                .optional()
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        CfgConfigurationBundle b = CFG_CONFIGURATION_BUNDLE;
+        return viewQuery(a, b)
+                .where(a.TENANT_ID.eq(tenantId))
+                .and(a.ACTIVATION_ID.eq(activationId))
+                .fetchOptional(this::map)
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "通道激活不存在"));
     }
 
-    private BundleChannelActivationView map(java.sql.ResultSet rs) throws java.sql.SQLException {
+    private org.jooq.SelectJoinStep<Record15<
+            UUID, UUID, String, String, UUID, String, String, UUID, String, String,
+            Integer, String, Instant, Instant, Long>> viewQuery(
+            CfgBundleChannelActivation a,
+            CfgConfigurationBundle b
+    ) {
+        return dsl.select(a.ACTIVATION_ID, a.PROJECT_ID, a.CHANNEL, a.SLOT_CODE, a.BUNDLE_ID,
+                        b.BUNDLE_CODE, b.BUNDLE_VERSION, a.PREVIOUS_ACTIVATION_ID, a.STATUS,
+                        a.APPROVAL_REF, a.TRAFFIC_PERCENT, a.ACTIVATED_BY, a.ACTIVATED_AT,
+                        a.SUPERSEDED_AT, a.AGGREGATE_VERSION)
+                .from(a)
+                .join(b)
+                .on(b.TENANT_ID.eq(a.TENANT_ID))
+                .and(b.BUNDLE_ID.eq(a.BUNDLE_ID));
+    }
+
+    private BundleChannelActivationView map(Record record) {
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        CfgConfigurationBundle b = CFG_CONFIGURATION_BUNDLE;
         return new BundleChannelActivationView(
-                rs.getObject("activation_id", UUID.class),
-                rs.getObject("project_id", UUID.class),
-                BundleChannel.valueOf(rs.getString("channel")),
-                rs.getString("slot_code"),
-                rs.getObject("bundle_id", UUID.class),
-                rs.getString("bundle_code"),
-                rs.getString("bundle_version"),
-                rs.getObject("previous_activation_id", UUID.class),
-                rs.getString("status"),
-                rs.getString("approval_ref"),
-                rs.getInt("traffic_percent"),
-                rs.getString("activated_by"),
-                rs.getTimestamp("activated_at").toInstant(),
-                rs.getTimestamp("superseded_at") == null
-                        ? null : rs.getTimestamp("superseded_at").toInstant(),
-                rs.getLong("aggregate_version"));
+                record.get(a.ACTIVATION_ID),
+                record.get(a.PROJECT_ID),
+                BundleChannel.valueOf(record.get(a.CHANNEL)),
+                record.get(a.SLOT_CODE),
+                record.get(a.BUNDLE_ID),
+                record.get(b.BUNDLE_CODE),
+                record.get(b.BUNDLE_VERSION),
+                record.get(a.PREVIOUS_ACTIVATION_ID),
+                record.get(a.STATUS),
+                record.get(a.APPROVAL_REF),
+                record.get(a.TRAFFIC_PERCENT),
+                record.get(a.ACTIVATED_BY),
+                record.get(a.ACTIVATED_AT),
+                record.get(a.SUPERSEDED_AT),
+                record.get(a.AGGREGATE_VERSION));
     }
 
     private static String requireText(String value, String field, int max) {

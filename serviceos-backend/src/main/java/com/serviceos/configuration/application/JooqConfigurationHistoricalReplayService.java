@@ -14,9 +14,10 @@ import com.serviceos.configuration.api.ExpressionContext;
 import com.serviceos.configuration.api.RunConfigurationHistoricalReplayCommand;
 import com.serviceos.configuration.api.RunConfigurationSimulationCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.CfgConfigurationBundle;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,28 +26,30 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import static com.serviceos.jooq.generated.tables.CfgConfigurationBundle.CFG_CONFIGURATION_BUNDLE;
+
 /**
- * 历史回放：只读取已发布 Bundle 冻结清单中的 WORKFLOW，再委托干跑模拟。
+ * 历史回放：只读取已发布 Bundle 冻结清单中的 WORKFLOW，再委托干跑模拟（jOOQ）。
  *
  * <p>不读取草稿、不读取当前通道激活、不写运行时表。</p>
  */
 @Service
-final class DefaultConfigurationHistoricalReplayService implements ConfigurationHistoricalReplayService {
+final class JooqConfigurationHistoricalReplayService implements ConfigurationHistoricalReplayService {
     private static final String WRITE = "configuration.draft.write";
     private static final String RESOURCE = "ConfigurationHistoricalReplay";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final AuthorizationService authorization;
     private final ConfigurationService configurations;
     private final ConfigurationWorkflowSimulationService simulations;
 
-    DefaultConfigurationHistoricalReplayService(
-            JdbcClient jdbc,
+    JooqConfigurationHistoricalReplayService(
+            DSLContext dsl,
             AuthorizationService authorization,
             ConfigurationService configurations,
             ConfigurationWorkflowSimulationService simulations
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.authorization = authorization;
         this.configurations = configurations;
         this.simulations = simulations;
@@ -125,21 +128,14 @@ final class DefaultConfigurationHistoricalReplayService implements Configuration
     }
 
     private BundleRow loadPublishedBundle(String tenantId, UUID bundleId) {
-        return jdbc.sql("""
-                        SELECT bundle_id, bundle_code, bundle_version, manifest_digest
-                          FROM cfg_configuration_bundle
-                         WHERE tenant_id = :tenantId
-                           AND bundle_id = :bundleId
-                           AND status = 'PUBLISHED'
-                        """)
-                .param("tenantId", tenantId)
-                .param("bundleId", bundleId)
-                .query((rs, rowNum) -> new BundleRow(
-                        rs.getObject("bundle_id", UUID.class),
-                        rs.getString("bundle_code"),
-                        rs.getString("bundle_version"),
-                        rs.getString("manifest_digest")))
-                .optional()
+        CfgConfigurationBundle b = CFG_CONFIGURATION_BUNDLE;
+        return dsl.select(b.BUNDLE_ID, b.BUNDLE_CODE, b.BUNDLE_VERSION, b.MANIFEST_DIGEST)
+                .from(b)
+                .where(b.TENANT_ID.eq(tenantId))
+                .and(b.BUNDLE_ID.eq(bundleId))
+                .and(b.STATUS.eq("PUBLISHED"))
+                .fetchOptional(record -> new BundleRow(
+                        record.value1(), record.value2(), record.value3(), record.value4()))
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND,
                         "未找到已发布 Bundle: " + bundleId));
     }

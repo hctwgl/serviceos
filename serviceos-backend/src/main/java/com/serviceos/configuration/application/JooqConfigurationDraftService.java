@@ -18,12 +18,17 @@ import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.UpdateConfigurationDraftCommand;
 import com.serviceos.configuration.infrastructure.ConfigurationAssetSchemaValidator;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.CfgConfigurationAssetClientTarget;
+import com.serviceos.jooq.generated.tables.CfgConfigurationAssetDraft;
+import com.serviceos.jooq.generated.tables.CfgConfigurationAssetVersion;
+import com.serviceos.jooq.generated.tables.records.CfgConfigurationAssetDraftRecord;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
-import com.serviceos.shared.infrastructure.PostgresJdbcParameters;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
+import org.jooq.UpdateConditionStep;
+import org.jooq.UpdateSetMoreStep;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -36,14 +41,18 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.serviceos.jooq.generated.tables.CfgConfigurationAssetClientTarget.CFG_CONFIGURATION_ASSET_CLIENT_TARGET;
+import static com.serviceos.jooq.generated.tables.CfgConfigurationAssetDraft.CFG_CONFIGURATION_ASSET_DRAFT;
+import static com.serviceos.jooq.generated.tables.CfgConfigurationAssetVersion.CFG_CONFIGURATION_ASSET_VERSION;
+
 /**
- * 配置设计器草稿服务。
+ * 配置设计器草稿服务（jOOQ）。
  *
  * <p>事务边界：草稿写/审批/发布同事务；发布成功后标记 PUBLISHED 并绑定不可变 versionId。
  * 生命周期：DRAFT → VALIDATED → APPROVED → PUBLISHED。其余资产类型失败关闭。</p>
  */
 @Service
-final class DefaultConfigurationDraftService implements ConfigurationDraftService {
+final class JooqConfigurationDraftService implements ConfigurationDraftService {
     private static final String WRITE = "configuration.draft.write";
     private static final String APPROVE = "configuration.approve";
     private static final String PUBLISH = "configuration.publish";
@@ -61,7 +70,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
             ConfigurationAssetType.PRICING,
             ConfigurationAssetType.CALENDAR);
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final AuthorizationService authorization;
     private final ConfigurationService configurations;
     private final ConfigurationAssetSchemaValidator schemaValidator;
@@ -70,8 +79,8 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
-    DefaultConfigurationDraftService(
-            JdbcClient jdbc,
+    JooqConfigurationDraftService(
+            DSLContext dsl,
             AuthorizationService authorization,
             ConfigurationService configurations,
             ConfigurationAssetSchemaValidator schemaValidator,
@@ -80,7 +89,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
             ObjectMapper objectMapper,
             Clock clock
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.authorization = authorization;
         this.configurations = configurations;
         this.schemaValidator = schemaValidator;
@@ -115,32 +124,26 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         UUID baseVersionId = command.baseVersionId() != null
                 ? command.baseVersionId()
                 : findLatestPublishedVersionId(principal.tenantId(), command.assetType(), assetKey);
-        jdbc.sql("""
-                        INSERT INTO cfg_configuration_asset_draft (
-                            draft_id, tenant_id, asset_type, asset_key, intended_semantic_version,
-                            schema_version, definition, content_digest, status, base_version_id,
-                            published_version_id, validation_errors, aggregate_version,
-                            created_by, updated_by, created_at, updated_at, supported_client_kinds
-                        ) VALUES (
-                            :draftId, :tenantId, :assetType, :assetKey, :semanticVersion,
-                            :schemaVersion, CAST(:definition AS jsonb), :digest, 'DRAFT', :baseVersionId,
-                            NULL, NULL, 1, :actor, :actor, :now, :now,
-                            CAST(:supportedClientKinds AS jsonb)
-                        )
-                        """)
-                .param("draftId", draftId)
-                .param("tenantId", principal.tenantId())
-                .param("assetType", command.assetType().name())
-                .param("assetKey", assetKey)
-                .param("semanticVersion", semanticVersion)
-                .param("schemaVersion", schemaVersion)
-                .param("definition", definition)
-                .param("digest", digest)
-                .param("baseVersionId", baseVersionId)
-                .param("actor", principal.principalId())
-                .param("now", PostgresJdbcParameters.timestamptz(now))
-                .param("supportedClientKinds", writeKindsJson(supportedKinds))
-                .update();
+        CfgConfigurationAssetDraft t = CFG_CONFIGURATION_ASSET_DRAFT;
+        // definition/supported_client_kinds 由 JsonbStringConverter 绑定 String -> JSONB，无需 CAST。
+        dsl.insertInto(t)
+                .set(t.DRAFT_ID, draftId)
+                .set(t.TENANT_ID, principal.tenantId())
+                .set(t.ASSET_TYPE, command.assetType().name())
+                .set(t.ASSET_KEY, assetKey)
+                .set(t.INTENDED_SEMANTIC_VERSION, semanticVersion)
+                .set(t.SCHEMA_VERSION, schemaVersion)
+                .set(t.DEFINITION, definition)
+                .set(t.CONTENT_DIGEST, digest)
+                .set(t.STATUS, "DRAFT")
+                .set(t.BASE_VERSION_ID, baseVersionId)
+                .set(t.AGGREGATE_VERSION, 1L)
+                .set(t.CREATED_BY, principal.principalId())
+                .set(t.UPDATED_BY, principal.principalId())
+                .set(t.CREATED_AT, now)
+                .set(t.UPDATED_AT, now)
+                .set(t.SUPPORTED_CLIENT_KINDS, writeKindsJson(supportedKinds))
+                .execute();
         return enrich(requireDraft(principal.tenantId(), draftId));
     }
 
@@ -171,39 +174,28 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         List<String> supportedKinds = updateKinds
                 ? normalizeSupportedClientKinds(command.supportedClientKinds())
                 : null;
-        // 编辑会使审批失效，强制回到 DRAFT。
-        int updated = jdbc.sql("""
-                        UPDATE cfg_configuration_asset_draft
-                           SET definition = CAST(:definition AS jsonb),
-                               content_digest = :digest,
-                               status = 'DRAFT',
-                               validation_errors = NULL,
-                               approval_ref = NULL,
-                               approved_by = NULL,
-                               approved_at = NULL,
-                               supported_client_kinds = CASE
-                                   WHEN CAST(:updateKinds AS boolean)
-                                       THEN CAST(:supportedClientKinds AS jsonb)
-                                   ELSE supported_client_kinds
-                               END,
-                               aggregate_version = aggregate_version + 1,
-                               updated_by = :actor,
-                               updated_at = :now
-                         WHERE tenant_id = :tenantId
-                           AND draft_id = :draftId
-                           AND aggregate_version = :expectedVersion
-                           AND status IN ('DRAFT', 'VALIDATED', 'APPROVED')
-                        """)
-                .param("definition", definition)
-                .param("digest", digest)
-                .param("updateKinds", updateKinds)
-                .param("supportedClientKinds", writeKindsJson(supportedKinds))
-                .param("actor", principal.principalId())
-                .param("now", PostgresJdbcParameters.timestamptz(now))
-                .param("tenantId", principal.tenantId())
-                .param("draftId", command.draftId())
-                .param("expectedVersion", command.expectedVersion())
-                .update();
+        CfgConfigurationAssetDraft t = CFG_CONFIGURATION_ASSET_DRAFT;
+        // 编辑会使审批失效，强制回到 DRAFT。定向目标仅在调用方显式携带时覆盖（旧 CASE WHEN 语义）。
+        UpdateSetMoreStep<CfgConfigurationAssetDraftRecord> update = dsl.update(t)
+                .set(t.DEFINITION, definition)
+                .set(t.CONTENT_DIGEST, digest)
+                .set(t.STATUS, "DRAFT")
+                .set(t.VALIDATION_ERRORS, (String) null)
+                .set(t.APPROVAL_REF, (String) null)
+                .set(t.APPROVED_BY, (String) null)
+                .set(t.APPROVED_AT, (Instant) null)
+                .set(t.AGGREGATE_VERSION, t.AGGREGATE_VERSION.plus(1))
+                .set(t.UPDATED_BY, principal.principalId())
+                .set(t.UPDATED_AT, now);
+        if (updateKinds) {
+            update.set(t.SUPPORTED_CLIENT_KINDS, writeKindsJson(supportedKinds));
+        }
+        UpdateConditionStep<CfgConfigurationAssetDraftRecord> conditioned = update
+                .where(t.TENANT_ID.eq(principal.tenantId()))
+                .and(t.DRAFT_ID.eq(command.draftId()))
+                .and(t.AGGREGATE_VERSION.eq(command.expectedVersion()))
+                .and(t.STATUS.in("DRAFT", "VALIDATED", "APPROVED"));
+        int updated = conditioned.execute();
         if (updated != 1) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "配置草稿版本冲突或状态已变更");
         }
@@ -230,18 +222,14 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         requireDesignerSupported(assetType);
         authorization.require(principal, AuthorizationRequest.tenantCapability(
                 WRITE, principal.tenantId(), RESOURCE, assetType.name()), correlationId);
-        return jdbc.sql("""
-                        SELECT * FROM cfg_configuration_asset_draft
-                         WHERE tenant_id = :tenantId
-                           AND asset_type = :assetType
-                           AND status IN ('DRAFT', 'VALIDATED', 'APPROVED', 'PUBLISHED')
-                         ORDER BY updated_at DESC
-                         LIMIT 100
-                        """)
-                .param("tenantId", principal.tenantId())
-                .param("assetType", assetType.name())
-                .query((rs, rowNum) -> map(rs))
-                .list()
+        CfgConfigurationAssetDraft t = CFG_CONFIGURATION_ASSET_DRAFT;
+        return dsl.selectFrom(t)
+                .where(t.TENANT_ID.eq(principal.tenantId()))
+                .and(t.ASSET_TYPE.eq(assetType.name()))
+                .and(t.STATUS.in("DRAFT", "VALIDATED", "APPROVED", "PUBLISHED"))
+                .orderBy(t.UPDATED_AT.desc())
+                .limit(100)
+                .fetch(this::map)
                 .stream()
                 .map(this::enrich)
                 .toList();
@@ -283,24 +271,17 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         }
 
         Instant now = clock.instant();
-        jdbc.sql("""
-                        UPDATE cfg_configuration_asset_draft
-                           SET status = :status,
-                               validation_errors = CAST(:errors AS jsonb),
-                               aggregate_version = aggregate_version + 1,
-                               updated_by = :actor,
-                               updated_at = :now
-                         WHERE tenant_id = :tenantId
-                           AND draft_id = :draftId
-                           AND status IN ('DRAFT', 'VALIDATED')
-                        """)
-                .param("status", nextStatus)
-                .param("errors", writeJson(errors))
-                .param("actor", principal.principalId())
-                .param("now", PostgresJdbcParameters.timestamptz(now))
-                .param("tenantId", principal.tenantId())
-                .param("draftId", draftId)
-                .update();
+        CfgConfigurationAssetDraft t = CFG_CONFIGURATION_ASSET_DRAFT;
+        dsl.update(t)
+                .set(t.STATUS, nextStatus)
+                .set(t.VALIDATION_ERRORS, writeJson(errors))
+                .set(t.AGGREGATE_VERSION, t.AGGREGATE_VERSION.plus(1))
+                .set(t.UPDATED_BY, principal.principalId())
+                .set(t.UPDATED_AT, now)
+                .where(t.TENANT_ID.eq(principal.tenantId()))
+                .and(t.DRAFT_ID.eq(draftId))
+                .and(t.STATUS.in("DRAFT", "VALIDATED"))
+                .execute();
         ConfigurationDraftView result = enrich(requireDraft(principal.tenantId(), draftId));
         auditCapability("CONFIGURATION_DRAFT_CLIENT_COMPAT_VALIDATED",
                 principal, metadata.correlationId(), result, compatibility,
@@ -356,27 +337,20 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                 APPROVE, principal.tenantId(), RESOURCE, command.draftId().toString()),
                 metadata.correlationId());
         Instant now = clock.instant();
-        int updated = jdbc.sql("""
-                        UPDATE cfg_configuration_asset_draft
-                           SET status = 'APPROVED',
-                               approval_ref = :approvalRef,
-                               approved_by = :actor,
-                               approved_at = :now,
-                               aggregate_version = aggregate_version + 1,
-                               updated_by = :actor,
-                               updated_at = :now
-                         WHERE tenant_id = :tenantId
-                           AND draft_id = :draftId
-                           AND aggregate_version = :expectedVersion
-                           AND status = 'VALIDATED'
-                        """)
-                .param("approvalRef", approvalRef)
-                .param("actor", principal.principalId())
-                .param("now", PostgresJdbcParameters.timestamptz(now))
-                .param("tenantId", principal.tenantId())
-                .param("draftId", command.draftId())
-                .param("expectedVersion", command.expectedVersion())
-                .update();
+        CfgConfigurationAssetDraft t = CFG_CONFIGURATION_ASSET_DRAFT;
+        int updated = dsl.update(t)
+                .set(t.STATUS, "APPROVED")
+                .set(t.APPROVAL_REF, approvalRef)
+                .set(t.APPROVED_BY, principal.principalId())
+                .set(t.APPROVED_AT, now)
+                .set(t.AGGREGATE_VERSION, t.AGGREGATE_VERSION.plus(1))
+                .set(t.UPDATED_BY, principal.principalId())
+                .set(t.UPDATED_AT, now)
+                .where(t.TENANT_ID.eq(principal.tenantId()))
+                .and(t.DRAFT_ID.eq(command.draftId()))
+                .and(t.AGGREGATE_VERSION.eq(command.expectedVersion()))
+                .and(t.STATUS.eq("VALIDATED"))
+                .execute();
         if (updated != 1) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "配置草稿审批时版本或状态冲突");
         }
@@ -426,23 +400,17 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                 principal.tenantId(), published.versionId(), current.supportedClientKinds());
 
         Instant now = clock.instant();
-        int updated = jdbc.sql("""
-                        UPDATE cfg_configuration_asset_draft
-                           SET status = 'PUBLISHED',
-                               published_version_id = :versionId,
-                               aggregate_version = aggregate_version + 1,
-                               updated_by = :actor,
-                               updated_at = :now
-                         WHERE tenant_id = :tenantId
-                           AND draft_id = :draftId
-                           AND status = 'APPROVED'
-                        """)
-                .param("versionId", published.versionId())
-                .param("actor", principal.principalId())
-                .param("now", PostgresJdbcParameters.timestamptz(now))
-                .param("tenantId", principal.tenantId())
-                .param("draftId", draftId)
-                .update();
+        CfgConfigurationAssetDraft t = CFG_CONFIGURATION_ASSET_DRAFT;
+        int updated = dsl.update(t)
+                .set(t.STATUS, "PUBLISHED")
+                .set(t.PUBLISHED_VERSION_ID, published.versionId())
+                .set(t.AGGREGATE_VERSION, t.AGGREGATE_VERSION.plus(1))
+                .set(t.UPDATED_BY, principal.principalId())
+                .set(t.UPDATED_AT, now)
+                .where(t.TENANT_ID.eq(principal.tenantId()))
+                .and(t.DRAFT_ID.eq(draftId))
+                .and(t.STATUS.eq("APPROVED"))
+                .execute();
         if (updated != 1) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "配置草稿发布时状态已变更");
         }
@@ -453,40 +421,37 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
     }
 
     private ConfigurationDraftView requireDraft(String tenantId, UUID draftId) {
-        return jdbc.sql("""
-                        SELECT * FROM cfg_configuration_asset_draft
-                         WHERE tenant_id = :tenantId AND draft_id = :draftId
-                        """)
-                .param("tenantId", tenantId)
-                .param("draftId", draftId)
-                .query((rs, rowNum) -> map(rs))
-                .optional()
+        CfgConfigurationAssetDraft t = CFG_CONFIGURATION_ASSET_DRAFT;
+        return dsl.selectFrom(t)
+                .where(t.TENANT_ID.eq(tenantId))
+                .and(t.DRAFT_ID.eq(draftId))
+                .fetchOptional(this::map)
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "配置草稿不存在"));
     }
 
-    private ConfigurationDraftView map(java.sql.ResultSet rs) throws java.sql.SQLException {
+    private ConfigurationDraftView map(CfgConfigurationAssetDraftRecord record) {
+        CfgConfigurationAssetDraft t = CFG_CONFIGURATION_ASSET_DRAFT;
         return new ConfigurationDraftView(
-                rs.getObject("draft_id", UUID.class),
-                ConfigurationAssetType.valueOf(rs.getString("asset_type")),
-                rs.getString("asset_key"),
-                rs.getString("intended_semantic_version"),
-                rs.getString("schema_version"),
-                rs.getString("definition"),
-                rs.getString("content_digest"),
-                rs.getString("status"),
-                rs.getObject("base_version_id", UUID.class),
-                rs.getObject("published_version_id", UUID.class),
-                readErrors(rs.getString("validation_errors")),
-                rs.getString("approval_ref"),
-                rs.getString("approved_by"),
-                rs.getTimestamp("approved_at") == null
-                        ? null : rs.getTimestamp("approved_at").toInstant(),
-                rs.getLong("aggregate_version"),
-                rs.getString("created_by"),
-                rs.getString("updated_by"),
-                rs.getTimestamp("created_at").toInstant(),
-                rs.getTimestamp("updated_at").toInstant(),
-                readKinds(rs.getString("supported_client_kinds")),
+                record.get(t.DRAFT_ID),
+                ConfigurationAssetType.valueOf(record.get(t.ASSET_TYPE)),
+                record.get(t.ASSET_KEY),
+                record.get(t.INTENDED_SEMANTIC_VERSION),
+                record.get(t.SCHEMA_VERSION),
+                record.get(t.DEFINITION),
+                record.get(t.CONTENT_DIGEST),
+                record.get(t.STATUS),
+                record.get(t.BASE_VERSION_ID),
+                record.get(t.PUBLISHED_VERSION_ID),
+                readErrors(record.get(t.VALIDATION_ERRORS)),
+                record.get(t.APPROVAL_REF),
+                record.get(t.APPROVED_BY),
+                record.get(t.APPROVED_AT),
+                record.get(t.AGGREGATE_VERSION),
+                record.get(t.CREATED_BY),
+                record.get(t.UPDATED_BY),
+                record.get(t.CREATED_AT),
+                record.get(t.UPDATED_AT),
+                readKinds(record.get(t.SUPPORTED_CLIENT_KINDS)),
                 null);
     }
 
@@ -503,17 +468,12 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         if (kinds == null) {
             return;
         }
-        jdbc.sql("""
-                        INSERT INTO cfg_configuration_asset_client_target (
-                            version_id, tenant_id, supported_client_kinds
-                        ) VALUES (
-                            :versionId, :tenantId, CAST(:kinds AS jsonb)
-                        )
-                        """)
-                .param("versionId", versionId)
-                .param("tenantId", tenantId)
-                .param("kinds", writeKindsJson(kinds))
-                .update();
+        CfgConfigurationAssetClientTarget t = CFG_CONFIGURATION_ASSET_CLIENT_TARGET;
+        dsl.insertInto(t)
+                .set(t.VERSION_ID, versionId)
+                .set(t.TENANT_ID, tenantId)
+                .set(t.SUPPORTED_CLIENT_KINDS, writeKindsJson(kinds))
+                .execute();
     }
 
     /**
@@ -591,34 +551,27 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
             ConfigurationAssetType assetType,
             String assetKey
     ) {
-        return jdbc.sql("""
-                        SELECT version_id
-                          FROM cfg_configuration_asset_version
-                         WHERE tenant_id = :tenantId
-                           AND asset_type = :assetType
-                           AND asset_key = :assetKey
-                           AND status = 'PUBLISHED'
-                         ORDER BY published_at DESC
-                         LIMIT 1
-                        """)
-                .param("tenantId", tenantId)
-                .param("assetType", assetType.name())
-                .param("assetKey", assetKey)
-                .query(UUID.class)
-                .optional()
+        CfgConfigurationAssetVersion v = CFG_CONFIGURATION_ASSET_VERSION;
+        return dsl.select(v.VERSION_ID)
+                .from(v)
+                .where(v.TENANT_ID.eq(tenantId))
+                .and(v.ASSET_TYPE.eq(assetType.name()))
+                .and(v.ASSET_KEY.eq(assetKey))
+                .and(v.STATUS.eq("PUBLISHED"))
+                .orderBy(v.PUBLISHED_AT.desc())
+                .limit(1)
+                .fetchOptional(v.VERSION_ID)
                 .orElse(null);
     }
 
     private String loadPublishedDefinition(String tenantId, UUID versionId) {
-        return jdbc.sql("""
-                        SELECT definition::text
-                          FROM cfg_configuration_asset_version
-                         WHERE tenant_id = :tenantId AND version_id = :versionId
-                        """)
-                .param("tenantId", tenantId)
-                .param("versionId", versionId)
-                .query(String.class)
-                .optional()
+        CfgConfigurationAssetVersion v = CFG_CONFIGURATION_ASSET_VERSION;
+        // definition 列经 JsonbStringConverter 直接映射为 String，无需 ::text。
+        return dsl.select(v.DEFINITION)
+                .from(v)
+                .where(v.TENANT_ID.eq(tenantId))
+                .and(v.VERSION_ID.eq(versionId))
+                .fetchOptional(v.DEFINITION)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "基线发布版本不存在"));
     }
