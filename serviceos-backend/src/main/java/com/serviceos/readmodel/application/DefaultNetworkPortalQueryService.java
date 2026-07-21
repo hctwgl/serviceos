@@ -851,6 +851,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
 
     /**
      * M228：NETWORK technician.readOwnNetwork 已 soft-gate；仅返回工作区 technicianId 命中项。
+     * M421：摘要复用开放任务/资质计数，避免列表与 fan-in 口径分裂。
      */
     private List<NetworkPortalTechnicianItem> loadTechnicianSummaries(
             String tenantId,
@@ -860,23 +861,88 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         if (wantedTechnicianIds.isEmpty()) {
             return List.of();
         }
+        Map<String, Integer> openTaskCounts = openTaskCountsForNetwork(tenantId, networkId);
+        Map<UUID, int[]> qualificationCounts = qualificationCountsForNetwork(tenantId, networkId);
         return technicians.listActiveTechnicians(tenantId, networkId).stream()
                 .filter(row -> wantedTechnicianIds.contains(row.technicianProfileId().toString()))
-                .map(row -> new NetworkPortalTechnicianItem(
-                        row.membershipId(),
-                        row.technicianProfileId(),
-                        row.principalId(),
-                        row.displayName(),
-                        row.profileStatus(),
-                        row.membershipStatus(),
-                        row.validFrom(),
-                        row.validTo(),
-                        row.membershipVersion()))
+                .map(row -> toTechnicianItem(row, openTaskCounts, qualificationCounts))
                 .sorted(Comparator
                         .comparing(NetworkPortalTechnicianItem::displayName,
                                 Comparator.nullsLast(String::compareTo))
                         .thenComparing(NetworkPortalTechnicianItem::technicianProfileId))
                 .toList();
+    }
+
+    /**
+     * 本网点 ACTIVE NETWORK 责任任务上已指派师傅的开放任务计数；键为 technicianProfileId 字符串。
+     */
+    private Map<String, Integer> openTaskCountsForNetwork(String tenantId, UUID networkId) {
+        Map<String, Integer> openTaskCounts = new LinkedHashMap<>();
+        for (NetworkActiveAssignmentView row : assignments.listActiveForNetwork(
+                tenantId, networkId.toString())) {
+            if (row.technicianId() != null && !row.technicianId().isBlank()) {
+                openTaskCounts.merge(row.technicianId(), 1, Integer::sum);
+            }
+        }
+        return openTaskCounts;
+    }
+
+    /**
+     * 本网点 ACTIVE 师傅资质计数：index0=已通过（APPROVED/VALID/ACTIVE），index1=PENDING。
+     */
+    private Map<UUID, int[]> qualificationCountsForNetwork(String tenantId, UUID networkId) {
+        Map<UUID, int[]> qualificationCounts = new LinkedHashMap<>();
+        for (TechnicianQualificationView row : qualifications.listForActiveTechnicians(
+                tenantId, networkId)) {
+            int[] counts = qualificationCounts.computeIfAbsent(
+                    row.technicianProfileId(), ignored -> new int[2]);
+            if ("APPROVED".equals(row.status())
+                    || "VALID".equals(row.status())
+                    || "ACTIVE".equals(row.status())) {
+                counts[0]++;
+            } else if ("PENDING".equals(row.status())) {
+                counts[1]++;
+            }
+        }
+        return qualificationCounts;
+    }
+
+    private static String formatQualificationSummary(int approved, int pending) {
+        if (approved > 0 && pending == 0) {
+            return "已通过资质 " + approved + " 项";
+        }
+        if (approved > 0) {
+            return "已通过 " + approved + " 项，待审 " + pending + " 项";
+        }
+        if (pending > 0) {
+            return "仅有待审资质 " + pending + " 项";
+        }
+        return "无资质记录";
+    }
+
+    private static NetworkPortalTechnicianItem toTechnicianItem(
+            NetworkPortalTechnicianView row,
+            Map<String, Integer> openTaskCounts,
+            Map<UUID, int[]> qualificationCounts
+    ) {
+        int openTasks = openTaskCounts.getOrDefault(row.technicianProfileId().toString(), 0);
+        int[] quals = qualificationCounts.getOrDefault(row.technicianProfileId(), new int[2]);
+        int approved = quals[0];
+        int pending = quals[1];
+        return new NetworkPortalTechnicianItem(
+                row.membershipId(),
+                row.technicianProfileId(),
+                row.principalId(),
+                row.displayName(),
+                row.profileStatus(),
+                row.membershipStatus(),
+                row.validFrom(),
+                row.validTo(),
+                row.membershipVersion(),
+                openTasks,
+                approved,
+                pending,
+                formatQualificationSummary(approved, pending));
     }
 
     private NetworkPortalWorkspaceCorrectionCaseSummary toCorrectionCaseSummary(
@@ -1028,18 +1094,11 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             CurrentPrincipal actor, String correlationId, String networkContextHeader
     ) {
         UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, TECHNICIAN_READ_OWN);
-        List<NetworkPortalTechnicianView> rows = technicians.listActiveTechnicians(actor.tenantId(), networkId);
-        List<NetworkPortalTechnicianItem> items = rows.stream()
-                .map(row -> new NetworkPortalTechnicianItem(
-                        row.membershipId(),
-                        row.technicianProfileId(),
-                        row.principalId(),
-                        row.displayName(),
-                        row.profileStatus(),
-                        row.membershipStatus(),
-                        row.validFrom(),
-                        row.validTo(),
-                        row.membershipVersion()))
+        Map<String, Integer> openTaskCounts = openTaskCountsForNetwork(actor.tenantId(), networkId);
+        Map<UUID, int[]> qualificationCounts = qualificationCountsForNetwork(actor.tenantId(), networkId);
+        List<NetworkPortalTechnicianItem> items = technicians.listActiveTechnicians(actor.tenantId(), networkId)
+                .stream()
+                .map(row -> toTechnicianItem(row, openTaskCounts, qualificationCounts))
                 .toList();
         return new NetworkPortalPage<>(networkId, items, clock.instant());
     }
@@ -1059,13 +1118,11 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         List<NetworkActiveAssignmentView> active = assignments.listActiveForNetwork(
                 actor.tenantId(), networkId.toString());
         NetworkActiveAssignmentView taskAssignment = null;
-        Map<String, Integer> openTaskCounts = new LinkedHashMap<>();
+        Map<String, Integer> openTaskCounts = openTaskCountsForNetwork(actor.tenantId(), networkId);
         for (NetworkActiveAssignmentView row : active) {
             if (taskId.equals(row.taskId())) {
                 taskAssignment = row;
-            }
-            if (row.technicianId() != null && !row.technicianId().isBlank()) {
-                openTaskCounts.merge(row.technicianId(), 1, Integer::sum);
+                break;
             }
         }
         if (taskAssignment == null) {
@@ -1080,17 +1137,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             }
         }
 
-        Map<UUID, int[]> qualificationCounts = new LinkedHashMap<>();
-        for (TechnicianQualificationView row : qualifications.listForActiveTechnicians(
-                actor.tenantId(), networkId)) {
-            int[] counts = qualificationCounts.computeIfAbsent(
-                    row.technicianProfileId(), ignored -> new int[2]);
-            if ("APPROVED".equals(row.status()) || "VALID".equals(row.status()) || "ACTIVE".equals(row.status())) {
-                counts[0]++;
-            } else if ("PENDING".equals(row.status())) {
-                counts[1]++;
-            }
-        }
+        Map<UUID, int[]> qualificationCounts = qualificationCountsForNetwork(actor.tenantId(), networkId);
 
         NetworkPortalCapacityItem capacityHint = null;
         for (NetworkPortalCapacityItem row : capacityItems(actor.tenantId(), networkId)) {
@@ -1204,17 +1251,12 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             if (!assignable) {
                 warnings.add("师傅关系或档案非 ACTIVE，不可分配");
             }
-            String qualificationSummary;
-            if (approved > 0 && pending == 0) {
-                qualificationSummary = "已通过资质 " + approved + " 项";
-            } else if (approved > 0) {
-                qualificationSummary = "已通过 " + approved + " 项，待审 " + pending + " 项";
+            String qualificationSummary = formatQualificationSummary(approved, pending);
+            if (approved > 0 && pending > 0) {
                 warnings.add("存在待审资质，请确认业务是否允许分配");
-            } else if (pending > 0) {
-                qualificationSummary = "仅有待审资质 " + pending + " 项";
+            } else if (approved == 0 && pending > 0) {
                 warnings.add("尚无已通过资质");
-            } else {
-                qualificationSummary = "无资质记录";
+            } else if (approved == 0) {
                 warnings.add("无资质记录");
             }
             if (capacityHint != null && capacityHint.availableUnits() <= 0) {

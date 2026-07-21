@@ -12,6 +12,14 @@ export type NetworkPortalTechnicianItem = {
   validTo: string | null
   /** M206：ACTIVE 关系乐观版本（附加字段，terminate 亦可从 memberships 列表取） */
   membershipVersion?: number
+  /** M421：本网点 ACTIVE 责任开放任务数（对齐 assign-candidates） */
+  openTaskCount: number
+  /** M421：已通过资质数 */
+  approvedQualificationCount: number
+  /** M421：待审资质数 */
+  pendingQualificationCount: number
+  /** M421：中文资质摘要 */
+  qualificationSummary: string
 }
 
 /** M227/M231：预约摘要（对齐 Admin WorkOrderWorkspaceAppointmentSummary）。 */

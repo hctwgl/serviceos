@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.86
+  version: 1.0.87
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -1841,6 +1841,7 @@ paths:
       summary: Network Portal 本网点师傅列表
       description: |
         M194：X-Network-Context + technician.readOwnNetwork。仅 ACTIVE NetworkTechnicianMembership。
+        M421：items 含开放任务数与资质计数/摘要（口径对齐 assign-candidates；不伪造技能/服务区域）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -8098,7 +8099,19 @@ components:
     NetworkPortalTechnicianItem:
       type: object
       additionalProperties: false
-      required: [membershipId, technicianProfileId, principalId, displayName, profileStatus, membershipStatus, validFrom, membershipVersion]
+      required:
+        - membershipId
+        - technicianProfileId
+        - principalId
+        - displayName
+        - profileStatus
+        - membershipStatus
+        - validFrom
+        - membershipVersion
+        - openTaskCount
+        - approvedQualificationCount
+        - pendingQualificationCount
+        - qualificationSummary
       properties:
         membershipId: { type: string, format: uuid }
         technicianProfileId: { type: string, format: uuid }
@@ -8113,6 +8126,25 @@ components:
           format: int64
           minimum: 1
           description: M206 附加：ACTIVE 关系乐观版本，可供 terminate If-Match
+        openTaskCount:
+          type: integer
+          minimum: 0
+          description: |
+            M421：本网点 ACTIVE NETWORK 责任任务中已指派该师傅的开放任务数；
+            口径与 assign-candidates.openTaskCount 一致。
+        approvedQualificationCount:
+          type: integer
+          minimum: 0
+          description: M421：已通过资质数（APPROVED/VALID/ACTIVE）
+        pendingQualificationCount:
+          type: integer
+          minimum: 0
+          description: M421：待审资质数（PENDING）
+        qualificationSummary:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: M421：中文资质摘要（与分配候选同源格式化）
     NetworkPortalTechnicianPage:
       type: object
       additionalProperties: false

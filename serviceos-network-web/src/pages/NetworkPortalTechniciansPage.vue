@@ -36,6 +36,11 @@ const qualValidTo = ref('')
 const summaryItems = computed<SummaryStripItem[]>(() => {
   const active = items.value.filter((item) => item.membershipStatus === 'ACTIVE').length
   const profileActive = items.value.filter((item) => item.profileStatus === 'ACTIVE').length
+  const openTasks = items.value.reduce((sum, item) => sum + (item.openTaskCount ?? 0), 0)
+  const pendingQuals = items.value.reduce(
+    (sum, item) => sum + (item.pendingQualificationCount ?? 0),
+    0,
+  )
   return [
     {
       key: 'active',
@@ -48,6 +53,19 @@ const summaryItems = computed<SummaryStripItem[]>(() => {
       label: '档案启用',
       value: profileActive,
       testId: 'technicians-summary-profile-active',
+    },
+    {
+      key: 'openTasks',
+      label: '开放任务',
+      value: openTasks,
+      testId: 'technicians-summary-open-tasks',
+    },
+    {
+      key: 'pendingQuals',
+      label: '待审资质',
+      value: pendingQuals,
+      to: '/network-portal/qualifications',
+      testId: 'technicians-summary-pending-qualifications',
     },
     {
       key: 'qual',
@@ -198,6 +216,8 @@ watch(
               <th>师傅</th>
               <th>主体</th>
               <th>档案 / 关系</th>
+              <th>开放任务</th>
+              <th>资质</th>
               <th>有效期</th>
               <th>版本</th>
               <th>操作</th>
@@ -224,6 +244,14 @@ watch(
               <td>
                 {{ statusLabel(item.profileStatus) }} /
                 {{ statusLabel(item.membershipStatus) }}
+              </td>
+              <td data-testid="technician-open-task-count">{{ item.openTaskCount ?? 0 }}</td>
+              <td data-testid="technician-qualification-summary">
+                <div>{{ item.qualificationSummary }}</div>
+                <div class="muted">
+                  已通过 {{ item.approvedQualificationCount ?? 0 }} · 待审
+                  {{ item.pendingQualificationCount ?? 0 }}
+                </div>
               </td>
               <td data-testid="technician-valid-range">
                 <div>{{ formatDateTime(item.validFrom) }} → {{ item.validTo ? formatDateTime(item.validTo) : '—' }}</div>
@@ -252,7 +280,8 @@ watch(
       </div>
 
       <p class="muted gap-note">
-        UI_DATA_GAP：技能、服务区域、当前任务量、最近同步与资质到期提醒尚未由专用读模型完整交付；当前展示服务端关系/档案状态。
+        UI_DATA_GAP：技能 taxonomy、服务区域、最近同步与资质到期提醒尚未由专用读模型完整交付；
+        当前任务量与资质摘要已由服务端列表字段交付（M421）。
       </p>
     </template>
 

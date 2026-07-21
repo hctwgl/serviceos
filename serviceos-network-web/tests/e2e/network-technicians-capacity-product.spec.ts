@@ -119,6 +119,10 @@ test.describe('M396 Network 师傅与产能产品化', () => {
               validFrom: '2026-01-01T00:00:00Z',
               validTo: null,
               membershipVersion: 3,
+              openTaskCount: 2,
+              approvedQualificationCount: 1,
+              pendingQualificationCount: 1,
+              qualificationSummary: '已通过 1 项，待审 1 项',
             },
           ],
           nextCursor: null,
@@ -130,7 +134,13 @@ test.describe('M396 Network 师傅与产能产品化', () => {
     await navigateNetwork(page, '/network-portal/technicians')
     await expect(page.getByTestId('network-portal-technicians')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByTestId('technicians-summary-active')).toContainText('1')
+    await expect(page.getByTestId('technicians-summary-open-tasks')).toContainText('2')
+    await expect(page.getByTestId('technicians-summary-pending-qualifications')).toContainText('1')
     await expect(page.getByTestId('network-technicians-table')).toContainText('张师傅')
+    await expect(page.getByTestId('technician-open-task-count')).toContainText('2')
+    await expect(page.getByTestId('technician-qualification-summary')).toContainText(
+      '已通过 1 项，待审 1 项',
+    )
     await page.getByTestId('technicians-toggle-manage').click()
     await expect(page.getByTestId('network-manage-technician-forms')).toBeVisible()
     await page.setViewportSize({ width: 1440, height: 1024 })

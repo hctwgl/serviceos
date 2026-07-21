@@ -427,6 +427,7 @@ title: ServiceOS 里程碑索引
 | M418 | M418 Admin 师傅档案生命周期并入主体变更时间线 | [429-m418-admin-technician-profile-change-timeline.md](../architecture/429-m418-admin-technician-profile-change-timeline.md) | [412-m418-admin-technician-profile-change-timeline-acceptance.md](../testing/412-m418-admin-technician-profile-change-timeline-acceptance.md) |
 | M419 | M419 Admin 主体授权拒绝安全活动流 | [430-m419-admin-principal-authorization-denial-activity.md](../architecture/430-m419-admin-principal-authorization-denial-activity.md) | [413-m419-admin-principal-authorization-denial-activity-acceptance.md](../testing/413-m419-admin-principal-authorization-denial-activity-acceptance.md) |
 | M420 | M420 Admin 师傅客户端种类声明并入主体变更时间线 | [431-m420-admin-technician-client-kinds-change-timeline.md](../architecture/431-m420-admin-technician-client-kinds-change-timeline.md) | [414-m420-admin-technician-client-kinds-change-timeline-acceptance.md](../testing/414-m420-admin-technician-client-kinds-change-timeline-acceptance.md) |
+| M421 | M421 Network 师傅列表资质与开放任务摘要 | [432-m421-network-technician-list-load-qualification-summary.md](../architecture/432-m421-network-technician-list-load-qualification-summary.md) | [415-m421-network-technician-list-load-qualification-summary-acceptance.md](../testing/415-m421-network-technician-list-load-qualification-summary-acceptance.md) |
 
 ## 未关联里程碑的文档
 

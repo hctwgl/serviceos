@@ -706,7 +706,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 技能、服务区域、当前任务量、最近同步读模型未就绪
+  - UI_DATA_GAP: 技能 taxonomy、服务区域、最近同步与资质到期提醒读模型未就绪（当前任务量与资质摘要已由 M421 交付）
 ```
 
 ```yaml
