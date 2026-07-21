@@ -112,6 +112,32 @@ export function listPrincipalRecentLogins(principalId: string, limit = 20) {
   })
 }
 
+export type PrincipalAuthorizationDenialItem = {
+  auditId: string
+  principalId: string
+  capabilityCode: string
+  targetType: string
+  targetId: string
+  decisionCode: string
+  resultCode: string
+  errorCode: string | null
+  correlationId: string
+  occurredAt: string
+}
+
+export type PrincipalAuthorizationDenialPage = {
+  items: PrincipalAuthorizationDenialItem[]
+  omitted: boolean
+  asOf: string
+}
+
+export function listPrincipalAuthorizationDenials(principalId: string, limit = 20) {
+  return apiGet<PrincipalAuthorizationDenialPage>(
+    `/security-principals/${principalId}/authorization-denials`,
+    { limit: String(limit) },
+  )
+}
+
 export type PrincipalChangeTimelineItem = {
   source:
     | 'LIFECYCLE'

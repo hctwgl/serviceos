@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.84
+  version: 1.0.85
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -124,6 +124,30 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}/authorization-denials:
+    get:
+      operationId: listPrincipalAuthorizationDenials
+      summary: 查询主体授权拒绝安全活动流
+      description: |
+        M419：硬门禁 identity.read；soft-gate authorization.read。
+        按被拒主体（actor）读取 AUTHORIZATION_DENIED 审计，不并入 change-timeline。
+        缺 authorization.read 时返回 items=[] 且 omitted=true，不伪造“近期无拒绝”。
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 授权拒绝安全活动页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PrincipalAuthorizationDenialPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /security-principals/{principalId}/change-timeline:
     get:
       operationId: listPrincipalChangeTimeline
@@ -132,7 +156,7 @@ paths:
         M405/M415/M416/M417/M418：需要 identity.read。
         聚合生命周期、非冗余审计、成功登录；并 soft-gate 合并组织任职（organization.read）、
         RoleGrant（authorization.read）、网点任职/师傅服务关系/师傅档案生命周期（network.read）事实。
-        缺权来源列入 omittedSources，不伪造空成功。
+        缺权来源列入 omittedSources，不伪造空成功。不包含 AUTHORIZATION_DENIED（见独立安全活动流）。
       parameters:
         - $ref: '#/components/parameters/PrincipalId'
         - name: limit
@@ -7344,6 +7368,31 @@ components:
       required: [items, asOf]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/PrincipalLoginEvent' } }
+        asOf: { type: string, format: date-time }
+    PrincipalAuthorizationDenialItem:
+      type: object
+      additionalProperties: false
+      required: [auditId, principalId, capabilityCode, targetType, targetId, decisionCode, resultCode, correlationId, occurredAt]
+      properties:
+        auditId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        capabilityCode: { type: string, minLength: 1, maxLength: 120 }
+        targetType: { type: string, minLength: 1, maxLength: 100 }
+        targetId: { type: string, minLength: 1, maxLength: 128 }
+        decisionCode: { type: string, minLength: 1, maxLength: 24 }
+        resultCode: { type: string, minLength: 1, maxLength: 40 }
+        errorCode: { type: [string, 'null'], maxLength: 100 }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+        occurredAt: { type: string, format: date-time }
+    PrincipalAuthorizationDenialPage:
+      type: object
+      additionalProperties: false
+      required: [items, omitted, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PrincipalAuthorizationDenialItem' } }
+        omitted:
+          type: boolean
+          description: true 表示缺 authorization.read，条目被诚实省略
         asOf: { type: string, format: date-time }
     PrincipalChangeTimelineItem:
       type: object

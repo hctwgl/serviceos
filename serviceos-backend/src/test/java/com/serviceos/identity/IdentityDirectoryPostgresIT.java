@@ -2,6 +2,8 @@ package com.serviceos.identity;
 
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.authorization.api.AuthorizationGovernanceCommandService;
+import com.serviceos.authorization.api.AuthorizationRequest;
+import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.identity.api.AuthenticatedIdentity;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.PrincipalAuthenticationService;
@@ -80,6 +82,9 @@ class IdentityDirectoryPostgresIT {
 
     @Autowired
     NetworkCommandService networks;
+
+    @Autowired
+    AuthorizationService authorizationService;
 
     @Autowired
     JdbcClient jdbc;
@@ -425,6 +430,46 @@ class IdentityDirectoryPostgresIT {
         assertThat(omitted.items()).noneMatch(item -> "TECHNICIAN_PROFILE".equals(item.source()));
         assertThat(omitted.items()).extracting(item -> item.source())
                 .contains("LIFECYCLE");
+    }
+
+    @Test
+    void authorizationDenialsListsActorDenialsWithSoftOmit() {
+        UUID principalId = UUID.fromString(authentication.resolveOrRegister(
+                identity("subject-deny", "拒绝活动用户"), "corr-deny-1"));
+        commands.updateProfile(actor(), metadata("deny-profile"), principalId, 1, "拒绝活动用户", "EMP-DENY-1");
+
+        CurrentPrincipal deniedActor = new CurrentPrincipal(
+                principalId.toString(), TENANT, CurrentPrincipal.PrincipalType.USER, CLIENT, Set.of());
+        assertThatThrownBy(() -> authorizationService.require(
+                deniedActor,
+                AuthorizationRequest.tenantCapability(
+                        "project.create", TENANT, "Project", "project-deny-demo"),
+                "corr-deny-seed"))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+
+        var page = queries.authorizationDenials(actor(), "corr-deny-list", principalId, 20);
+        assertThat(page.omitted()).isFalse();
+        assertThat(page.items()).isNotEmpty();
+        assertThat(page.items().getFirst().principalId()).isEqualTo(principalId);
+        assertThat(page.items().getFirst().capabilityCode()).isEqualTo("project.create");
+        assertThat(page.items().getFirst().decisionCode()).isEqualTo("DENY");
+        assertThat(page.items().getFirst().resultCode()).isEqualTo("REJECTED");
+        assertThat(page.items().getFirst().errorCode()).isEqualTo("CAPABILITY_MISSING");
+        assertThat(page.items().getFirst().targetType()).isEqualTo("Project");
+        assertThat(page.items().getFirst().correlationId()).isEqualTo("corr-deny-seed");
+
+        jdbc.sql("""
+                DELETE FROM auth_role_capability
+                 WHERE capability_code = 'authorization.read'
+                   AND role_id IN (
+                     SELECT role_id FROM auth_role
+                      WHERE tenant_id = :tenant AND role_code = 'identity-admin'
+                   )
+                """).param("tenant", TENANT).update();
+        var omitted = queries.authorizationDenials(actor(), "corr-deny-omit", principalId, 20);
+        assertThat(omitted.omitted()).isTrue();
+        assertThat(omitted.items()).isEmpty();
     }
 
     private void seedApprover(String principalId) {

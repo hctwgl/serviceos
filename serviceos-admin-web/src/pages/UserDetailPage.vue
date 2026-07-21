@@ -7,11 +7,13 @@ import {
   disableSecurityPrincipal,
   enableSecurityPrincipal,
   getSecurityPrincipal,
+  listPrincipalAuthorizationDenials,
   listPrincipalChangeTimeline,
   listPrincipalIdentityLinks,
   listPrincipalRecentLogins,
   updateSecurityPrincipalProfile,
   type IdentityLink,
+  type PrincipalAuthorizationDenialItem,
   type PrincipalChangeTimelineItem,
   type PrincipalLoginEvent,
   type SecurityPrincipalDetail,
@@ -52,8 +54,13 @@ const etag = ref<string | null>(null)
 const identities = ref<IdentityLink[] | null>(null)
 const recentLogins = ref<PrincipalLoginEvent[] | null>(null)
 const recentLoginsError = ref<string | null>(null)
+const authorizationDenials = ref<PrincipalAuthorizationDenialItem[]>([])
+const authorizationDenialsOmitted = ref(false)
+const authorizationDenialsError = ref<string | null>(null)
 const changeTimeline = ref<PrincipalChangeTimelineItem[]>([])
-const changeTimelineOmitted = ref<Array<'MEMBERSHIP' | 'ROLE_GRANT'>>([])
+const changeTimelineOmitted = ref<
+  Array<'MEMBERSHIP' | 'ROLE_GRANT' | 'NETWORK_MEMBERSHIP' | 'TECHNICIAN_MEMBERSHIP' | 'TECHNICIAN_PROFILE'>
+>([])
 const changeTimelineError = ref<string | null>(null)
 const grants = ref<RoleGrant[]>([])
 const reassignments = ref<ReassignmentWorkItem[]>([])
@@ -135,6 +142,16 @@ async function load() {
     } catch (err) {
       recentLogins.value = null
       recentLoginsError.value = safeAccessDeniedMessage(err)
+    }
+    try {
+      const denialPage = await listPrincipalAuthorizationDenials(principalId.value, 20)
+      authorizationDenials.value = denialPage.items
+      authorizationDenialsOmitted.value = denialPage.omitted
+      authorizationDenialsError.value = null
+    } catch (err) {
+      authorizationDenials.value = []
+      authorizationDenialsOmitted.value = false
+      authorizationDenialsError.value = safeAccessDeniedMessage(err)
     }
     try {
       const timeline = await listPrincipalChangeTimeline(principalId.value, 50)
@@ -681,6 +698,27 @@ onMounted(() => {
               </li>
             </ul>
             <p v-else class="muted">尚无成功登录记录（仅记录 OIDC 成功解析）</p>
+          </article>
+
+          <article class="card" data-testid="section-authorization-denials">
+            <h3>授权拒绝</h3>
+            <p v-if="authorizationDenialsError" class="muted">{{ authorizationDenialsError }}</p>
+            <p v-else-if="authorizationDenialsOmitted" class="muted" data-testid="authorization-denials-omitted">
+              无 authorization.read，不展示授权拒绝
+            </p>
+            <ul
+              v-else-if="authorizationDenials.length"
+              data-testid="user-authorization-denial-list"
+            >
+              <li v-for="item in authorizationDenials" :key="item.auditId">
+                {{ formatDateTimeDisplay(item.occurredAt) }}
+                · {{ item.capabilityCode }}
+                · {{ item.targetType }}/{{ item.targetId }}
+                · {{ item.errorCode || '—' }}
+                <span class="muted"> · {{ item.correlationId }}</span>
+              </li>
+            </ul>
+            <p v-else class="muted">近期无授权拒绝</p>
           </article>
 
           <article class="card" data-testid="section-identity-links">

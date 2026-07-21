@@ -63,4 +63,43 @@ class JdbcAuditQueryService implements AuditQueryService {
                 .list();
         return new AuditRecordPage(items, clock.instant());
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AuditRecordPage listAuthorizationDenialsByActor(
+            String tenantId, String actorId, int limit
+    ) {
+        Objects.requireNonNull(tenantId, "tenantId");
+        Objects.requireNonNull(actorId, "actorId");
+        if (limit < 1 || limit > 50) {
+            throw new IllegalArgumentException("limit must be between 1 and 50");
+        }
+        List<AuditRecordView> items = jdbc.sql("""
+                SELECT audit_id, actor_id, action_name, capability_code, target_type, target_id,
+                       decision_code, result_code, error_code, correlation_id, occurred_at
+                  FROM aud_audit_record
+                 WHERE tenant_id = :tenantId
+                   AND actor_id = :actorId
+                   AND action_name = 'AUTHORIZATION_DENIED'
+                 ORDER BY occurred_at DESC, audit_id DESC
+                 LIMIT :limit
+                """)
+                .param("tenantId", tenantId)
+                .param("actorId", actorId)
+                .param("limit", limit)
+                .query((rs, rowNum) -> new AuditRecordView(
+                        rs.getObject("audit_id", UUID.class),
+                        rs.getString("actor_id"),
+                        rs.getString("action_name"),
+                        rs.getString("capability_code"),
+                        rs.getString("target_type"),
+                        rs.getString("target_id"),
+                        rs.getString("decision_code"),
+                        rs.getString("result_code"),
+                        rs.getString("error_code"),
+                        rs.getString("correlation_id"),
+                        rs.getObject("occurred_at", OffsetDateTime.class).toInstant()))
+                .list();
+        return new AuditRecordPage(items, clock.instant());
+    }
 }

@@ -425,6 +425,7 @@ title: ServiceOS 里程碑索引
 | M416 | M416 Admin 网点任职并入主体变更时间线 | [427-m416-admin-network-membership-change-timeline.md](../architecture/427-m416-admin-network-membership-change-timeline.md) | [410-m416-admin-network-membership-change-timeline-acceptance.md](../testing/410-m416-admin-network-membership-change-timeline-acceptance.md) |
 | M417 | M417 Admin 师傅服务关系并入主体变更时间线 | [428-m417-admin-technician-membership-change-timeline.md](../architecture/428-m417-admin-technician-membership-change-timeline.md) | [411-m417-admin-technician-membership-change-timeline-acceptance.md](../testing/411-m417-admin-technician-membership-change-timeline-acceptance.md) |
 | M418 | M418 Admin 师傅档案生命周期并入主体变更时间线 | [429-m418-admin-technician-profile-change-timeline.md](../architecture/429-m418-admin-technician-profile-change-timeline.md) | [412-m418-admin-technician-profile-change-timeline-acceptance.md](../testing/412-m418-admin-technician-profile-change-timeline-acceptance.md) |
+| M419 | M419 Admin 主体授权拒绝安全活动流 | [430-m419-admin-principal-authorization-denial-activity.md](../architecture/430-m419-admin-principal-authorization-denial-activity.md) | [413-m419-admin-principal-authorization-denial-activity-acceptance.md](../testing/413-m419-admin-principal-authorization-denial-activity-acceptance.md) |
 
 ## 未关联里程碑的文档
 

@@ -798,6 +798,27 @@ export async function mockProductizationApis(
       })
       return
     }
+    if (url.includes('/authorization-denials')) {
+      await fulfillJson(route, {
+        items: [
+          {
+            auditId: '22222222-2222-4222-8222-222222222222',
+            principalId: '66666666-6666-4666-8666-666666666666',
+            capabilityCode: 'project.create',
+            targetType: 'Project',
+            targetId: 'project-deny-demo',
+            decisionCode: 'DENY',
+            resultCode: 'REJECTED',
+            errorCode: 'CAPABILITY_MISSING',
+            correlationId: 'corr-deny-demo',
+            occurredAt: '2026-07-20T03:20:00Z',
+          },
+        ],
+        omitted: false,
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
     if (url.includes('/change-timeline')) {
       await fulfillJson(route, {
         items: [
@@ -912,6 +933,8 @@ export async function mockProductizationApis(
       if (url.includes('/security-principals/66666666-6666-4666-8666-666666666666')
         && !url.includes('/identities')
         && !url.includes('/recent-logins')
+        && !url.includes('/authorization-denials')
+        && !url.includes('/change-timeline')
         && method === 'GET') {
         await fulfillJson(route, {
           principal: {

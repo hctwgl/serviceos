@@ -5,6 +5,8 @@ import com.serviceos.audit.api.AuditRecordView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.IdentityAuthorizationPort;
 import com.serviceos.identity.api.IdentityLinkView;
+import com.serviceos.identity.api.PrincipalAuthorizationDenialItem;
+import com.serviceos.identity.api.PrincipalAuthorizationDenialPage;
 import com.serviceos.identity.api.PrincipalChangeTimelineContributor;
 import com.serviceos.identity.api.PrincipalChangeTimelineItem;
 import com.serviceos.identity.api.PrincipalChangeTimelinePage;
@@ -29,6 +31,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -119,6 +122,31 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
         return new PrincipalLoginEventPage(
                 directory.listLoginEvents(actor.tenantId(), principalId, effective),
                 clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PrincipalAuthorizationDenialPage authorizationDenials(
+            CurrentPrincipal actor, String correlationId, UUID principalId, Integer limit
+    ) {
+        require(actor, correlationId, "identity.read", principalId.toString());
+        requirePrincipal(actor.tenantId(), principalId);
+        int effective = limit == null ? 20 : limit;
+        if (effective < 1 || effective > 50) {
+            throw new IllegalArgumentException("limit must be between 1 and 50");
+        }
+        // soft-gate：缺 authorization.read 时诚实省略，不伪造“近期无拒绝”。
+        if (!authorization.allowsTenantCapability(
+                actor, "authorization.read", principalId.toString(), correlationId)) {
+            return new PrincipalAuthorizationDenialPage(List.of(), true, clock.instant());
+        }
+        List<PrincipalAuthorizationDenialItem> items = audits
+                .listAuthorizationDenialsByActor(actor.tenantId(), principalId.toString(), effective)
+                .items()
+                .stream()
+                .map(record -> toDenialItem(principalId, record))
+                .toList();
+        return new PrincipalAuthorizationDenialPage(items, false, clock.instant());
     }
 
     @Override
@@ -250,6 +278,22 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
             return base;
         }
         return base + " · " + reason.trim();
+    }
+
+    private static PrincipalAuthorizationDenialItem toDenialItem(
+            UUID principalId, AuditRecordView record
+    ) {
+        return new PrincipalAuthorizationDenialItem(
+                record.auditId(),
+                principalId,
+                Objects.requireNonNullElse(record.capabilityCode(), "UNKNOWN"),
+                record.targetType(),
+                record.targetId(),
+                Objects.requireNonNullElse(record.decisionCode(), "DENY"),
+                record.resultCode(),
+                record.errorCode(),
+                record.correlationId(),
+                record.occurredAt());
     }
 
     private static String auditSummary(AuditRecordView audit) {

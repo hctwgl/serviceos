@@ -594,7 +594,26 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 通用 AUTHORIZATION_DENIED 宜独立安全活动流，不宜直接混入变更时间线
+  - UI_DATA_GAP: 通用 AUTHORIZATION_DENIED 宜独立安全活动流，不宜直接混入变更时间线（已由 M419 关闭主路径）
+  - UI_DATA_GAP: TECHNICIAN_CLIENT_KINDS_DECLARED 并入主体时间线
+```
+
+### 9.18 M419 记录（授权拒绝安全活动流）
+
+```yaml
+pageId: ADMIN.USER.DETAIL
+route: /users/:id
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 失败登录与设备指纹尚未交付
   - UI_DATA_GAP: TECHNICIAN_CLIENT_KINDS_DECLARED 并入主体时间线
 ```
 

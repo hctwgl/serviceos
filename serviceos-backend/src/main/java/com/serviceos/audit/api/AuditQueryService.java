@@ -6,4 +6,12 @@ package com.serviceos.audit.api;
 public interface AuditQueryService {
     AuditRecordPage listByTarget(
             String tenantId, String targetType, String targetId, int limit);
+
+    /**
+     * 按被拒主体（actor）列出 AUTHORIZATION_DENIED。
+     *
+     * <p>limit 范围 1～50；不含 digest / matched_grant_ids 等敏感细节。</p>
+     */
+    AuditRecordPage listAuthorizationDenialsByActor(
+            String tenantId, String actorId, int limit);
 }

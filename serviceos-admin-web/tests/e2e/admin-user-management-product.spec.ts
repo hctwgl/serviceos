@@ -40,8 +40,15 @@ test.describe('M402–M405 Admin 用户登记到变更时间线', () => {
     await page.getByRole('tab', { name: '登录与安全' }).click()
     await expect(page.getByTestId('section-recent-logins')).toBeVisible()
     await expect(page.getByTestId('user-recent-login-list')).toContainText('admin-web')
+    await expect(page.getByTestId('section-authorization-denials')).toBeVisible()
+    await expect(page.getByTestId('user-authorization-denial-list')).toContainText('project.create')
+    await expect(page.getByTestId('user-authorization-denial-list')).toContainText('CAPABILITY_MISSING')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/admin-user-recent-logins-1440.png',
+      fullPage: true,
+    })
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/admin-user-authorization-denials-1440.png',
       fullPage: true,
     })
 

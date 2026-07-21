@@ -2,6 +2,7 @@ package com.serviceos.identity.web;
 
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.identity.api.IdentityLinkView;
+import com.serviceos.identity.api.PrincipalAuthorizationDenialPage;
 import com.serviceos.identity.api.PrincipalChangeTimelinePage;
 import com.serviceos.identity.api.PrincipalLoginEventPage;
 import com.serviceos.identity.api.PrincipalPersonaView;
@@ -110,6 +111,17 @@ final class SecurityPrincipalController {
     ) {
         return response(
                 queries.recentLogins(principals.current(), correlationId, principalId, limit),
+                correlationId);
+    }
+
+    @GetMapping("/{principalId}/authorization-denials")
+    ResponseEntity<PrincipalAuthorizationDenialPage> authorizationDenials(
+            @PathVariable UUID principalId,
+            @RequestParam(required = false) Integer limit,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        return response(
+                queries.authorizationDenials(principals.current(), correlationId, principalId, limit),
                 correlationId);
     }
 
