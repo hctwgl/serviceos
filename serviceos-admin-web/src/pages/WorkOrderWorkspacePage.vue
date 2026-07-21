@@ -11,6 +11,8 @@ import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
 import SensitiveText from '../components/business/SensitiveText.vue'
 import { presentWorkOrderStatus } from '../presentation/work-order-status.presenter'
 import { presentPricingStatus } from '../presentation/pricing-status.presenter'
+import { presentReviewStatus } from '../presentation/review-status.presenter'
+import { presentCorrectionStatus } from '../presentation/correction-status.presenter'
 import { labelClientCode, labelServiceProduct } from '../presentation/enum-labels'
 import { presentEntityName } from '../presentation/entity-name.presenter'
 import { formatDateTimeDisplay } from '../presentation/date-time.presenter'
@@ -421,12 +423,30 @@ type OutboundCrossLink = {
   label: string
 }
 
+type ReviewDecisionRow = {
+  reviewDecisionId: string
+  decisionOrdinal: number
+  decision: string
+  decisionSource: string
+  reasonCodes: string[]
+  decidedAt: string
+}
+
 type ReviewCaseLink = {
   reviewCaseId: string
   origin: string
   status: string
   evidenceSetSnapshotId: string
   reopenedFromReviewCaseId: string
+  /** M425：工作区已投影的完整决策记录（无 note/decidedBy）。 */
+  decisions: ReviewDecisionRow[]
+}
+
+type CorrectionResubmissionRow = {
+  correctionResubmissionId: string
+  resubmissionOrdinal: number
+  evidenceSetSnapshotId: string
+  submittedAt: string
 }
 
 type CorrectionCaseLink = {
@@ -434,6 +454,8 @@ type CorrectionCaseLink = {
   status: string
   sourceReviewCaseId: string
   latestResubmissionSnapshotId: string
+  /** M425：补传轮次摘要（与决策记录同屏产品化）。 */
+  resubmissions: CorrectionResubmissionRow[]
 }
 
 type ReviewCorrectionCrossLink = {
@@ -662,6 +684,59 @@ const outboundCrossLinks = computed((): OutboundCrossLink[] => {
   return links
 })
 
+function parseReviewDecisions(raw: unknown): ReviewDecisionRow[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.reviewDecisionId
+      if (typeof id !== 'string' || !id) return null
+      const ordinal = Number(row.decisionOrdinal)
+      if (!Number.isFinite(ordinal) || ordinal < 1) return null
+      const decidedAt = typeof row.decidedAt === 'string' ? row.decidedAt : ''
+      if (!decidedAt) return null
+      const reasonCodes = Array.isArray(row.reasonCodes)
+        ? row.reasonCodes.filter((code): code is string => typeof code === 'string' && code.length > 0)
+        : []
+      return {
+        reviewDecisionId: id,
+        decisionOrdinal: ordinal,
+        decision: String(row.decision ?? ''),
+        decisionSource: String(row.decisionSource ?? ''),
+        reasonCodes,
+        decidedAt,
+      }
+    })
+    .filter((item): item is ReviewDecisionRow => item != null)
+    .sort((a, b) => a.decisionOrdinal - b.decisionOrdinal)
+}
+
+function parseCorrectionResubmissions(raw: unknown): CorrectionResubmissionRow[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.correctionResubmissionId
+      const snapshotId = row.evidenceSetSnapshotId
+      if (typeof id !== 'string' || !id) return null
+      if (typeof snapshotId !== 'string' || !snapshotId) return null
+      const ordinal = Number(row.resubmissionOrdinal)
+      if (!Number.isFinite(ordinal) || ordinal < 1) return null
+      const submittedAt = typeof row.submittedAt === 'string' ? row.submittedAt : ''
+      if (!submittedAt) return null
+      return {
+        correctionResubmissionId: id,
+        resubmissionOrdinal: ordinal,
+        evidenceSetSnapshotId: snapshotId,
+        submittedAt,
+      }
+    })
+    .filter((item): item is CorrectionResubmissionRow => item != null)
+    .sort((a, b) => a.resubmissionOrdinal - b.resubmissionOrdinal)
+}
+
 /** 复用已 Implemented Review/Correction 详情路由；投影缺权时数组为 null。 */
 const reviewCaseLinks = computed((): ReviewCaseLink[] => {
   const section = sectionData.value?.reviewsCorrections
@@ -684,6 +759,7 @@ const reviewCaseLinks = computed((): ReviewCaseLink[] => {
         status: String(row.status ?? '—'),
         evidenceSetSnapshotId: snapshotId,
         reopenedFromReviewCaseId: reopenedFrom,
+        decisions: parseReviewDecisions(row.decisions),
       }
     })
     .filter((item): item is ReviewCaseLink => item != null)
@@ -711,6 +787,7 @@ const correctionCaseLinks = computed((): CorrectionCaseLink[] => {
         status: String(row.status ?? '—'),
         sourceReviewCaseId,
         latestResubmissionSnapshotId: latestSnapshot,
+        resubmissions: parseCorrectionResubmissions(row.resubmissions),
       }
     })
     .filter((item): item is CorrectionCaseLink => item != null)
@@ -1490,24 +1567,141 @@ onMounted(() => {
       <TabPane key="REVIEWS_CORRECTIONS" tab="审核与整改">
         <p v-if="sectionError" class="error">{{ sectionError }}</p>
         <p v-else-if="sectionLoading">区块加载中…</p>
-        <p v-if="reviewCaseLinks.length" class="links">
-          <RouterLink
-            v-for="item in reviewCaseLinks"
-            :key="item.reviewCaseId"
-            :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.reviewCaseId } }"
+        <template v-else>
+          <section
+            v-if="reviewCaseLinks.length"
+            class="review-records"
+            data-testid="workspace-review-records"
+            aria-label="审核决策记录"
           >
-            {{ statusLabel(item.origin) }} / {{ statusLabel(item.status) }}
-          </RouterLink>
-        </p>
-        <p v-if="correctionCaseLinks.length" class="links">
-          <RouterLink
-            v-for="item in correctionCaseLinks"
-            :key="item.correctionCaseId"
-            :to="{ name: 'ADMIN.CORRECTION.DETAIL', params: { id: item.correctionCaseId } }"
+            <article
+              v-for="item in reviewCaseLinks"
+              :key="item.reviewCaseId"
+              class="review-case-card"
+              data-testid="workspace-review-case"
+            >
+              <header class="review-case-card__head">
+                <div>
+                  <strong>{{ statusLabel(item.origin) }}</strong>
+                  ·
+                  <SemanticStatusTag :presentation="presentReviewStatus(item.status)" />
+                </div>
+                <RouterLink
+                  :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.reviewCaseId } }"
+                  data-testid="workspace-review-case-link"
+                >
+                  打开审核详情
+                </RouterLink>
+              </header>
+              <table
+                v-if="item.decisions.length"
+                class="decision-table"
+                data-testid="workspace-review-decisions"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">轮次</th>
+                    <th scope="col">裁决</th>
+                    <th scope="col">来源</th>
+                    <th scope="col">原因码</th>
+                    <th scope="col">裁决时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="decision in item.decisions"
+                    :key="decision.reviewDecisionId"
+                    data-testid="workspace-review-decision-row"
+                  >
+                    <td>{{ decision.decisionOrdinal }}</td>
+                    <td>
+                      <SemanticStatusTag
+                        :presentation="presentReviewStatus(decision.decision)"
+                      />
+                    </td>
+                    <td>{{ statusLabel(decision.decisionSource) }}</td>
+                    <td>
+                      {{
+                        decision.reasonCodes.length
+                          ? decision.reasonCodes.map((code) => statusLabel(code)).join('、')
+                          : presentEmptyValue('not_provided')
+                      }}
+                    </td>
+                    <td>{{ formatDateTimeDisplay(decision.decidedAt) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p v-else class="muted" data-testid="workspace-review-decisions-empty">
+                暂无决策记录
+              </p>
+            </article>
+          </section>
+          <p v-else class="muted" data-testid="workspace-review-records-empty">
+            暂无审核案例摘要
+          </p>
+
+          <section
+            v-if="correctionCaseLinks.length"
+            class="correction-records"
+            data-testid="workspace-correction-records"
+            aria-label="整改补传记录"
           >
-            {{ statusLabel(item.status) }}
-          </RouterLink>
-        </p>
+            <article
+              v-for="item in correctionCaseLinks"
+              :key="item.correctionCaseId"
+              class="review-case-card"
+              data-testid="workspace-correction-case"
+            >
+              <header class="review-case-card__head">
+                <div>
+                  <strong>整改</strong>
+                  ·
+                  <SemanticStatusTag :presentation="presentCorrectionStatus(item.status)" />
+                </div>
+                <RouterLink
+                  :to="{ name: 'ADMIN.CORRECTION.DETAIL', params: { id: item.correctionCaseId } }"
+                  data-testid="workspace-correction-case-link"
+                >
+                  打开整改详情
+                </RouterLink>
+              </header>
+              <table
+                v-if="item.resubmissions.length"
+                class="decision-table"
+                data-testid="workspace-correction-resubmissions"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">轮次</th>
+                    <th scope="col">资料快照</th>
+                    <th scope="col">提交时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="resubmission in item.resubmissions"
+                    :key="resubmission.correctionResubmissionId"
+                    data-testid="workspace-correction-resubmission-row"
+                  >
+                    <td>{{ resubmission.resubmissionOrdinal }}</td>
+                    <td>
+                      <RouterLink
+                        :to="{
+                          name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+                          params: { id: resubmission.evidenceSetSnapshotId },
+                        }"
+                      >
+                        快照 {{ resubmission.evidenceSetSnapshotId.slice(0, 8) }}
+                      </RouterLink>
+                    </td>
+                    <td>{{ formatDateTimeDisplay(resubmission.submittedAt) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p v-else class="muted">暂无补传记录</p>
+            </article>
+          </section>
+        </template>
       </TabPane>
 
       <TabPane key="FINAL_REVIEW" tab="平台终审">
@@ -1852,6 +2046,41 @@ onMounted(() => {
 .muted { margin: 0 0 8px; color: var(--sos-color-text-tertiary, #7b8494); font-size: 13px; }
 .field { display: grid; gap: 6px; margin-bottom: 12px; font-size: 13px; }
 .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.review-records,
+.correction-records {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.review-case-card {
+  border: 1px solid var(--sos-color-border-default, #d9dee7);
+  border-radius: var(--sos-radius-md, 8px);
+  background: var(--sos-color-surface-card, #fff);
+  padding: 12px 14px;
+}
+.review-case-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.decision-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.decision-table th,
+.decision-table td {
+  border-top: 1px solid var(--sos-color-border-default, #e5e9f0);
+  padding: 8px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.decision-table th {
+  color: var(--sos-color-text-secondary, #5b6575);
+  font-weight: 600;
+}
 .pricing-list { margin: 8px 0 0; padding-left: 18px; }
 .assign-advanced { margin-top: 12px; }
 .handoff-link { font-size: 13px; }

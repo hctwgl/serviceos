@@ -1043,6 +1043,69 @@ export async function mockProductizationApis(
     }
     // 工单详情最小壳：避免页面硬失败
     if (url.includes('/work-orders/11111111-1111-4111-8111-111111111111/workspace')) {
+      if (url.includes('/sections/REVIEWS_CORRECTIONS')) {
+        await fulfillJson(route, {
+          sectionCode: 'REVIEWS_CORRECTIONS',
+          reviewsCorrections: {
+            reviews: [
+              {
+                reviewCaseId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                taskId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                projectId: '22222222-2222-4222-8222-222222222222',
+                evidenceSetSnapshotId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+                scopeType: 'EVIDENCE_SET_SNAPSHOT',
+                origin: 'INTERNAL',
+                policyVersion: 'v1',
+                status: 'REJECTED',
+                createdAt: '2026-07-20T03:30:00Z',
+                decidedAt: '2026-07-20T03:45:00Z',
+                sourceReviewCaseId: null,
+                externalSubmissionRef: null,
+                callbackBatchRef: null,
+                mappingVersionId: null,
+                reopenedFromReviewCaseId: null,
+                reopenTriggerRef: null,
+                decisions: [
+                  {
+                    reviewDecisionId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+                    decisionOrdinal: 1,
+                    decision: 'REJECTED',
+                    decisionSource: 'INTERNAL',
+                    reasonCodes: ['PHOTO_UNCLEAR'],
+                    decidedAt: '2026-07-20T03:45:00Z',
+                  },
+                ],
+              },
+            ],
+            corrections: [
+              {
+                correctionCaseId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+                taskId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                projectId: '22222222-2222-4222-8222-222222222222',
+                sourceReviewCaseId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                sourceReviewDecisionId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+                reasonCodes: ['PHOTO_UNCLEAR'],
+                correctionTaskId: null,
+                status: 'RESUBMITTED',
+                createdAt: '2026-07-20T03:50:00Z',
+                latestResubmissionSnapshotId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+                closedAt: null,
+                waivedAt: null,
+                resubmissions: [
+                  {
+                    correctionResubmissionId: '99999999-9999-4999-8999-999999999999',
+                    resubmissionOrdinal: 1,
+                    evidenceSetSnapshotId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+                    submittedAt: '2026-07-20T04:10:00Z',
+                  },
+                ],
+              },
+            ],
+            nextCursor: null,
+          },
+        })
+        return
+      }
       if (url.includes('/sections/')) {
         await fulfillJson(route, { sectionCode: 'TASKS', tasks: { items: [] } })
         return
@@ -1076,7 +1139,7 @@ export async function mockProductizationApis(
           TIMELINE_AUDIT: 'AVAILABLE',
           APPOINTMENTS_VISITS: 'EMPTY',
           FORMS_EVIDENCE: 'EMPTY',
-          REVIEWS_CORRECTIONS: 'EMPTY',
+          REVIEWS_CORRECTIONS: 'AVAILABLE',
           FINAL_REVIEW: 'EMPTY',
           INTEGRATION: 'EMPTY',
         },

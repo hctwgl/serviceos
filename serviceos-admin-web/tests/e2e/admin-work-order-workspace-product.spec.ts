@@ -25,9 +25,16 @@ test.describe('M389 工单详情统一履约工作区', () => {
     await expect(page.getByTestId('workspace-masked-service-address')).toContainText('杭州市西湖区***')
     await expect(page.getByTestId('workspace-masked-customer-phone')).not.toContainText('138')
 
+    await page.getByRole('tab', { name: '审核与整改' }).click()
+    await expect(page.getByTestId('workspace-review-records')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('workspace-review-case')).toBeVisible()
+    await expect(page.getByTestId('workspace-review-decision-row')).toContainText('已驳回')
+    await expect(page.getByTestId('workspace-review-decision-row')).toContainText('内部')
+    await expect(page.getByTestId('workspace-correction-resubmission-row')).toBeVisible()
+
     await page.setViewportSize({ width: 1440, height: 1024 })
     await page.screenshot({
-      path: 'tests/e2e/__screenshots__/work-order-workspace-product-1440.png',
+      path: 'tests/e2e/__screenshots__/work-order-workspace-review-records-1440.png',
       fullPage: true,
     })
   })

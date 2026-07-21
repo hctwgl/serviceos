@@ -306,7 +306,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 表单资料缩略图与完整审核记录产品化未完成
+  - UI_DATA_GAP: 表单资料缩略图未完成（完整审核决策记录已由 M425 关闭主路径）
   # 客户/地址/联系方式脱敏摘要已由 M423 交付
 ```
 
@@ -325,8 +325,26 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 表单资料缩略图与完整审核记录产品化未完成
-  - CONTENT_GAP: Network 工作区脱敏客户联系与工单目录客户字段未交付
+  - UI_DATA_GAP: 表单资料缩略图未完成（完整审核决策记录已由 M425 关闭主路径）
+  - CONTENT_GAP: Network 工作区脱敏客户联系已由 M424 交付；工单目录客户字段未交付
+```
+
+### 9.21 M425 记录（工单工作区完整审核决策记录）
+
+```yaml
+pageId: ADMIN.WORKORDER.WORKSPACE
+route: /work-orders/:id
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 表单资料缩略图 / Evidence revision 授权预览未完成
 ```
 
 ### 9.3 M397 记录（用户管理）
