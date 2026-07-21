@@ -5,6 +5,7 @@ import com.serviceos.workorder.api.WorkOrderDirectoryStageQuery;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -13,7 +14,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * M432/M433：批量解析工单当前阶段码与认领主体。
+ * M432/M433/M438：批量解析工单当前阶段码、认领主体，以及按当前阶段筛选工单 ID。
  *
  * <p>使用 PostgreSQL {@code DISTINCT ON}，按 created_at/task_id 取最早 ACTIVE 任务，
  * 与工作区 currentTaskSummary 在列表顺序下的 findFirst 口径一致。</p>
@@ -22,7 +23,7 @@ import java.util.UUID;
 final class JdbcWorkOrderDirectoryStageQuery
         implements WorkOrderDirectoryStageQuery, WorkOrderDirectoryAssigneeQuery {
 
-    private static final String SQL = """
+    private static final String SIDE_CAR_SQL = """
             SELECT DISTINCT ON (work_order_id)
                    work_order_id AS work_order_id,
                    stage_code AS stage_code,
@@ -35,6 +36,43 @@ final class JdbcWorkOrderDirectoryStageQuery
                    'RETRY_WAIT', 'MANUAL_INTERVENTION'
                )
              ORDER BY work_order_id, created_at ASC, task_id ASC
+            """;
+
+    private static final String FILTER_SQL_TENANT_WIDE = """
+            SELECT work_order_id
+              FROM (
+                    SELECT DISTINCT ON (work_order_id)
+                           work_order_id AS work_order_id,
+                           stage_code AS stage_code
+                      FROM tsk_task
+                     WHERE tenant_id = :tenantId
+                       AND work_order_id IS NOT NULL
+                       AND status IN (
+                           'READY', 'PENDING', 'CLAIMED', 'RUNNING',
+                           'RETRY_WAIT', 'MANUAL_INTERVENTION'
+                       )
+                     ORDER BY work_order_id, created_at ASC, task_id ASC
+                   ) current_tasks
+             WHERE stage_code = :stageCode
+            """;
+
+    private static final String FILTER_SQL_PROJECT_SCOPED = """
+            SELECT work_order_id
+              FROM (
+                    SELECT DISTINCT ON (work_order_id)
+                           work_order_id AS work_order_id,
+                           stage_code AS stage_code
+                      FROM tsk_task
+                     WHERE tenant_id = :tenantId
+                       AND work_order_id IS NOT NULL
+                       AND project_id IN (:projectIds)
+                       AND status IN (
+                           'READY', 'PENDING', 'CLAIMED', 'RUNNING',
+                           'RETRY_WAIT', 'MANUAL_INTERVENTION'
+                       )
+                     ORDER BY work_order_id, created_at ASC, task_id ASC
+                   ) current_tasks
+             WHERE stage_code = :stageCode
             """;
 
     private final JdbcClient jdbc;
@@ -67,6 +105,50 @@ final class JdbcWorkOrderDirectoryStageQuery
         return Map.copyOf(claimed);
     }
 
+    @Override
+    public List<UUID> findWorkOrderIdsByCurrentStageCode(
+            String tenantId,
+            String stageCode,
+            boolean tenantWide,
+            Collection<UUID> projectIds
+    ) {
+        Objects.requireNonNull(tenantId, "tenantId must not be null");
+        Objects.requireNonNull(stageCode, "stageCode must not be null");
+        Objects.requireNonNull(projectIds, "projectIds must not be null");
+        if (!tenantWide && projectIds.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = new ArrayList<>();
+        if (tenantWide) {
+            jdbc.sql(FILTER_SQL_TENANT_WIDE)
+                    .param("tenantId", tenantId)
+                    .param("stageCode", stageCode)
+                    .query((rs, rowNum) -> {
+                        UUID workOrderId = rs.getObject("work_order_id", UUID.class);
+                        if (workOrderId != null) {
+                            ids.add(workOrderId);
+                        }
+                        return null;
+                    })
+                    .list();
+        } else {
+            List<UUID> scoped = List.copyOf(projectIds);
+            jdbc.sql(FILTER_SQL_PROJECT_SCOPED)
+                    .param("tenantId", tenantId)
+                    .param("stageCode", stageCode)
+                    .param("projectIds", scoped)
+                    .query((rs, rowNum) -> {
+                        UUID workOrderId = rs.getObject("work_order_id", UUID.class);
+                        if (workOrderId != null) {
+                            ids.add(workOrderId);
+                        }
+                        return null;
+                    })
+                    .list();
+        }
+        return List.copyOf(ids);
+    }
+
     private Map<UUID, CurrentTaskRow> loadCurrentTasks(String tenantId, Collection<UUID> workOrderIds) {
         Objects.requireNonNull(tenantId, "tenantId must not be null");
         Objects.requireNonNull(workOrderIds, "workOrderIds must not be null");
@@ -75,7 +157,7 @@ final class JdbcWorkOrderDirectoryStageQuery
         }
         List<UUID> ids = List.copyOf(workOrderIds);
         Map<UUID, CurrentTaskRow> result = new HashMap<>();
-        jdbc.sql(SQL)
+        jdbc.sql(SIDE_CAR_SQL)
                 .param("tenantId", tenantId)
                 .param("workOrderIds", ids)
                 .query((rs, rowNum) -> {

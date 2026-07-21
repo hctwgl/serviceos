@@ -22,6 +22,18 @@
     <if test="provinceCode != null">AND province_code=#{provinceCode}</if>
     <if test="cityCode != null">AND city_code=#{cityCode}</if>
     <if test="districtCode != null">AND district_code=#{districtCode}</if>
+    <!-- M438：阶段筛选由 task SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
+    <if test="applyStageFilter">
+      <choose>
+        <when test="stageWorkOrderIds != null and !stageWorkOrderIds.isEmpty()">
+          AND id IN
+          <foreach collection="stageWorkOrderIds" item="id" open="(" separator="," close=")">
+            CAST(#{id} AS uuid)
+          </foreach>
+        </when>
+        <otherwise>AND FALSE</otherwise>
+      </choose>
+    </if>
   </sql>
   <select id="findPage" resultType="map">
     SELECT <include refid="columns"/> FROM wo_work_order

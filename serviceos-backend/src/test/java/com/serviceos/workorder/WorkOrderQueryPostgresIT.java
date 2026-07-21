@@ -118,16 +118,41 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byDistrict=queries.list(reader,"corr-region-district",
-    new WorkOrderQuery(null,null,null,null,null,null,"370102",null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,"370102",null,null,20));
   assertThat(byDistrict.items()).extracting(WorkOrderView::id).containsExactly(hangzhou);
   assertThat(byDistrict.totalCount()).isEqualTo(1);
   var byProvince=queries.list(reader,"corr-region-province",
-    new WorkOrderQuery(null,null,null,null,"440000",null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,"440000",null,null,null,null,20));
   assertThat(byProvince.items()).extracting(WorkOrderView::externalOrderCode).containsExactly("ORDER-SZ");
   var none=queries.list(reader,"corr-region-none",
-    new WorkOrderQuery(null,null,null,null,"110000",null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,"110000",null,null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
+ }
+
+ @Test void listFiltersByCurrentStageCode(){
+  Scope a=scope("tenant-test","A");
+  UUID survey=receive(a,"ORDER-SURVEY-FILTER","5".repeat(64));
+  UUID install=receive(a,"ORDER-INSTALL-FILTER","6".repeat(64));
+  seedActiveTask(a,survey,"SURVEY",null,null);
+  seedActiveTask(a,install,"INSTALLATION",null,null);
+  seedRole("reader","PROJECT",a.projectId().toString());
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var bySurvey=queries.list(reader,"corr-stage-filter",
+    new WorkOrderQuery(null,null,null,null,null,null,null,"SURVEY",null,20));
+  assertThat(bySurvey.items()).extracting(WorkOrderView::id).containsExactly(survey);
+  assertThat(bySurvey.items().getFirst().currentStageCode()).isEqualTo("SURVEY");
+  assertThat(bySurvey.totalCount()).isEqualTo(1);
+  var byInstall=queries.list(reader,"corr-stage-install",
+    new WorkOrderQuery(null,null,null,null,null,null,null,"INSTALLATION",null,20));
+  assertThat(byInstall.items()).extracting(WorkOrderView::id).containsExactly(install);
+  var none=queries.list(reader,"corr-stage-none",
+    new WorkOrderQuery(null,null,null,null,null,null,null,"REPAIR",null,20));
+  assertThat(none.items()).isEmpty();
+  assertThat(none.totalCount()).isZero();
+  assertThatThrownBy(()->queries.list(reader,"corr-stage-invalid",
+    new WorkOrderQuery(null,null,null,null,null,null,null,"survey",null,20)))
+    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("currentStageCode");
  }
 
  @Test void listExposesTotalCountAcrossPagesAndCapsAtLimit(){

@@ -49,6 +49,8 @@ test.describe('M377 Admin productization visual baselines', () => {
     // M437：更多筛选中启用服务区域
     await page.getByRole('button', { name: '更多筛选' }).click()
     await expect(page.getByTestId('work-order-region-filter')).toBeVisible()
+    // M438：更多筛选中启用当前阶段
+    await expect(page.getByTestId('work-order-stage-filter')).toBeVisible()
     await shot(page, 'work-order-directory-productized')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-region-names-1440.png',
@@ -80,6 +82,11 @@ test.describe('M377 Admin productization visual baselines', () => {
     await page.getByTestId('work-order-region-filter').scrollIntoViewIfNeeded()
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-region-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-stage-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-stage-filter-1440.png',
       fullPage: true,
     })
   })

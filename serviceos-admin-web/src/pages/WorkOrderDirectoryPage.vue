@@ -38,12 +38,26 @@ const regionNameByCode = ref<Map<string, string>>(new Map())
 /** M437：region-catalog 编码→级别，用于选择服务区域后映射查询参数。 */
 const regionLevelByCode = ref<Map<string, RegionCatalogItem['regionLevel']>>(new Map())
 
-/** M437：服务区域筛选（国标码）；其余更多筛选仍为缺口。 */
+/** M437：服务区域筛选（国标码）。 */
 const regionFilterCode = ref<string | undefined>(undefined)
+/** M438：当前阶段筛选（与目录列同口径）。 */
+const stageFilterCode = ref<string | undefined>(undefined)
 const moreNetwork = ref('')
 const moreTechnician = ref('')
-const moreStage = ref('')
 const moreSla = ref<string | undefined>(undefined)
+
+/** 常用履约阶段；未知码由服务端校验失败关闭，不在此发明业务阶段。 */
+const stageFilterOptions = statusOptions([
+  'SURVEY',
+  'INSTALLATION',
+  'REPAIR',
+  'CORRECTION',
+  'SECOND_VISIT',
+  'PILOT_SURVEY',
+  'PILOT_INSTALL',
+  'PILOT_COMPLETION',
+  'HOME_CHARGING_SURVEY_INSTALL',
+])
 
 const regionFilterOptions = computed(() =>
   [...regionNameByCode.value.entries()].map(([code, name]) => ({
@@ -83,6 +97,8 @@ function hydrateFiltersFromRoute() {
   if (nextDistrict) regionFilterCode.value = nextDistrict
   else if (nextCity) regionFilterCode.value = nextCity
   else if (nextProvince) regionFilterCode.value = nextProvince
+  const nextStage = firstRouteQuery(route, 'currentStageCode')
+  if (nextStage !== undefined) stageFilterCode.value = nextStage || undefined
 }
 
 function looksLikeUuid(value: string): boolean {
@@ -104,6 +120,7 @@ async function load(next?: string) {
       projectId: looksLikeUuid(projectKeyword.value)
         ? projectKeyword.value.trim()
         : undefined,
+      currentStageCode: stageFilterCode.value || undefined,
       ...regionQueryParams(),
     })
     cursor.value = page.value.nextCursor ?? undefined
@@ -131,6 +148,7 @@ function currentFilters() {
     projectId: looksLikeUuid(projectKeyword.value)
       ? projectKeyword.value.trim()
       : undefined,
+    currentStageCode: stageFilterCode.value || undefined,
     ...region,
   }
 }
@@ -141,6 +159,7 @@ function applySavedView(filters: Record<string, string>) {
   projectKeyword.value = filters.projectId ?? ''
   regionFilterCode.value =
     filters.districtCode || filters.cityCode || filters.provinceCode || undefined
+  stageFilterCode.value = filters.currentStageCode || undefined
   return search()
 }
 
@@ -150,9 +169,9 @@ function resetFilters() {
   projectKeyword.value = ''
   keyword.value = ''
   regionFilterCode.value = undefined
+  stageFilterCode.value = undefined
   moreNetwork.value = ''
   moreTechnician.value = ''
-  moreStage.value = ''
   moreSla.value = undefined
   return search()
 }
@@ -588,7 +607,7 @@ watch(
         type="info"
         show-icon
         message="部分更多筛选暂不可用"
-        description="网点、师傅、阶段、SLA、创建时间等筛选条件尚未由工单目录查询 API 提供（UI_DATA_GAP）。服务区域已支持按国标码精确筛选。"
+        description="网点、师傅、SLA、创建时间等筛选条件尚未由工单目录查询 API 提供（UI_DATA_GAP）。服务区域与当前阶段已支持精确筛选。"
       />
       <label class="filter-field">
         <span>服务区域</span>
@@ -606,16 +625,27 @@ watch(
         />
       </label>
       <label class="filter-field">
+        <span>当前阶段</span>
+        <Select
+          v-model:value="stageFilterCode"
+          allow-clear
+          show-search
+          style="width: 200px"
+          aria-label="当前阶段筛选"
+          data-testid="work-order-stage-filter"
+          placeholder="按当前阶段筛选"
+          :options="stageFilterOptions"
+          :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          @change="search"
+        />
+      </label>
+      <label class="filter-field">
         <span>服务网点</span>
         <Input v-model:value="moreNetwork" disabled placeholder="暂未提供" />
       </label>
       <label class="filter-field">
         <span>服务师傅</span>
         <Input v-model:value="moreTechnician" disabled placeholder="暂未提供" />
-      </label>
-      <label class="filter-field">
-        <span>当前阶段</span>
-        <Input v-model:value="moreStage" disabled placeholder="暂未提供" />
       </label>
       <label class="filter-field">
         <span>SLA 状态</span>

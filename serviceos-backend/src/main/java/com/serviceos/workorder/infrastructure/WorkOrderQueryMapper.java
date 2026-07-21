@@ -15,6 +15,8 @@ interface WorkOrderQueryMapper {
             @Param("status") String status, @Param("externalOrderCode") String externalOrderCode,
             @Param("provinceCode") String provinceCode, @Param("cityCode") String cityCode,
             @Param("districtCode") String districtCode,
+            @Param("applyStageFilter") boolean applyStageFilter,
+            @Param("stageWorkOrderIds") List<String> stageWorkOrderIds,
             @Param("cursorReceivedAt") Instant cursorReceivedAt,
             @Param("cursorId") UUID cursorId, @Param("fetchSize") int fetchSize);
 
@@ -24,6 +26,8 @@ interface WorkOrderQueryMapper {
             @Param("status") String status, @Param("externalOrderCode") String externalOrderCode,
             @Param("provinceCode") String provinceCode, @Param("cityCode") String cityCode,
             @Param("districtCode") String districtCode,
+            @Param("applyStageFilter") boolean applyStageFilter,
+            @Param("stageWorkOrderIds") List<String> stageWorkOrderIds,
             @Param("fetchSize") int fetchSize);
 
     Map<String,Object> findById(@Param("tenantId") String tenantId, @Param("workOrderId") UUID workOrderId);

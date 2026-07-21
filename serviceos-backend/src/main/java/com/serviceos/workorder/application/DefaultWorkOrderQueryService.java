@@ -78,6 +78,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         String provinceCode = normalizeRegionCode(query.provinceCode(), "provinceCode");
         String cityCode = normalizeRegionCode(query.cityCode(), "cityCode");
         String districtCode = normalizeRegionCode(query.districtCode(), "districtCode");
+        // M438：当前阶段码与目录列同口径；非法码失败关闭。
+        String currentStageCode = normalizeStageCode(query.currentStageCode());
         AuthorizedProjectScope scope = projectScopes.require(principal, READ, "WorkOrder", correlationId);
         if (query.projectId() != null && !scope.tenantWide() && !scope.projectIds().contains(query.projectId())) {
             authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
@@ -89,13 +91,26 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 + "|externalOrderCode=" + nullable(externalOrderCode)
                 + "|provinceCode=" + nullable(provinceCode)
                 + "|cityCode=" + nullable(cityCode)
-                + "|districtCode=" + nullable(districtCode));
+                + "|districtCode=" + nullable(districtCode)
+                + "|currentStageCode=" + nullable(currentStageCode));
         Cursor cursor = decodeCursor(query.cursor(), scope.scopeDigest(), filterDigest);
         List<UUID> projectIds = scope.projectIds().stream()
                 .sorted(Comparator.comparing(UUID::toString)).toList();
+        // M438：阶段筛选经 task SPI 解析为工单 ID，再在授权 SQL 中 IN 收敛。
+        boolean applyStageFilter = currentStageCode != null;
+        List<UUID> stageWorkOrderIds = List.of();
+        if (applyStageFilter) {
+            WorkOrderDirectoryStageQuery stagesPort = stageQuery.getIfAvailable();
+            if (stagesPort == null) {
+                throw new IllegalStateException("工单目录阶段筛选端口不可用");
+            }
+            stageWorkOrderIds = stagesPort.findWorkOrderIdsByCurrentStageCode(
+                    principal.tenantId(), currentStageCode, scope.tenantWide(), projectIds);
+        }
         List<WorkOrderView> fetched = queries.findPage(principal.tenantId(), scope.tenantWide(), projectIds,
                 clientCode, query.projectId(), status, externalOrderCode,
                 provinceCode, cityCode, districtCode,
+                applyStageFilter, stageWorkOrderIds,
                 cursor == null ? null : cursor.receivedAt(),
                 cursor == null ? null : cursor.id(), query.limit() + 1);
         boolean more = fetched.size() > query.limit();
@@ -115,6 +130,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 principal.tenantId(), scope.tenantWide(), projectIds,
                 clientCode, query.projectId(), status, externalOrderCode,
                 provinceCode, cityCode, districtCode,
+                applyStageFilter, stageWorkOrderIds,
                 WorkOrderPage.TOTAL_COUNT_LIMIT + 1);
         boolean totalTruncated = matched > WorkOrderPage.TOTAL_COUNT_LIMIT;
         int totalCount = totalTruncated ? WorkOrderPage.TOTAL_COUNT_LIMIT : matched;
@@ -375,6 +391,16 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         if (value == null) return null;
         if (value.isBlank() || !value.equals(value.trim()) || value.length() > 16)
             throw new IllegalArgumentException(field + " is invalid");
+        return value;
+    }
+
+    /** M438：阶段码与 tsk_task.stage_code CHECK 一致（^[A-Z][A-Z0-9_]*$）。 */
+    private static String normalizeStageCode(String value) {
+        if (value == null) return null;
+        if (value.isBlank() || !value.equals(value.trim()) || value.length() > 64
+                || !value.matches("^[A-Z][A-Z0-9_]*$")) {
+            throw new IllegalArgumentException("currentStageCode is invalid");
+        }
         return value;
     }
     private static String normalizeStatus(String value) {

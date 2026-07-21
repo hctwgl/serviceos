@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.99
+  version: 1.0.100
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3393,6 +3393,8 @@ paths:
         上限 100，超出只声明 truncated，不返回精确全量 COUNT(*)。
         M437：可选 `provinceCode` / `cityCode` / `districtCode` 国标码精确匹配（AND）；
         写入 cursor filterDigest；不发明名称解析。
+        M438：可选 `currentStageCode` 与目录列同口径（最早 ACTIVE 任务 stageCode）精确匹配；
+        经 task SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
       parameters:
         - { name: clientCode, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
         - { name: projectId, in: query, schema: { type: string, format: uuid } }
@@ -3403,6 +3405,9 @@ paths:
             description: M437：市国标码精确匹配 }
         - { name: districtCode, in: query, schema: { type: string, minLength: 1, maxLength: 16 },
             description: M437：区县国标码精确匹配 }
+        - { name: currentStageCode, in: query,
+            schema: { type: string, minLength: 1, maxLength: 64, pattern: '^[A-Z][A-Z0-9_]*$' },
+            description: M438：当前阶段码精确匹配（与 currentStageCode 列同口径） }
         - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
         - $ref: '#/components/parameters/CorrelationId'
