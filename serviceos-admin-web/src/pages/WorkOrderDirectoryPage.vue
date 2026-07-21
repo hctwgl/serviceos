@@ -126,6 +126,9 @@ type Row = {
   clientCode: string
   projectId: string
   receivedAt: string
+  maskedCustomerName: string | null
+  maskedCustomerPhone: string | null
+  maskedServiceAddress: string | null
 }
 
 const rows = computed((): Row[] => {
@@ -134,7 +137,7 @@ const rows = computed((): Row[] => {
   return (page.value?.items ?? [])
     .filter((item) => {
       if (q) {
-        const hay = `${item.externalOrderCode} ${item.clientCode}`.toLowerCase()
+        const hay = `${item.externalOrderCode} ${item.clientCode} ${item.maskedCustomerName ?? ''} ${item.maskedCustomerPhone ?? ''}`.toLowerCase()
         if (!hay.includes(q)) return false
       }
       if (project && !looksLikeUuid(projectKeyword.value)) {
@@ -155,6 +158,9 @@ const rows = computed((): Row[] => {
       clientCode: item.clientCode,
       projectId: item.projectId,
       receivedAt: item.receivedAt,
+      maskedCustomerName: item.maskedCustomerName,
+      maskedCustomerPhone: item.maskedCustomerPhone,
+      maskedServiceAddress: item.maskedServiceAddress,
     }))
 })
 
@@ -235,10 +241,28 @@ const columns = computed((): TableColumnsType<Row> => [
   {
     title: '客户',
     key: 'customer',
-    width: 100,
-    customRender: () =>
-      h(Tooltip, { title: '目录投影未提供客户字段（UI_DATA_GAP）' }, () =>
-        presentEmptyValue('not_provided'),
+    width: 160,
+    customRender: ({ record }: { record: Row }) =>
+      h(
+        'div',
+        { class: 'masked-customer-cell', 'data-testid': 'work-order-masked-customer' },
+        [
+          h(
+            'div',
+            { 'data-testid': 'work-order-masked-customer-name' },
+            record.maskedCustomerName || '—',
+          ),
+          h(
+            'div',
+            { class: 'masked-customer-sub', 'data-testid': 'work-order-masked-customer-phone' },
+            record.maskedCustomerPhone || '—',
+          ),
+          h(
+            'div',
+            { class: 'masked-customer-sub', 'data-testid': 'work-order-masked-service-address' },
+            record.maskedServiceAddress || '—',
+          ),
+        ],
       ),
   },
   {
@@ -487,5 +511,16 @@ watch(
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+.masked-customer-cell {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.masked-customer-sub {
+  color: var(--sos-color-text-secondary, #5b6575);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 </style>

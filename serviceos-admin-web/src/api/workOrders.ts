@@ -10,6 +10,10 @@ export type WorkOrder = {
   status: 'RECEIVED' | 'ACTIVE' | 'FULFILLED'
   receivedAt: string
   version: number
+  /** M429：服务端脱敏客户联系。 */
+  maskedCustomerName: string | null
+  maskedCustomerPhone: string | null
+  maskedServiceAddress: string | null
 }
 
 export type WorkOrderPage = {

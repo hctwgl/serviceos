@@ -70,8 +70,12 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 cursor == null ? null : cursor.id(), query.limit() + 1);
         boolean more = fetched.size() > query.limit();
         List<WorkOrderView> selected = more ? fetched.subList(0, query.limit()) : fetched;
-        WorkOrderView last = more ? selected.getLast() : null;
-        return new WorkOrderPage(selected, last == null ? null : encodeCursor(scope.scopeDigest(),
+        // M429：列表项已通过项目范围授权；补齐服务端脱敏客户联系（不 soft-omit）。
+        List<WorkOrderView> enriched = selected.stream()
+                .map(item -> withMaskedContact(principal.tenantId(), item))
+                .toList();
+        WorkOrderView last = more ? enriched.getLast() : null;
+        return new WorkOrderPage(enriched, last == null ? null : encodeCursor(scope.scopeDigest(),
                 filterDigest, last.receivedAt(), last.id()), clock.instant());
     }
 
@@ -82,7 +86,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "工单不存在"));
         authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
                 "WorkOrder", workOrder.id().toString(), workOrder.projectId().toString()), correlationId);
-        return new WorkOrderDetail(workOrder, clock.instant());
+        // M429：详情与目录契约对齐，返回脱敏联系、不含原文。
+        return new WorkOrderDetail(withMaskedContact(principal.tenantId(), workOrder), clock.instant());
     }
 
     @Override
@@ -125,6 +130,35 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 maskName(raw.customerName()),
                 maskPhone(raw.customerMobile()),
                 maskAddress(raw.serviceAddress()));
+    }
+
+    /** M429：在已授权的 WorkOrderView 上附着脱敏联系；原文不进入视图。 */
+    private WorkOrderView withMaskedContact(String tenantId, WorkOrderView view) {
+        WorkOrderMaskedContactView contact = maskRawContact(tenantId, view.id());
+        return new WorkOrderView(
+                view.id(),
+                view.tenantId(),
+                view.projectId(),
+                view.clientCode(),
+                view.brandCode(),
+                view.serviceProductCode(),
+                view.externalOrderCode(),
+                view.status(),
+                view.configurationBundleId(),
+                view.configurationBundleCode(),
+                view.configurationBundleVersion(),
+                view.configurationBundleDigest(),
+                view.provinceCode(),
+                view.cityCode(),
+                view.districtCode(),
+                view.externalDispatchedAt(),
+                view.receivedAt(),
+                view.activatedAt(),
+                view.fulfilledAt(),
+                view.version(),
+                contact.maskedCustomerName(),
+                contact.maskedCustomerPhone(),
+                contact.maskedServiceAddress());
     }
 
     /** 姓名仅保留首字，其余以 * 代替。 */

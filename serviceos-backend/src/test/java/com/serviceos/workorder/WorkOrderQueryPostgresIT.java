@@ -46,7 +46,16 @@ class WorkOrderQueryPostgresIT {
   var page=queries.list(reader,"corr-list",new WorkOrderQuery(null,null,"RECEIVED",null,1));
   assertThat(page.items()).extracting(WorkOrderView::id).containsExactly(wa);
   assertThat(page.items().getFirst().externalOrderCode()).isEqualTo("ORDER-A");
-  assertThat(queries.get(reader,"corr-get",wa).workOrder().configurationBundleId()).isEqualTo(a.bundle().bundleId());
+  // M429：目录返回脱敏客户联系；receive 夹具原文为 敏感姓名 / 13800000000 / 敏感地址
+  assertThat(page.items().getFirst().maskedCustomerName()).isEqualTo("敏***");
+  assertThat(page.items().getFirst().maskedCustomerPhone()).isEqualTo("*******0000");
+  assertThat(page.items().getFirst().maskedServiceAddress()).isEqualTo("敏***");
+  assertThat(page.items().getFirst().maskedCustomerPhone()).doesNotContain("138");
+  assertThat(page.items().getFirst().maskedServiceAddress()).doesNotContain("敏感地址");
+  var detail=queries.get(reader,"corr-get",wa).workOrder();
+  assertThat(detail.configurationBundleId()).isEqualTo(a.bundle().bundleId());
+  assertThat(detail.maskedCustomerName()).isEqualTo("敏***");
+  assertThat(detail.maskedCustomerPhone()).isEqualTo("*******0000");
   assertThatThrownBy(()->queries.get(reader,"corr-deny",wb)).isInstanceOfSatisfying(BusinessProblem.class,
     p->assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
   assertThat(jdbc.sql("SELECT decision_code FROM aud_audit_record ORDER BY occurred_at DESC LIMIT 1").query(String.class).single()).isEqualTo("DENY");
@@ -63,7 +72,8 @@ class WorkOrderQueryPostgresIT {
     .isInstanceOfSatisfying(BusinessProblem.class,p->assertThat(p.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
   assertThat(jdbc.sql("SELECT risk_level FROM auth_capability WHERE capability_code='workOrder.read'").query(String.class).single()).isEqualTo("NORMAL");
   assertThat(jdbc.sql("SELECT count(*) FROM pg_indexes WHERE indexname='ix_wo_work_order_tenant_project_received'").query(Long.class).single()).isOne();
-  assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("135"); assertThat(flyway.info().applied()).hasSize(137);
+  assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("145");
+  assertThat(flyway.info().applied()).hasSize(147);
  }
 
  private Scope scope(String tenant,String code){UUID project=UUID.randomUUID();jdbc.sql("""

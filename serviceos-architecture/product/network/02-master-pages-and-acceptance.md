@@ -691,7 +691,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - CONTENT_GAP: Admin 工单目录客户列、独立 updatedAt 未交付
+  - CONTENT_GAP: Admin 工单目录客户列（已由 M429 关闭）、独立 updatedAt 未交付
 ```
 
 ## 47. M392 验收记录（资料整改 + 异常中心）

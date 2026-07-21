@@ -326,7 +326,7 @@ qualityStatus:
 productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 表单资料缩略图未完成（完整审核决策记录已由 M425、授权预览主路径已由 M426 关闭）
-  - CONTENT_GAP: Network 工作区脱敏客户联系已由 M424 交付；工单目录客户字段已由 M428 交付
+  - CONTENT_GAP: Network 工作区脱敏客户联系已由 M424 交付；Network 目录客户字段已由 M428 交付；Admin 目录客户字段已由 M429 交付
 ```
 
 ### 9.21 M425 记录（工单工作区完整审核决策记录）
@@ -363,6 +363,24 @@ qualityStatus:
 productOwnerDecision: null
 knownGaps:
   - CONTENT_GAP: Network Portal 资料缩略图 UI（已由 M427 关闭）、非图片内联预览器未交付
+```
+
+### 9.23 M429 记录（工单目录脱敏客户联系）
+
+```yaml
+pageId: ADMIN.WORKORDER.LIST
+route: /work-orders
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 阶段/责任人/SLA/独立 updatedAt、服务端客户关键词检索未交付
 ```
 
 ### 9.3 M397 记录（用户管理）

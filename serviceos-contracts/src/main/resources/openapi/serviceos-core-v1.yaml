@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.92
+  version: 1.0.93
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3383,7 +3383,10 @@ paths:
     get:
       operationId: listAuthorizedWorkOrders
       summary: 查询当前主体有权读取的工单目录
-      description: workOrder.read 实时项目范围在 SQL 中收敛；cursor 绑定范围摘要和全部筛选条件。
+      description: |
+        workOrder.read 实时项目范围在 SQL 中收敛；cursor 绑定范围摘要和全部筛选条件。
+        M429：items 含服务端脱敏客户联系 `maskedCustomerName` / `maskedCustomerPhone` /
+        `maskedServiceAddress`（随基座返回，不 soft-omit；无原文）。
       parameters:
         - { name: clientCode, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
         - { name: projectId, in: query, schema: { type: string, format: uuid } }
@@ -3402,13 +3405,13 @@ paths:
   /work-orders/{workOrderId}:
     get:
       operationId: getAuthorizedWorkOrder
-      summary: 读取不含客户 PII 的工单当前权威事实
+      summary: 读取工单当前权威事实（含服务端脱敏客户联系，无原文 PII）
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
         - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
-          description: 工单当前事实
+          description: 工单当前事实（M429：含 masked* 脱敏联系）
           headers:
             ETag: { required: true, schema: { type: string } }
             X-Correlation-Id: { required: true, schema: { type: string } }
@@ -9678,7 +9681,7 @@ components:
       required: [id, tenantId, projectId, clientCode, brandCode, serviceProductCode, externalOrderCode,
         status, configurationBundleId, configurationBundleCode, configurationBundleVersion,
         configurationBundleDigest, provinceCode, cityCode, districtCode, externalDispatchedAt,
-        receivedAt, version]
+        receivedAt, version, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress]
       properties:
         id: { type: string, format: uuid }
         tenantId: { type: string }
@@ -9700,6 +9703,18 @@ components:
         activatedAt: { type: [string, 'null'], format: date-time }
         fulfilledAt: { type: [string, 'null'], format: date-time }
         version: { type: integer, format: int64, minimum: 1 }
+        maskedCustomerName:
+          type: [string, 'null']
+          maxLength: 64
+          description: M429：服务端脱敏客户姓名；随目录/详情基座返回，不 soft-omit
+        maskedCustomerPhone:
+          type: [string, 'null']
+          maxLength: 32
+          description: M429：服务端脱敏手机号；不得返回完整号码
+        maskedServiceAddress:
+          type: [string, 'null']
+          maxLength: 200
+          description: M429：服务端脱敏服务地址；不得返回完整地址
     WorkOrderPage:
       type: object
       additionalProperties: false

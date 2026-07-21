@@ -1,9 +1,15 @@
 package com.serviceos.workorder.api;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.time.Instant;
 import java.util.UUID;
 
-/** 不含客户 PII 的 WorkOrder 运营概要。 */
+/**
+ * WorkOrder 运营概要。
+ *
+ * <p>不含客户原文 PII。M429：可含服务端脱敏客户联系（masked*）；原文永不离开 workorder 模块。</p>
+ */
 public record WorkOrderView(
         UUID id, String tenantId, UUID projectId, String clientCode, String brandCode,
         String serviceProductCode, String externalOrderCode, String status,
@@ -11,6 +17,25 @@ public record WorkOrderView(
         String configurationBundleVersion, String configurationBundleDigest,
         String provinceCode, String cityCode, String districtCode,
         Instant externalDispatchedAt, Instant receivedAt, Instant activatedAt,
-        Instant fulfilledAt, long version
+        Instant fulfilledAt, long version,
+        @JsonInclude(JsonInclude.Include.ALWAYS) String maskedCustomerName,
+        @JsonInclude(JsonInclude.Include.ALWAYS) String maskedCustomerPhone,
+        @JsonInclude(JsonInclude.Include.ALWAYS) String maskedServiceAddress
 ) {
+    /** 仓储层装载：尚无脱敏 enrichment。 */
+    public WorkOrderView(
+            UUID id, String tenantId, UUID projectId, String clientCode, String brandCode,
+            String serviceProductCode, String externalOrderCode, String status,
+            UUID configurationBundleId, String configurationBundleCode,
+            String configurationBundleVersion, String configurationBundleDigest,
+            String provinceCode, String cityCode, String districtCode,
+            Instant externalDispatchedAt, Instant receivedAt, Instant activatedAt,
+            Instant fulfilledAt, long version
+    ) {
+        this(id, tenantId, projectId, clientCode, brandCode, serviceProductCode, externalOrderCode,
+                status, configurationBundleId, configurationBundleCode, configurationBundleVersion,
+                configurationBundleDigest, provinceCode, cityCode, districtCode,
+                externalDispatchedAt, receivedAt, activatedAt, fulfilledAt, version,
+                null, null, null);
+    }
 }

@@ -24,7 +24,18 @@ test.describe('M377 Admin productization visual baselines', () => {
     await expect(page.getByRole('heading', { name: '工单中心' })).toBeVisible()
     await expect(page.getByText('吉利汽车')).toBeVisible()
     await expect(page.getByText(/11111111-1111-4111-8111-111111111111/)).toHaveCount(0)
+    // M429：目录客户脱敏列
+    await expect(page.getByTestId('work-order-masked-customer-name')).toContainText('王*')
+    await expect(page.getByTestId('work-order-masked-customer-phone')).toContainText('*******5678')
+    await expect(page.getByTestId('work-order-masked-service-address')).toContainText(
+      '杭州市西湖区***',
+    )
+    await expect(page.getByTestId('work-order-masked-customer-phone')).not.toContainText('138')
     await shot(page, 'work-order-directory-productized')
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-masked-contact-1440.png',
+      fullPage: true,
+    })
   })
 
   test('工单中心 Empty', async ({ page }) => {

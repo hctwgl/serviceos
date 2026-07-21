@@ -32,6 +32,6 @@ openapiVersion: "1.0.92"
 
 ## 4. 明确未实现
 
-- Admin 工单目录客户列
+- Admin 工单目录客户列（已由 **M429** 交付）
 - 独立 `updatedAt`、目录 reviews、notifications、Portal ACK
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）
