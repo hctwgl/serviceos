@@ -48,7 +48,7 @@ function profileStatus(status: string) {
               <PageError v-if="!profile.dataComplete" :detail="profile.dataProblem ?? '履约方案数据不完整'" />
               <dl><div><dt>履约阶段</dt><dd>{{ profile.stageCount ?? '—' }} 个</dd></div><div><dt>业务表单</dt><dd>{{ profile.formCount ?? '—' }} 份</dd></div><div><dt>资料要求</dt><dd>{{ profile.evidenceCount ?? '—' }} 项</dd></div><div><dt>当前版本</dt><dd>{{ profile.activeVersion ?? '尚未发布' }}</dd></div></dl>
               <section><div><span>流程概览</span><strong>{{ profile.workflowSummary ?? '尚未生成流程摘要' }}</strong></div><div><span>SLA 概览</span><strong>{{ profile.slaSummary ?? '尚未生成 SLA 摘要' }}</strong></div></section>
-              <footer><span>最近更新 {{ formatDateTime(profile.updatedAt) }}</span><span>履约配置工作区将在下一切片接入</span></footer>
+              <footer><span>最近更新 {{ formatDateTime(profile.updatedAt) }}</span><RouterLink :to="`/projects/${project.projectId}/fulfillment?profileId=${profile.profileId}`">进入履约配置</RouterLink></footer>
             </article>
           </div>
         </main>
