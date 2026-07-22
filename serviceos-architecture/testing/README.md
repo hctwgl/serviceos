@@ -342,5 +342,6 @@
 - [M367 Manual/Network assign kind 硬拒绝验收矩阵](364-m367-manual-network-assign-client-kind-reject-acceptance.md)
 - [M368 Network Portal on-behalf NETWORK_WEB 能力门禁验收矩阵](365-m368-network-portal-onbehalf-network-web-capability-acceptance.md)
 - [M369 BUSINESS 日历 SLA 截止时间验收矩阵](366-m369-business-calendar-sla-acceptance.md)
+- [M452 Admin 关注项目角标精确 COUNT 验收矩阵](446-m452-admin-followed-project-badge-exact-count-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
