@@ -1,21 +1,50 @@
 <script setup lang="ts">
-import { loadAdminWorkbench } from '@serviceos/api-client'
+import type { AdminWorkOrderDirectoryItem } from '@serviceos/api-client'
+import { loadAdminWorkbench, loadAdminWorkOrders } from '@serviceos/api-client'
 import { currentIdentity } from '@serviceos/auth-context'
 import { useQuery } from '@tanstack/vue-query'
-import { RightOutlined } from '@serviceos/design-system'
-import { computed } from 'vue'
+import {
+  Button,
+  CalendarOutlined,
+  DownloadOutlined,
+  Input,
+  SearchOutlined,
+  Select,
+} from '@serviceos/design-system'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageError from '../components/PageError.vue'
+import StatusPill from '../components/StatusPill.vue'
+import { formatDateTime } from '../presenters/work-order'
 
 const query = useQuery({ queryKey: ['admin-workbench'], queryFn: loadAdminWorkbench })
+const keyword = ref('')
+const projectId = ref<string>()
+const status = ref<string>()
+const slaRisk = ref<string>()
+const applied = ref<Record<string, string | number | undefined>>({ limit: 8 })
+const tasks = useQuery({
+  queryKey: computed(() => ['admin-workbench-priority-items', applied.value]),
+  queryFn: () => loadAdminWorkOrders(applied.value),
+})
 const summary = computed(() => query.data.value)
 const identity = currentIdentity()
-const queues = computed(() => [
-  { label: '待派责任网点', count: summary.value?.dispatchCount, to: '/work-orders?view=dispatch', hint: '确认服务区域与网点产能后完成派单' },
-  { label: '待审核', count: summary.value?.reviewCount, to: '/work-orders?view=review', hint: '检查表单资料并给出审核结论' },
-  { label: '待整改', count: summary.value?.correctionCount, to: '/work-orders?view=correction', hint: '跟进整改责任人和截止时间' },
-  { label: '异常阻塞', count: summary.value?.exceptionCount, to: '/work-orders?view=exceptions', hint: '处理阻塞履约的运营异常' },
-])
+
+function search() {
+  applied.value = {
+    limit: 8,
+    q: keyword.value.trim() || undefined,
+    projectId: projectId.value,
+    status: status.value,
+    slaRisk: slaRisk.value,
+  }
+}
+
+function riskTone(row: AdminWorkOrderDirectoryItem): 'red' | 'orange' | 'green' {
+  if (row.slaLevel === 'BREACHED') return 'red'
+  if (row.slaLevel === 'RISK') return 'orange'
+  return 'green'
+}
 </script>
 
 <template>
@@ -57,21 +86,51 @@ const queues = computed(() => [
           <RouterLink to="/work-orders?view=external">等待外部处理 <b>{{ summary?.waitingExternalCount ?? '—' }}</b></RouterLink>
           <RouterLink to="/work-orders?view=unassigned">待派责任网点 <b>{{ summary?.unassignedCount ?? '—' }}</b></RouterLink>
         </div>
-        <div class="queue-content">
-          <div class="queue-toolbar">
-            <div>
-              <h2>需要立即处理</h2>
-              <p>已按 SLA 风险、预约时间和责任状态排序。</p>
-            </div>
-            <RouterLink to="/work-orders">进入工单中心 <RightOutlined /></RouterLink>
-          </div>
-          <div class="workbench-queue-list">
-            <RouterLink v-for="item in queues" :key="item.label" :to="item.to" class="workbench-queue-row">
-              <div><strong>{{ item.label }}</strong><small>{{ item.hint }}</small></div>
-              <b>{{ item.count ?? '—' }}</b><RightOutlined />
-            </RouterLink>
-          </div>
+        <form class="workbench-filter-bar" @submit.prevent="search">
+          <Input v-model:value="keyword" placeholder="搜索工单编号 / 客户 / 项目" allow-clear>
+            <template #prefix><SearchOutlined /></template>
+          </Input>
+          <Select
+            v-model:value="projectId"
+            placeholder="项目"
+            allow-clear
+            :options="tasks.data.value?.projectOptions.map((item) => ({ value: item.id, label: item.name })) ?? []"
+          />
+          <Select v-model:value="status" placeholder="工单状态" allow-clear :options="[{ value: 'RECEIVED', label: '待受理' }, { value: 'ACTIVE', label: '进行中' }, { value: 'FULFILLED', label: '已完成' }]" />
+          <Select v-model:value="slaRisk" placeholder="SLA 风险" allow-clear :options="[{ value: 'BREACHED', label: '已超时' }, { value: 'NEAR', label: '即将超时' }]" />
+          <Button html-type="submit" type="primary">查询</Button>
+          <Button><CalendarOutlined /> 保存视图</Button>
+          <Button><DownloadOutlined /> 导出</Button>
+        </form>
+
+        <div class="workbench-table-wrap">
+          <table class="business-table workbench-table">
+            <thead>
+              <tr><th><input type="checkbox" aria-label="全选" /></th><th>工单编号</th><th>客户</th><th>项目</th><th>当前阶段</th><th>责任网点</th><th>责任师傅</th><th>更新时间</th><th>SLA 风险</th><th>状态</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in tasks.data.value?.items ?? []" :key="row.id">
+                <td><input type="checkbox" :aria-label="`选择 ${row.orderCode}`" /></td>
+                <td><RouterLink :to="`/work-orders/${row.id}`">{{ row.orderCode }}</RouterLink></td>
+                <td><strong>{{ row.customerName || '数据不完整' }}</strong><small>{{ row.clientName }}</small></td>
+                <td><strong>{{ row.projectName || '数据不完整' }}</strong><small>{{ row.serviceName }}</small></td>
+                <td>{{ row.stageName || '数据不完整' }}</td>
+                <td>{{ row.networkName || '待分配' }}</td>
+                <td>{{ row.technicianName || '待分配' }}</td>
+                <td>{{ formatDateTime(row.updatedAt) }}</td>
+                <td><StatusPill :tone="riskTone(row)" :label="row.slaLabel" /></td>
+                <td><StatusPill :tone="row.dataComplete ? 'blue' : 'red'" :label="row.dataComplete ? (row.statusName || '数据不完整') : '数据不完整'" /></td>
+                <td><RouterLink :to="`/work-orders/${row.id}`">查看</RouterLink></td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="tasks.isLoading.value" class="table-loading">正在加载优先工单…</div>
+          <div v-else-if="!tasks.data.value?.items.length" class="empty-state"><h3>当前没有待处理工单</h3><p>请切换业务视图或调整筛选条件。</p></div>
         </div>
+        <footer class="workbench-table-footer">
+          <span>共 {{ tasks.data.value?.totalCount ?? 0 }} 条</span>
+          <RouterLink to="/work-orders">进入工单中心</RouterLink>
+        </footer>
       </section>
     </template>
   </div>

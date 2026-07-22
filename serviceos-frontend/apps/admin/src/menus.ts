@@ -1,0 +1,23 @@
+import type { MenuRecordRaw } from '@vben/types'
+
+export const serviceOsMenus: MenuRecordRaw[] = [
+  { name: '工作台', path: '/workbench', icon: 'lucide:house', order: 10 },
+  {
+    name: '工单运营',
+    path: '/work-orders',
+    icon: 'lucide:clipboard-list',
+    order: 20,
+    children: [
+      { name: '我的工单', path: '/work-orders?view=mine' },
+      { name: '工单池', path: '/work-orders' },
+      { name: '工单看板', path: '/work-orders?view=board' },
+      { name: '工单查询', path: '/work-orders?view=all' },
+    ],
+  },
+  { name: '服务履约', path: '/work-orders?view=fulfillment', icon: 'lucide:list-checks', order: 30 },
+  { name: '审核与整改', path: '/work-orders?view=review', icon: 'lucide:clipboard-check', order: 40 },
+  { name: '客户与项目', path: '/work-orders?view=projects', icon: 'lucide:briefcase-business', order: 50 },
+  { name: '组织与资源', path: '/work-orders?view=resources', icon: 'lucide:users-round', order: 60 },
+  { name: '系统管理', path: '/work-orders?view=system', icon: 'lucide:settings', order: 70 },
+  { name: '审计与监控', path: '/work-orders?view=audit', icon: 'lucide:chart-no-axes-combined', order: 80 },
+]

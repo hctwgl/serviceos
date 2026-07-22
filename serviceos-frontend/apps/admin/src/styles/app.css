@@ -3,41 +3,44 @@
 a { color: inherit; text-decoration: none; }
 button { color: inherit; }
 
-.admin-shell { min-height: 100vh; }
-.sidebar {
-  position: fixed; inset: 0 auto 0 0; z-index: 30; width: var(--sos-sidebar-width);
-  display: flex; flex-direction: column; border-right: 1px solid var(--sos-border);
-  background: var(--sos-surface);
+html, body, #app { width: 100%; min-height: 100%; }
+body { overflow: hidden; }
+
+.serviceos-vben-layout {
+  --background: 220 33% 98%;
+  --background-deep: 220 33% 98%;
+  --foreground: 220 39% 14%;
+  --sidebar: 0 0% 100%;
+  --sidebar-deep: 0 0% 100%;
+  --border: 220 24% 92%;
+  --primary: 217 100% 55%;
 }
-.brand { height: var(--sos-header-height); display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid var(--sos-border); font-size: 16px; font-weight: 700; }
-.brand-mark { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: var(--sos-brand); color: var(--sos-surface); font-size: 14px; }
-.main-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
-.nav-item { position: relative; display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 6px; color: var(--sos-text-strong); font-size: 14px; }
-.nav-item svg { font-size: 16px; }
-.nav-item:hover { color: var(--sos-brand); background: var(--sos-canvas-hover); }
-.nav-item-disabled { cursor: default; }
-.nav-item-disabled:hover { color: var(--sos-text-strong); background: transparent; }
-.nav-item.active { color: var(--sos-brand); background: var(--sos-brand-soft); font-weight: 600; }
-.nav-item.active::before { content: ''; position: absolute; left: -10px; width: 3px; height: 24px; border-radius: 0 3px 3px 0; background: var(--sos-brand); }
-.nav-arrow { margin-left: auto; font-size: 10px !important; }
-.sub-nav { display: grid; gap: 2px; margin: 4px 0 8px 35px; color: var(--sos-text-secondary); font-size: 13px; }
-.sub-nav span { padding: 8px 10px; border-left: 1px solid var(--sos-border-muted); }
-.sub-nav .selected { color: var(--sos-brand); font-weight: 600; }
-.collapse-button { height: 48px; border: 0; border-top: 1px solid var(--sos-border); background: var(--sos-surface); text-align: left; padding: 0 20px; cursor: pointer; }
-.shell-main { min-height: 100vh; margin-left: var(--sos-sidebar-width); }
-.topbar { position: sticky; top: 0; z-index: 25; height: var(--sos-header-height); display: flex; align-items: center; gap: 24px; padding: 0 20px; border-bottom: 1px solid var(--sos-border); background: rgba(255,255,255,.98); }
-.project-switcher { height: 34px; min-width: 180px; padding: 0 12px; border: 1px solid var(--sos-border); border-radius: 5px; background: var(--sos-surface); color: var(--sos-text-strong); text-align: left; }
-.project-switcher svg { float: right; margin-top: 4px; font-size: 10px; }
-.global-search { display: flex; align-items: center; gap: 8px; width: min(420px, 38vw); height: 34px; margin: 0 auto; padding: 0 12px; border: 1px solid var(--sos-border-control); border-radius: 6px; background: var(--sos-canvas-subtle); color: var(--sos-text-tertiary); }
-.global-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 13px; }
-.top-actions { position: relative; display: flex; align-items: center; gap: 3px; }
-.top-actions button, .top-action-link { position: relative; display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 9px; border: 0; background: transparent; cursor: pointer; }
-.top-actions b { position: absolute; top: 0; right: 0; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: var(--sos-danger); color: var(--sos-surface); font-size: 9px; line-height: 15px; }
-.top-actions .avatar { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--sos-avatar); font-size: 12px; }
-.user-menu { position: absolute; top: 45px; right: 0; z-index: 40; display: grid; min-width: 190px; padding: 12px; border: 1px solid var(--sos-border); border-radius: var(--sos-radius); background: var(--sos-surface); box-shadow: var(--sos-popover-shadow); }
-.user-menu strong { font-size: 13px; }.user-menu span { margin: 3px 0 10px; color: var(--sos-text-secondary); font-size: 12px; }
-.user-menu button { height: 34px; border: 1px solid var(--sos-border); border-radius: 5px; background: var(--sos-surface); color: var(--sos-text-strong); cursor: pointer; }.user-menu button:hover { color: var(--sos-brand); border-color: var(--sos-brand-border); }
-.page-main { padding: 18px 20px 28px; }
+
+.serviceos-logo-text { color: var(--sos-text-heading); font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+.serviceos-vben-layout [data-sidebar] { border-right: 1px solid var(--sos-border); box-shadow: none; }
+.serviceos-vben-layout header { border-bottom: 1px solid var(--sos-border); background: rgba(255, 255, 255, .98); box-shadow: none; }
+.serviceos-vben-layout main { background: var(--sos-canvas); }
+
+.project-switcher { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-width: 188px; height: 34px; margin-left: 12px; padding: 0 12px; border: 1px solid var(--sos-border); border-radius: 5px; background: var(--sos-surface); color: var(--sos-text-strong); cursor: pointer; }
+.project-switcher svg { font-size: 10px; }
+.global-search { display: flex; align-items: center; gap: 8px; width: min(420px, 34vw); height: 34px; margin-left: clamp(24px, 8vw, 118px); padding: 0 12px; border: 1px solid var(--sos-border-control); border-radius: 6px; background: var(--sos-canvas-subtle); color: var(--sos-text-tertiary); }
+.global-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--sos-text); font-size: 13px; }
+.header-action { position: relative; display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 9px; border: 0; border-radius: 5px; background: transparent; color: var(--sos-text-strong); cursor: pointer; }
+.header-action:hover { color: var(--sos-brand); background: var(--sos-brand-soft); }
+.header-badge { position: absolute; top: 0; right: 0; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: var(--sos-danger); color: var(--sos-surface); font-size: 9px; line-height: 15px; }
+.serviceos-user-area { position: relative; margin: 0 10px 0 2px; }
+.serviceos-user-button { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--sos-text-strong); cursor: pointer; }
+.serviceos-user-button:hover { background: var(--sos-canvas-hover); }
+.serviceos-avatar { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--sos-avatar); color: var(--sos-text-strong); font-size: 12px; }
+.serviceos-user-button svg { font-size: 10px; }
+.serviceos-user-menu { position: absolute; top: 44px; right: 0; z-index: 1000; display: grid; min-width: 190px; padding: 12px; border: 1px solid var(--sos-border); border-radius: var(--sos-radius); background: var(--sos-surface); box-shadow: var(--sos-popover-shadow); }
+.serviceos-user-menu strong { font-size: 13px; }
+.serviceos-user-menu span { margin: 3px 0 10px; color: var(--sos-text-secondary); font-size: 12px; }
+.serviceos-user-menu button { height: 34px; border: 1px solid var(--sos-border); border-radius: 5px; background: var(--sos-surface); color: var(--sos-text-strong); cursor: pointer; }
+.serviceos-user-menu button:hover { color: var(--sos-brand); border-color: var(--sos-brand-border); }
+
+.page-main { width: 100%; padding: 18px 20px 28px; }
+.workbench-page, .directory-page, .workspace-page { width: 100%; min-height: calc(100vh - var(--sos-header-height)); padding: 18px 20px 28px; }
 .page-heading { margin-bottom: 14px; }
 .page-heading.inline { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .page-heading h1 { margin: 3px 0 4px; font-size: 23px; line-height: 1.35; color: var(--sos-text-heading); }
@@ -46,8 +49,8 @@ button { color: inherit; }
 .heading-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 9px; padding-top: 8px; }
 
 .metric-grid { display: grid; grid-template-columns: 1.25fr repeat(3, 1fr); gap: 14px; }
-.metric-card { min-height: 118px; display: flex; flex-direction: column; justify-content: center; padding: 18px 22px; border: 1px solid var(--sos-border); border-radius: var(--sos-radius); background: var(--sos-surface); }
-.metric-card.urgent { border-color: var(--sos-danger-card-border); background: linear-gradient(135deg, var(--sos-surface) 55%, var(--sos-danger-card-soft)); }
+.metric-card { min-height: 104px; display: flex; flex-direction: column; justify-content: center; padding: 16px 20px; border: 1px solid var(--sos-border); border-radius: var(--sos-radius); background: var(--sos-surface); }
+.metric-card.urgent { border-color: var(--sos-danger-card-border); background: var(--sos-danger-card-soft); }
 .metric-card span { color: var(--sos-text-strong); font-weight: 600; }
 .metric-card strong { margin: 7px 0; color: var(--sos-text-heading); font-size: 31px; line-height: 1; }
 .metric-card.urgent strong { color: var(--sos-danger-accent); }
@@ -65,6 +68,12 @@ button { color: inherit; }
 .workbench-queue-row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--sos-border); border-radius: 6px; }
 .workbench-queue-row:hover { border-color: var(--sos-brand-border); background: var(--sos-brand-hover); }
 .workbench-queue-row div { display: grid; gap: 5px; }.workbench-queue-row small { color: var(--sos-text-secondary); }.workbench-queue-row > b { color: var(--sos-brand); font-size: 21px; }
+
+.workbench-filter-bar { display: grid; grid-template-columns: minmax(220px, 1.8fr) repeat(3, minmax(120px, .8fr)) auto auto auto; gap: 9px; padding: 12px 14px; border-bottom: 1px solid var(--sos-border); }
+.workbench-table-wrap { overflow-x: auto; }
+.workbench-table { min-width: 1080px; }
+.workbench-table-footer { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 15px; color: var(--sos-text-secondary); font-size: 12px; }
+.workbench-table-footer a { color: var(--sos-brand); font-weight: 600; }
 
 .filter-bar { display: grid; grid-template-columns: minmax(240px, 2fr) repeat(3, minmax(130px, 1fr)) auto auto; gap: 10px; padding: 13px 14px; border-bottom: 1px solid var(--sos-border); }
 .data-table-wrap { overflow-x: auto; }

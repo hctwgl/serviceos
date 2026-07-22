@@ -1,20 +1,20 @@
-import { fileURLToPath, URL } from 'node:url'
-import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vite'
+import { defineConfig } from '@vben/vite-config'
 
-export default defineConfig({
-  plugins: [vue()],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+export default defineConfig(async () => ({
+  application: {},
+  vite: {
+    resolve: {
+      alias: {
+        '@': new URL('./src', import.meta.url).pathname,
+      },
+    },
+    server: {
+      host: '0.0.0.0',
+      port: 5173,
+      allowedHosts: ['localhost', 'terminal.local'],
+      proxy: {
+        '/api': 'http://localhost:8080',
+      },
     },
   },
-  server: {
-    host: '0.0.0.0',
-    port: 5173,
-    allowedHosts: ['localhost', 'terminal.local'],
-    proxy: {
-      '/api': 'http://localhost:8080',
-    },
-  },
-})
+}))
