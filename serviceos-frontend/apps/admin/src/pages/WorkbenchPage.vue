@@ -8,22 +8,19 @@ import {
   Button,
   CalendarOutlined,
   Card,
-  Col,
   DownloadOutlined,
   Form,
   Input,
   RightOutlined,
-  Row,
   SearchOutlined,
   Select,
   Space,
-  Statistic,
   Table,
   Tabs,
   Tag,
 } from '@serviceos/design-system'
 import { useQuery } from '@tanstack/vue-query'
-import { Page } from '@vben/common-ui'
+import { Page, VbenCountToAnimator } from '@vben/common-ui'
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import PageError from '../components/PageError.vue'
@@ -44,12 +41,46 @@ const tasksQuery = useQuery({
 })
 
 const summary = computed(() => summaryQuery.data.value)
+const metricCards = computed(() => [
+  {
+    key: 'priority',
+    title: '今日优先处理',
+    value: summary.value?.priorityCount ?? 0,
+    description: `其中 ${summary.value?.slaRiskCount ?? '—'} 单存在 SLA 风险`,
+    to: '/work-orders?view=priority',
+    tone: 'urgent',
+  },
+  {
+    key: 'review',
+    title: '待审核',
+    value: summary.value?.reviewCount ?? 0,
+    description: '检查资料并给出审核结论',
+    to: '/work-orders?view=review',
+    tone: 'default',
+  },
+  {
+    key: 'correction',
+    title: '待整改',
+    value: summary.value?.correctionCount ?? 0,
+    description: '跟进整改责任人和截止时间',
+    to: '/work-orders?view=correction',
+    tone: 'default',
+  },
+  {
+    key: 'dispatch',
+    title: '待派单',
+    value: summary.value?.dispatchCount ?? 0,
+    description: '等待平台分配责任网点',
+    to: '/work-orders?view=dispatch',
+    tone: 'default',
+  },
+])
 const queueTabs = computed(() => [
-  { key: 'all', label: `全部工单 ${tasksQuery.data.value?.totalCount ?? '—'}` },
-  { key: 'dispatch', label: `待派责任网点 ${summary.value?.dispatchCount ?? '—'}` },
-  { key: 'sla', label: `SLA 风险 ${summary.value?.slaRiskCount ?? '—'}` },
-  { key: 'review', label: `待审核 ${summary.value?.reviewCount ?? '—'}` },
-  { key: 'correction', label: `待整改 ${summary.value?.correctionCount ?? '—'}` },
+  { key: 'priority', label: '我的待办', count: summary.value?.priorityCount ?? '—' },
+  { key: 'sla', label: 'SLA 风险', count: summary.value?.slaRiskCount ?? '—' },
+  { key: 'exceptions', label: '异常阻塞', count: summary.value?.exceptionCount ?? '—' },
+  { key: 'external', label: '等待外部处理', count: summary.value?.waitingExternalCount ?? '—' },
+  { key: 'dispatch', label: '待派责任网点', count: summary.value?.dispatchCount ?? '—' },
 ])
 
 const columns: TableColumnsType<AdminWorkOrderDirectoryItem> = [
@@ -106,45 +137,36 @@ function slaColor(level: string) {
     />
 
     <template v-else>
-      <Row :gutter="[16, 16]">
-        <Col :xs="24" :sm="12" :xl="6">
-          <RouterLink to="/work-orders?view=priority">
-            <Card class="workbench-metric-card workbench-metric-card--urgent" :bordered="false" hoverable>
-              <Statistic title="今日优先处理" :value="summary?.priorityCount ?? 0" />
-              <p>其中 {{ summary?.slaRiskCount ?? '—' }} 单存在 SLA 风险</p>
-            </Card>
-          </RouterLink>
-        </Col>
-        <Col :xs="24" :sm="12" :xl="6">
-          <RouterLink to="/work-orders?view=review">
-            <Card class="workbench-metric-card" :bordered="false" hoverable>
-              <Statistic title="待审核" :value="summary?.reviewCount ?? 0" />
-              <p>当前待处理审核任务</p>
-            </Card>
-          </RouterLink>
-        </Col>
-        <Col :xs="24" :sm="12" :xl="6">
-          <RouterLink to="/work-orders?view=correction">
-            <Card class="workbench-metric-card" :bordered="false" hoverable>
-              <Statistic title="待整改" :value="summary?.correctionCount ?? 0" />
-              <p>需要及时跟进的整改任务</p>
-            </Card>
-          </RouterLink>
-        </Col>
-        <Col :xs="24" :sm="12" :xl="6">
-          <RouterLink to="/work-orders?view=dispatch">
-            <Card class="workbench-metric-card" :bordered="false" hoverable>
-              <Statistic title="待派单" :value="summary?.dispatchCount ?? 0" />
-              <p>等待平台分配责任网点</p>
-            </Card>
-          </RouterLink>
-        </Col>
-      </Row>
+      <div class="workbench-metric-grid">
+        <RouterLink v-for="metric in metricCards" :key="metric.key" :to="metric.to">
+          <Card
+            :class="['workbench-metric-card', `workbench-metric-card--${metric.tone}`]"
+            :bordered="false"
+            hoverable
+          >
+            <div class="workbench-metric-title">{{ metric.title }}</div>
+            <VbenCountToAnimator
+              :duration="450"
+              :end-val="metric.value"
+              :start-val="0"
+              class="workbench-metric-value"
+            />
+            <p>{{ metric.description }}</p>
+          </Card>
+        </RouterLink>
+      </div>
 
       <Card class="workbench-operations-card" :bordered="false">
         <template #title>
-          <Tabs :active-key="'all'" @change="openQueue">
-            <Tabs.TabPane v-for="tab in queueTabs" :key="tab.key" :tab="tab.label" />
+          <Tabs :active-key="'priority'" @change="openQueue">
+            <Tabs.TabPane v-for="tab in queueTabs" :key="tab.key">
+              <template #tab>
+                <span class="workbench-tab-label">
+                  {{ tab.label }}
+                  <b>{{ tab.count }}</b>
+                </span>
+              </template>
+            </Tabs.TabPane>
           </Tabs>
         </template>
         <template #extra>
