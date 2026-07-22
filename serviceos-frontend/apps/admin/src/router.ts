@@ -20,6 +20,8 @@ export const router = createRouter({
         { path: 'system/users', name: 'users', meta: { title: '用户管理' }, component: () => import('./features/users/pages/UserDirectoryPage.vue') },
         { path: 'system/roles', name: 'roles', meta: { title: '角色与授权' }, component: () => import('./features/roles/pages/RoleDirectoryPage.vue') },
         { path: 'resources/organizations', name: 'organizations', meta: { title: '组织架构' }, component: () => import('./features/organizations/pages/OrganizationDirectoryPage.vue') },
+        { path: 'resources/networks', name: 'service-networks', meta: { title: '服务网点' }, component: () => import('./features/resources/pages/ServiceNetworkDirectoryPage.vue') },
+        { path: 'resources/technicians', name: 'technicians', meta: { title: '师傅档案' }, component: () => import('./features/resources/pages/TechnicianDirectoryPage.vue') },
       ],
     },
   ],

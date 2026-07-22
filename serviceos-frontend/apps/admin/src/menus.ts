@@ -24,6 +24,8 @@ export const serviceOsMenus: MenuRecordRaw[] = [
     order: 60,
     children: [
       { name: '组织架构', path: '/resources/organizations' },
+      { name: '服务网点', path: '/resources/networks' },
+      { name: '师傅档案', path: '/resources/technicians' },
     ],
   },
   {

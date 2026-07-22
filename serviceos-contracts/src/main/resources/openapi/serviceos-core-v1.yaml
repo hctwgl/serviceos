@@ -84,6 +84,22 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /admin/resource-directory:
+    get:
+      operationId: getAdminResourceDirectory
+      summary: Admin 服务网点与师傅页面目录
+      description: >-
+        需要 network.read。服务端组合合作组织名称、有效覆盖、师傅服务关系和资质摘要，
+        前端不得按内部标识自行拼接多个领域接口。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 服务网点与师傅目录
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AdminResourceDirectoryPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /security-principals/{principalId}:
     get:
       operationId: getSecurityPrincipal
@@ -7691,6 +7707,44 @@ components:
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/AdminUserDirectoryItem' } }
         nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+    AdminServiceNetworkDirectoryItem:
+      type: object
+      additionalProperties: false
+      required: [id, networkCode, networkName, partnerOrganizationName, status, regionCodes,
+        activeTechnicianCount, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        networkCode: { type: string, minLength: 1, maxLength: 64 }
+        networkName: { type: string, minLength: 1, maxLength: 200 }
+        partnerOrganizationName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DEACTIVATED] }
+        regionCodes: { type: array, items: { type: string, minLength: 1, maxLength: 16 } }
+        activeTechnicianCount: { type: integer, minimum: 0 }
+        updatedAt: { type: string, format: date-time }
+    AdminTechnicianDirectoryItem:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, status, supportedClientKinds, networkNames,
+        approvedQualificationCodes, pendingQualificationCount, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+        supportedClientKinds:
+          type: array
+          items: { enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
+        networkNames: { type: array, items: { type: string, minLength: 1, maxLength: 200 } }
+        approvedQualificationCodes: { type: array, items: { type: string, minLength: 1, maxLength: 64 } }
+        pendingQualificationCount: { type: integer, minimum: 0 }
+        updatedAt: { type: string, format: date-time }
+    AdminResourceDirectoryPage:
+      type: object
+      additionalProperties: false
+      required: [networks, technicians, asOf]
+      properties:
+        networks: { type: array, items: { $ref: '#/components/schemas/AdminServiceNetworkDirectoryItem' } }
+        technicians: { type: array, items: { $ref: '#/components/schemas/AdminTechnicianDirectoryItem' } }
         asOf: { type: string, format: date-time }
     PrincipalPersona:
       type: object

@@ -25,6 +25,36 @@ public class JdbcServiceNetworkCoverageQuery implements ServiceNetworkCoverageQu
     }
 
     @Override
+    public List<ServiceNetworkCoverageView> listActiveCoverageByNetworks(
+            String tenantId,
+            Collection<String> serviceNetworkIds,
+            Instant asOf
+    ) {
+        Objects.requireNonNull(tenantId, "tenantId");
+        Objects.requireNonNull(serviceNetworkIds, "serviceNetworkIds");
+        Instant evaluatedAt = Objects.requireNonNull(asOf, "asOf");
+        List<String> networkIds = normalizeNetworkIds(serviceNetworkIds);
+        if (networkIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.sql("""
+                SELECT coverage_id, service_network_id, brand_code, business_type, region_code
+                  FROM net_service_network_coverage
+                 WHERE tenant_id = :tenantId
+                   AND service_network_id::text IN (:networkIds)
+                   AND coverage_status = 'ACTIVE'
+                   AND valid_from <= :asOf
+                   AND (valid_to IS NULL OR valid_to > :asOf)
+                 ORDER BY service_network_id, brand_code, business_type, region_code
+                """)
+                .param("tenantId", tenantId.trim())
+                .param("networkIds", networkIds)
+                .param("asOf", timestamptz(evaluatedAt))
+                .query((rs, rowNum) -> mapCoverage(rs))
+                .list();
+    }
+
+    @Override
     public List<ServiceNetworkCoverageView> listActiveCoverage(
             String tenantId,
             Collection<String> serviceNetworkIds,
@@ -41,11 +71,7 @@ public class JdbcServiceNetworkCoverageQuery implements ServiceNetworkCoverageQu
             return List.of();
         }
         // 与 ServiceNetworkDirectoryQuery 一致：按 ::text 匹配项目侧 network_id。
-        List<String> networkIds = serviceNetworkIds.stream()
-                .map(String::trim)
-                .filter(id -> !id.isEmpty())
-                .distinct()
-                .toList();
+        List<String> networkIds = normalizeNetworkIds(serviceNetworkIds);
         if (networkIds.isEmpty()) {
             return List.of();
         }
@@ -66,12 +92,24 @@ public class JdbcServiceNetworkCoverageQuery implements ServiceNetworkCoverageQu
                 .param("brandCode", brandCode.trim())
                 .param("businessType", businessType.trim())
                 .param("asOf", timestamptz(evaluatedAt))
-                .query((rs, rowNum) -> new ServiceNetworkCoverageView(
-                        rs.getObject("coverage_id", UUID.class),
-                        rs.getObject("service_network_id", UUID.class),
-                        rs.getString("brand_code"),
-                        rs.getString("business_type"),
-                        rs.getString("region_code")))
+                .query((rs, rowNum) -> mapCoverage(rs))
                 .list();
+    }
+
+    private static List<String> normalizeNetworkIds(Collection<String> serviceNetworkIds) {
+        return serviceNetworkIds.stream()
+                .map(String::trim)
+                .filter(id -> !id.isEmpty())
+                .distinct()
+                .toList();
+    }
+
+    private static ServiceNetworkCoverageView mapCoverage(java.sql.ResultSet rs) throws java.sql.SQLException {
+        return new ServiceNetworkCoverageView(
+                rs.getObject("coverage_id", UUID.class),
+                rs.getObject("service_network_id", UUID.class),
+                rs.getString("brand_code"),
+                rs.getString("business_type"),
+                rs.getString("region_code"));
     }
 }
