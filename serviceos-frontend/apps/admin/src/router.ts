@@ -27,6 +27,7 @@ export const router = createRouter({
         { path: 'projects/:id', name: 'project-workspace', meta: { title: '项目详情', hideInMenu: true }, component: () => import('./features/projects/pages/ProjectWorkspacePage.vue') },
         { path: 'projects/:id/fulfillment', name: 'project-fulfillment', meta: { title: '项目履约配置', hideInMenu: true }, component: () => import('./features/projects/pages/ProjectFulfillmentPage.vue') },
         { path: 'projects/:id/fulfillment/:profileId/draft', name: 'project-fulfillment-draft', meta: { title: '履约配置草稿', hideInMenu: true }, component: () => import('./features/projects/pages/ProjectFulfillmentDraftPage.vue') },
+        { path: 'projects/:id/fulfillment/:profileId/publish', name: 'project-fulfillment-publish', meta: { title: '版本与发布', hideInMenu: true }, component: () => import('./features/projects/pages/ProjectFulfillmentPublishPage.vue') },
       ],
     },
   ],

@@ -124,6 +124,7 @@ function taskTypeLabel(taskType: string | null) {
     <template #extra>
       <Space>
         <RouterLink :to="`/projects/${projectId}/fulfillment?profileId=${profileId}`"><Button>返回配置概览</Button></RouterLink>
+        <RouterLink :to="`/projects/${projectId}/fulfillment/${profileId}/publish`"><Button>版本与发布</Button></RouterLink>
         <Button :loading="validateCommand.isPending.value" @click="validateCommand.mutate()">校验草稿</Button>
         <Button type="primary" :loading="updateCommand.isPending.value" @click="saveDraft">保存草稿</Button>
       </Space>

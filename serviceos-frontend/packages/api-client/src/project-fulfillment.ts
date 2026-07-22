@@ -88,6 +88,77 @@ export type ProjectFulfillmentValidationIssue = {
   userMessage: string
 }
 
+export type ProjectFulfillmentRunbookStage = {
+  actionCount?: number
+  actionSummary?: string | null
+  evidenceCount?: number
+  evidenceSummary?: string | null
+  exceptionSummary?: string | null
+  formCount?: number
+  formSummary?: string | null
+  nextStageSummary?: string | null
+  ownerTypeLabel: string
+  sequence: number
+  slaSummary?: string | null
+  stageName: string
+  taskTypeLabel?: string | null
+  terminal: boolean
+}
+
+export type ProjectFulfillmentRunbook = {
+  clientSupportSummary?: string | null
+  impactSummary: string
+  orderTypeName?: string | null
+  profileName: string
+  serviceProductCode: string
+  serviceProductLabel: string
+  stageCount: number
+  stages: ProjectFulfillmentRunbookStage[]
+  versionLabel?: string | null
+}
+
+export type ProjectFulfillmentManifest = {
+  contentDigest: string
+  manifestJson: string
+  runbook: ProjectFulfillmentRunbook
+}
+
+export type ProjectFulfillmentCompareChange = {
+  category: 'ACTION' | 'DISPATCH' | 'EVIDENCE' | 'FORM' | 'NOTIFICATION' | 'OTHER' | 'SLA' | 'STAGE' | 'TASK'
+  changeType: 'ADDED' | 'MODIFIED' | 'REMOVED'
+  detail?: string | null
+  summary: string
+}
+
+export type ProjectFulfillmentCompareImpact = {
+  asOf: string
+  baselineKind: 'NONE' | 'PUBLISHED'
+  baselineRevisionId?: string | null
+  baselineVersionLabel?: string | null
+  changeCount: number
+  changes: ProjectFulfillmentCompareChange[]
+  draftRevisionId: string
+  impact: {
+    effectiveFromHint?: string | null
+    existingWorkOrdersScope: string
+    newWorkOrdersScope: string
+  }
+  profileId: string
+  risks: string[]
+}
+
+export type ProjectFulfillmentRevision = {
+  createdAt: string
+  effectiveFrom?: string | null
+  effectiveTo?: string | null
+  profileId: string
+  publishedAt?: string | null
+  publishedBy?: string | null
+  revisionId: string
+  revisionStatus: 'DRAFT' | 'PUBLISHED'
+  versionNo: number
+}
+
 export function loadProjectFulfillmentProfiles(projectId: string) {
   return get<ProjectFulfillmentProfileSummary[]>(`/projects/${projectId}/fulfillment-profiles`)
     .then((result) => result.data)
@@ -140,5 +211,41 @@ export function validateProjectFulfillmentDraft(projectId: string, profileId: st
     `/projects/${projectId}/fulfillment-profiles/${profileId}:validate`,
     {},
     { 'Idempotency-Key': newIdempotencyKey('project-fulfillment-validate') },
+  ).then((result) => result.data)
+}
+
+export function compileProjectFulfillmentPreview(projectId: string, profileId: string) {
+  return post<ProjectFulfillmentManifest>(
+    `/projects/${projectId}/fulfillment-profiles/${profileId}:compile-preview`,
+    {},
+    { 'Idempotency-Key': newIdempotencyKey('project-fulfillment-preview') },
+  ).then((result) => result.data)
+}
+
+export function compareProjectFulfillmentImpact(projectId: string, profileId: string) {
+  return get<ProjectFulfillmentCompareImpact>(
+    `/projects/${projectId}/fulfillment-profiles/${profileId}/compare-impact`,
+  ).then((result) => result.data)
+}
+
+export function loadProjectFulfillmentRevisions(projectId: string, profileId: string) {
+  return get<ProjectFulfillmentRevision[]>(
+    `/projects/${projectId}/fulfillment-profiles/${profileId}/revisions`,
+  ).then((result) => result.data)
+}
+
+export function publishProjectFulfillmentRevision(
+  projectId: string,
+  profileId: string,
+  aggregateVersion: number,
+  input: { effectiveFrom?: string; publishNote?: string },
+) {
+  return post<ProjectFulfillmentRevision>(
+    `/projects/${projectId}/fulfillment-profiles/${profileId}:publish`,
+    input,
+    {
+      'Idempotency-Key': newIdempotencyKey('project-fulfillment-publish'),
+      'If-Match': `"${aggregateVersion}"`,
+    },
   ).then((result) => result.data)
 }
