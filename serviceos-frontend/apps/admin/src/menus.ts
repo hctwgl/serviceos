@@ -17,7 +17,15 @@ export const serviceOsMenus: MenuRecordRaw[] = [
   { name: '服务履约', path: '/work-orders?view=fulfillment', icon: 'lucide:list-checks', order: 30 },
   { name: '审核与整改', path: '/work-orders?view=review', icon: 'lucide:clipboard-check', order: 40 },
   { name: '客户与项目', path: '/work-orders?view=projects', icon: 'lucide:briefcase-business', order: 50 },
-  { name: '组织与资源', path: '/work-orders?view=resources', icon: 'lucide:users-round', order: 60 },
+  {
+    name: '组织与资源',
+    path: '/resources',
+    icon: 'lucide:users-round',
+    order: 60,
+    children: [
+      { name: '组织架构', path: '/resources/organizations' },
+    ],
+  },
   {
     name: '系统管理',
     path: '/system',

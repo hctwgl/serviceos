@@ -58,6 +58,48 @@ for (const item of [
   staff[item[0]] = await registerPrincipal(item[1], item[2], item[3])
 }
 
+// 企业组织与人员任职必须通过正式身份治理接口建立，不能只在用户目录中留下“无任职”的占位状态。
+// 组织结构是人员归属事实，不承担角色授权；后续 RoleGrant 仍按租户、项目和区域范围独立配置。
+const organization = (await request('/organizations', {
+  method: 'POST', idempotencyKey: key('organization-serviceos-east-china'),
+  body: {
+    code: 'SERVICEOS-EAST-CHINA',
+    name: 'ServiceOS 华东运营中心',
+    authorityMode: 'LOCAL',
+  },
+})).body
+
+async function createOrganizationUnit(unitCode, unitName) {
+  const current = (await request(`/organizations/${organization.id}`)).body.organization
+  return (await request(`/organizations/${organization.id}/units`, {
+    method: 'POST', idempotencyKey: key(`org-unit-${unitCode}`),
+    headers: { 'If-Match': `"${current.version}"` },
+    body: { parentUnitId: null, unitCode, unitName },
+  })).body
+}
+
+const customerServiceUnit = await createOrganizationUnit('CUSTOMER-SERVICE', '客户服务部')
+const projectDeliveryUnit = await createOrganizationUnit('PROJECT-DELIVERY', '项目履约部')
+const qualityUnit = await createOrganizationUnit('QUALITY-ASSURANCE', '质量审核部')
+
+const membershipValidFrom = new Date(Date.now() - 86_400_000).toISOString()
+for (const [staffKey, unit, membershipType] of [
+  ['customerManager', customerServiceUnit, 'MANAGER'],
+  ['projectManager', projectDeliveryUnit, 'MANAGER'],
+  ['projectAssistant', projectDeliveryUnit, 'PRIMARY'],
+  ['reviewer', qualityUnit, 'PRIMARY'],
+]) {
+  await request(`/organizations/${organization.id}/memberships`, {
+    method: 'POST', idempotencyKey: key(`org-membership-${staffKey}`),
+    body: {
+      unitId: unit.id,
+      principalId: staff[staffKey].id,
+      membershipType,
+      validFrom: membershipValidFrom,
+    },
+  })
+}
+
 const partner = (await request('/partner-organizations', {
   method: 'POST', idempotencyKey: key('partner-jinan'),
   body: { code: 'JINAN-HENGTONG', name: '济南恒通新能源服务有限公司' },
@@ -264,5 +306,6 @@ for (const [index, technicianProfile] of technicianProfiles.entries()) {
 }
 
 console.log(`已通过正式业务接口创建项目：${project.name}`)
+console.log(`已建立企业组织：${organization.name}（客户服务部、项目履约部、质量审核部）`)
 console.log(`已创建服务网点：${network.networkName}`)
 console.log(`已登记 ${Object.keys(staff).length} 名项目人员和师傅，并创建 ${customers.length} 张真实工单。`)
