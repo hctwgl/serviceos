@@ -176,6 +176,14 @@ body { overflow: hidden; }
 .project-team-rule-card ol { display: grid; gap: 10px; margin: 0; padding-left: 20px; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.6; }
 .drawer-explanation { margin: 4px 0 18px; padding: 12px; border-radius: 6px; background: hsl(var(--muted) / 45%); color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.6; }
 .drawer-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; padding-top: 16px; border-top: 1px solid hsl(var(--border)); }
+.create-project-intro { margin-bottom: 18px; padding: 13px 15px; border: 1px solid hsl(var(--primary) / 18%); border-radius: 6px; background: hsl(var(--primary) / 5%); color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.65; }
+.create-project-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.create-project-form-grid .full-row { grid-column: 1 / -1; }
+.create-project-form-grid .ant-form-item { margin-bottom: 18px; }
+.create-project-form-grid .ant-form-item-extra, .create-project-form-grid small { display: block; margin-top: 5px; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.5; }
+.project-create-summary { display: grid; gap: 5px; margin-top: 4px; padding: 13px 15px; border-radius: 6px; background: hsl(var(--muted) / 45%); }
+.project-create-summary strong { font-size: 13px; }
+.project-create-summary span { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.6; }
 
 @media (max-width: 1280px) {
   :root { --sos-sidebar-width: 164px; }

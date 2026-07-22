@@ -116,6 +116,27 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/AdminClientProjectDirectoryView' } } }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /admin/projects/creation-options:
+    get:
+      operationId: getAdminProjectCreationOptions
+      summary: 读取 Admin 新建项目页面选项
+      description: >-
+        需要 project.read 与 network.read。服务端一次返回有效客户、匹配的标准行政区域、有效服务网点和页面允许动作；
+        前端不得调用多个领域目录自行拼装新建项目选项。创建命令仍实时校验 project.create。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: regionQuery
+          in: query
+          required: false
+          description: 按行政区域名称或标准编码搜索，避免浏览器一次加载全国完整行政区目录。
+          schema: { type: string, maxLength: 100 }
+      responses:
+        '200':
+          description: 新建项目页面级选项
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AdminProjectCreationOptionsView' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /admin/projects/{projectId}/workspace:
     get:
       operationId: getAdminProjectWorkspace
@@ -7941,6 +7962,50 @@ components:
       properties:
         clients: { type: array, items: { $ref: '#/components/schemas/AdminClientDirectoryItem' } }
         projects: { type: array, items: { $ref: '#/components/schemas/AdminProjectDirectoryItem' } }
+        asOf: { type: string, format: date-time }
+    AdminProjectCreationClientOption:
+      type: object
+      additionalProperties: false
+      required: [code, name]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 128 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+    AdminProjectCreationRegionOption:
+      type: object
+      additionalProperties: false
+      required: [code, name, level, parentCode]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 32 }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        level: { enum: [PROVINCE, CITY, DISTRICT] }
+        parentCode: { type: [string, 'null'], maxLength: 32 }
+    AdminProjectCreationNetworkOption:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, status]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        status: { const: ACTIVE }
+    AdminProjectCreationOptionsView:
+      type: object
+      additionalProperties: false
+      required: [clients, regions, networks, allowedActions, asOf]
+      properties:
+        clients:
+          type: array
+          items: { $ref: '#/components/schemas/AdminProjectCreationClientOption' }
+        regions:
+          type: array
+          items: { $ref: '#/components/schemas/AdminProjectCreationRegionOption' }
+        networks:
+          type: array
+          items: { $ref: '#/components/schemas/AdminProjectCreationNetworkOption' }
+        allowedActions:
+          type: array
+          uniqueItems: true
+          items: { enum: [CREATE_PROJECT] }
         asOf: { type: string, format: date-time }
     AdminProjectFulfillmentProfile:
       type: object
