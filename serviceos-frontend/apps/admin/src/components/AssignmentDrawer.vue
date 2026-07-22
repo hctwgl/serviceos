@@ -43,7 +43,7 @@ watch(() => props.open, (open) => {
 </script>
 
 <template>
-  <Drawer :open="open" width="520" title="分配责任网点" placement="right" @close="emit('close')">
+  <Drawer :open="open" width="480" title="分配责任网点" placement="right" @close="emit('close')">
     <div class="assignment-intro">
       系统只展示满足当前项目、服务区域、业务类型和容量要求的网点。
     </div>
@@ -56,10 +56,17 @@ watch(() => props.open, (open) => {
       </div>
       <Radio.Group v-else v-model:value="selected" class="candidate-list">
         <Radio v-for="item in candidates.data.value.candidates" :key="item.networkId" :value="item.networkId" class="candidate-card">
-          <span class="candidate-rank">推荐 {{ item.rank }}</span>
-          <strong>{{ item.networkName }}</strong>
-          <span>{{ item.coverageSummary }}</span>
-          <span>剩余容量 {{ item.remainingCapacity }} · {{ item.recommendationSummary }}</span>
+          <span class="candidate-content">
+            <span class="candidate-heading">
+              <strong>{{ item.networkName }}</strong>
+              <b class="candidate-rank">推荐 {{ item.rank }}</b>
+            </span>
+            <span class="candidate-facts">
+              <span>{{ item.coverageSummary }}</span>
+              <span>剩余容量 {{ item.remainingCapacity }}</span>
+            </span>
+            <small>{{ item.recommendationSummary }}</small>
+          </span>
         </Radio>
       </Radio.Group>
       <div v-if="selectedCandidate" class="candidate-reason">
