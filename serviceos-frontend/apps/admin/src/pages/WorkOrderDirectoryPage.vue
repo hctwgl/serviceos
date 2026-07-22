@@ -12,16 +12,18 @@ import {
   SettingOutlined,
 } from '@serviceos/design-system'
 import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import PageError from '../components/PageError.vue'
 import StatusPill from '../components/StatusPill.vue'
 import { formatDateTime } from '../presenters/work-order'
 
+const route = useRoute()
+const initialProjectId = typeof route.query.projectId === 'string' ? route.query.projectId : undefined
 const keyword = ref('')
-const project = ref<string>()
+const project = ref<string | undefined>(initialProjectId)
 const status = ref<string>()
 const slaRisk = ref<string>()
-const applied = ref({ q: '', projectId: undefined as string | undefined, status: undefined as string | undefined, slaRisk: undefined as string | undefined })
+const applied = ref({ q: '', projectId: initialProjectId, status: undefined as string | undefined, slaRisk: undefined as string | undefined })
 
 const query = useQuery({
   queryKey: computed(() => ['work-orders', applied.value]),

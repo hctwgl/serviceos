@@ -24,6 +24,7 @@ export const router = createRouter({
         { path: 'resources/technicians', name: 'technicians', meta: { title: '师傅档案' }, component: () => import('./features/resources/pages/TechnicianDirectoryPage.vue') },
         { path: 'clients', name: 'clients', meta: { title: '客户品牌' }, component: () => import('./features/projects/pages/ClientDirectoryPage.vue') },
         { path: 'projects', name: 'projects', meta: { title: '项目管理' }, component: () => import('./features/projects/pages/ProjectDirectoryPage.vue') },
+        { path: 'projects/:id', name: 'project-workspace', meta: { title: '项目详情', hideInMenu: true }, component: () => import('./features/projects/pages/ProjectWorkspacePage.vue') },
       ],
     },
   ],

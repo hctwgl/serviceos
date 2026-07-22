@@ -116,6 +116,27 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/AdminClientProjectDirectoryView' } } }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /admin/projects/{projectId}/workspace:
+    get:
+      operationId: getAdminProjectWorkspace
+      summary: Admin 项目详情与履约配置概览
+      description: >-
+        需要 project.read；履约配置按 project.fulfillment.read 独立软门禁。
+        服务端返回项目、客户、服务区域、参与网点和配置方案的中文页面事实。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: 项目详情工作区
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AdminProjectWorkspaceView' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /security-principals/{principalId}:
     get:
       operationId: getSecurityPrincipal
@@ -7801,6 +7822,49 @@ components:
       properties:
         clients: { type: array, items: { $ref: '#/components/schemas/AdminClientDirectoryItem' } }
         projects: { type: array, items: { $ref: '#/components/schemas/AdminProjectDirectoryItem' } }
+        asOf: { type: string, format: date-time }
+    AdminProjectFulfillmentProfile:
+      type: object
+      additionalProperties: false
+      required: [profileId, profileName, status, updatedAt, dataComplete]
+      properties:
+        profileId: { type: string, format: uuid }
+        profileName: { type: string, minLength: 1, maxLength: 200 }
+        serviceProductName: { type: [string, 'null'], maxLength: 200 }
+        status: { enum: [DRAFT, ACTIVE, SUSPENDED, RETIRED] }
+        stageCount: { type: [integer, 'null'], minimum: 0 }
+        formCount: { type: [integer, 'null'], minimum: 0 }
+        evidenceCount: { type: [integer, 'null'], minimum: 0 }
+        activeVersion: { type: [string, 'null'], maxLength: 64 }
+        effectiveFrom: { type: [string, 'null'], format: date-time }
+        workflowSummary: { type: [string, 'null'], maxLength: 500 }
+        slaSummary: { type: [string, 'null'], maxLength: 500 }
+        updatedAt: { type: string, format: date-time }
+        dataComplete: { type: boolean }
+        dataProblem: { type: [string, 'null'] }
+    AdminProjectWorkspaceView:
+      type: object
+      additionalProperties: false
+      required: [projectId, projectCode, projectName, status, startsOn, regionNames, networkNames,
+        configurationReadable, fulfillmentProfiles, dataComplete, asOf]
+      properties:
+        projectId: { type: string, format: uuid }
+        projectCode: { type: string, minLength: 1, maxLength: 128 }
+        projectName: { type: string, minLength: 1, maxLength: 200 }
+        clientName: { type: [string, 'null'], maxLength: 200 }
+        status: { enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED] }
+        startsOn: { type: string, format: date }
+        endsOn: { type: [string, 'null'], format: date }
+        regionNames: { type: array, items: { type: string, minLength: 1, maxLength: 200 } }
+        networkNames: { type: array, items: { type: string, minLength: 1, maxLength: 200 } }
+        configurationReadable: { type: boolean }
+        fulfillmentProfiles:
+          type: array
+          items: { $ref: '#/components/schemas/AdminProjectFulfillmentProfile' }
+        activeWorkOrderCount: { type: [integer, 'null'], minimum: 0 }
+        activeWorkOrderCountTruncated: { type: [boolean, 'null'] }
+        dataComplete: { type: boolean }
+        dataProblem: { type: [string, 'null'] }
         asOf: { type: string, format: date-time }
     PrincipalPersona:
       type: object
