@@ -35,7 +35,7 @@ status: Proposed
 | evidence | ARCH-10、ADR-008/018/022/039/040、M201～M202 | API-03、Core OpenAPI 0.94.0 Network Portal evidence on-behalf / correction queue、evidence.slots-reresolved@v1 | DATA-03、V053、V099 | M3 EVD/FILE、M53、M201、M202 | E3 |
 | review | ARCH-10 | API-03、OpenAPI 0.30.0、client-review-case-created@v1 | DATA-03、V049/V054/V056 | M3 REV/COR、M55/M57 | E3 |
 | network | ARCH-11、ADR-024/042/043/044、M185、M204～M206 | API-04、Core OpenAPI 1.0.0 Network Portal manage-technician + qualification/membership list | DATA-04、V088、V100 | M4 NET、M185、M204～M206 | E4 |
-| dispatch | ARCH-11、ADR-009、ADR-034/038、M144、M196、M200 | API-04、Core OpenAPI 0.92.0 Network Portal assign/reassign-technician | DATA-04、V024、V096、V098 | M4 DSP/ASN、M144、M196、M200 | E4 |
+| dispatch | ARCH-11、ADR-009、ADR-034/038、M144、M196、M200、M453 | API-04、Core OpenAPI 2.0.0 责任网点候选与两阶段责任链 | DATA-04、V024、V096、V098（M453 无迁移） | M4 DSP/ASN、M144、M196、M200、M453 | E4 |
 | sla | ARCH-12、M61～M66 | sla.started/breached/met@v1；API-04、OpenAPI Core 0.38.0 | DATA-04、V061～V066 | M4 SLA、M61～M66 | E4 |
 | integration | ARCH-13、ADR-010/014、M57～M60 | API-04、OpenAPI Core 0.32.0、BYD CPIM 0.3.0、outbound-delivery-created/acknowledged/replay-requested/recovered@v1、route/callback 事件 | DATA-04、V055～V060 | M4 INT/DLV、M56～M60 | E2/E4 |
 | notification | ARCH-14 | API-04 | DATA-04 | M4 NTF | E4 |
@@ -238,7 +238,7 @@ Feature gate/authority: if applicable
 | M141 | Admin 入站同单表单/资料/审核/外发 E2E：`BYD:INSTALL:` 系谱、formRef+PILOT_SURVEY Evidence、visit→form→snapshot→INTERNAL APPROVED→BYD ACK→厂端回调→dual complete→FULFILLED；SA 仍为本地夹具 | PRODUCT-01/02 + ARCH-08/09/10/11/13/19 + BYD Inbound/Outbound + Form/Evidence/Review + Admin Web build/E2E + `154-m141-*` + `138-m141-*` | Admin 派单 HTTP、同单整改分支、真实 sandbox、完整 ADMIN-PILOT-09 |
 | M142 | Admin 入站同单整改补传复审外发 E2E：visit→form→REJECTED→CorrectionCase→同 Item 补传→resubmit/close→复审 APPROVED→BYD ACK→厂端回调→FULFILLED；SA 仍为本地夹具 | PRODUCT-01/02 + ARCH-08/09/10/11/13/19 + BYD Inbound/Outbound + Form/Evidence/Review/Correction + Admin Web build/E2E + `155-m142-*` + `139-m142-*` | Admin 派单 HTTP、真实 sandbox、完整 ADMIN-PILOT-09 |
 | M143 | Admin 试点 SPI ServiceAssignment 种子：field-ops/入站工单经 Capacity+Assignment SPI 注入 ACTIVE NETWORK/TECHNICIAN、CONFIRMED reservation 与 COMPLETED saga；删除 SQL 直插 | PRODUCT-01/02 + ARCH-11/19 + Dispatch SPI + Admin pilot smoke + `156-m143-*` + `140-m143-*` | Admin 派单 HTTP、真实 sandbox、完整 ADMIN-PILOT-09 |
-| M144 | Admin 人工初派 ServiceAssignment HTTP：`manual-assign` OpenAPI 0.72.0 + 编排门面；Admin UI；field-ops/入站 Playwright；删除 SPI 种子；入站证明 ADMIN-PILOT-09（窄化派单） | PRODUCT-01/02 + ARCH-11/19 + Core OpenAPI 0.72.0 + Dispatch ManualAssign + Admin Web E2E + `157-m144-*` + `141-m144-*` | 评分/硬过滤/ServiceNetwork 生命周期、真实 sandbox |
+| M144 | 历史 Admin 双责任 HTTP 试点；M453 已删除外部路径与 Admin UI，内部原子编排仅供 Network Portal 指派师傅复用 | PRODUCT-01/02 + ARCH-11/19 + Dispatch ManualAssign 内部编排 + `157-m144-*` + `141-m144-*` | 当前产品入口以 M453 两阶段责任链为准 |
 | M145 | Admin 入站 Envelope/Canonical 详情深链：工作区 INTEGRATION → `/integration/inbound/{id}`；复用已 Implemented GET；Playwright 断言 Envelope/Canonical/`BYD:INSTALL:` | PRODUCT-01/02 + ARCH-13/19 + Inbound GET APIs + Admin Web E2E + `158-m145-*` + `142-m145-*` | 专用入站队列列表 API、原文下载、真实 sandbox |
 | M146 | Admin 外发交付队列筛选：OutboundQueuePage 绑定 Accepted OpenAPI 单值筛选（默认 UNKNOWN）；Playwright ACK 后 `status=ACKNOWLEDGED` 可见交付 | PRODUCT-01/02 + ARCH-13/19 + API-06 §6 outbound-deliveries + Admin Web E2E + `159-m146-*` + `143-m146-*` | 多 status OR、SavedView、专用入站队列列表 API、真实 sandbox |
 | M147 | Admin 工作区外发交付详情深链：INTEGRATION `outboundDeliveries[]` → `/integration/outbound/{id}`；复用已 Implemented GET/详情页；Playwright 断言 | PRODUCT-01/02 + ARCH-13/19 + API-06 workspace INTEGRATION + Outbound GET + Admin Web E2E + `160-m147-*` + `144-m147-*` | 专用入站队列列表 API、SavedView、真实 sandbox |
@@ -541,4 +541,4 @@ Feature gate/authority: if applicable
 | M450 | Admin 工单目录异常摘要列 | 461-m450-* + 444-m450-*；OpenAPI 1.0.112；页级 `exceptionSummaries` + soft-gate + PostgresIT + Playwright | 异常筛选；人工视觉批准 |
 | M451 | Admin 工单目录异常摘要深链 | 462-m451-* + 445-m451-*；OpenAPI 仍 1.0.112；列链接 → 异常队列 query 水合 + Playwright | 异常筛选；单异常详情直达；人工视觉批准 |
 | M452 | Admin 关注项目角标精确 COUNT | 463-m452-* + 446-m452-*；OpenAPI 1.0.113；精确 COUNT + `*Truncated=false` + PostgresIT | 履约使用中摘要精确 COUNT；人工视觉批准 |
-
+| M453 | Admin 责任网点候选与分配产品化 | 464-m453-* + 447-m453-*；OpenAPI 2.0.0；共享硬过滤评估器 + PROJECT Scope 查询 + 命令重校验 + 删除历史双责任外部路径 + 师傅档案/登录主体唯一映射 + PostgresIT/MVC/Admin/真实 OIDC E2E/客户端/L3 门禁 | 通用人工特批、DispatchDecision 查询、人工视觉批准 |

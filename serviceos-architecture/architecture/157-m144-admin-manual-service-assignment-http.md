@@ -7,9 +7,12 @@ lastUpdated: 2026-07-17
 
 # M144 Admin 人工初派 ServiceAssignment HTTP
 
+> 历史实现说明：本里程碑证明的 Admin 双责任 HTTP 入口已被 M453 的正式责任链替代并删除。
+> 内部双责任事务编排仍由 Network Portal 指派师傅用例复用；当前外部产品契约只允许平台派网点、网点派师傅。
+
 ## 1. 范围
 
-承接 M143，将 Visit 所需 ServiceAssignment 从 SPI 种子改为 **Admin HTTP 人工初派**：
+承接 M143，当时将 Visit 所需 ServiceAssignment 从 SPI 种子改为 **Admin HTTP 人工初派**：
 
 ```text
 POST /api/v1/tasks/{taskId}/service-assignments:manual-assign
@@ -37,12 +40,12 @@ POST /api/v1/tasks/{taskId}/service-assignments:manual-assign
 | 改派 | 不做；已有不同 ACTIVE 责任则冲突失败关闭 |
 | UI | 工单工作区最小人工初派控件；无 `/dispatch` 队列页 |
 
-完整 DispatchRequest/Decision/ServiceNetwork 生命周期仍属未实现。
+该试点表面不再是当前可用契约；M453 删除了双责任 HTTP 路径和 Admin 控件，并用权威候选、提交时重校验和两阶段责任链替代。
 
 ## 3. 实现要点
 
 1. `ManualServiceAssignmentService` 编排已 Implemented SPI；Controller 只做协议适配；
-2. Core OpenAPI **0.72.0**；本地 RoleGrant 增加上述两能力；
+2. 当时的 Core OpenAPI 为 **0.72.0**；该路径已从当前 OpenAPI 删除；
 3. 删除 M143 SPI 种子入口；冒烟 SQL 断言 `created_by` 为 Admin 主体。
 
 ## 4. 明确未实现

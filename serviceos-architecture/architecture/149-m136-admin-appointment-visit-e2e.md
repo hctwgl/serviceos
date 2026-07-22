@@ -43,7 +43,8 @@ assign/claim/start
 ## 4. 工程证据
 
 - `serviceos-deploy/keycloak/grant-local-project-admin.sql`
-- Admin HTTP `service-assignments:manual-assign`（M144；M143 SPI 种子与更早 SQL 直插已删除）
+- 当前使用 M453 正式两阶段责任链：Admin `manual-assign-network` 派网点，再由 Network Portal
+  `assign-technician` 派师傅（M144 双责任 HTTP 与 M143 SPI 种子均已删除）
 - `serviceos-deploy/admin-pilot/verify-admin-smoke.sh`
 - `serviceos-admin-web/tests/e2e/admin-pilot-smoke.spec.ts`
 - `testing/133-m136-admin-appointment-visit-acceptance.md`
