@@ -11,15 +11,9 @@ import com.serviceos.configuration.api.FrozenBundleClientCapabilityProbe;
 import com.serviceos.configuration.api.ExpressionContext;
 import com.serviceos.dispatch.api.ActivateNetworkFromFrozenDispatchCommand;
 import com.serviceos.dispatch.api.ActivateTechnicianFromFrozenDispatchCommand;
-import com.serviceos.dispatch.api.NetworkAllocationActualQuery;
-import com.serviceos.dispatch.api.NetworkAllocationTargetQuery;
 import com.serviceos.dispatch.api.ServiceAssignmentService;
 import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
-import com.serviceos.network.api.ServiceNetworkCoverageQuery;
-import com.serviceos.network.api.ServiceNetworkCoverageView;
-import com.serviceos.network.api.ServiceNetworkDirectoryQuery;
-import com.serviceos.project.api.ProjectNetworkDirectoryQuery;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
 import com.serviceos.reliability.spi.OutboxMessage;
@@ -35,10 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -60,11 +51,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
 
     private final TaskFulfillmentContextService tasks;
     private final WorkOrderExpressionContextQuery workOrderContexts;
-    private final ProjectNetworkDirectoryQuery projectNetworks;
-    private final ServiceNetworkDirectoryQuery serviceNetworks;
-    private final ServiceNetworkCoverageQuery coverages;
-    private final NetworkAllocationTargetQuery allocationTargets;
-    private final NetworkAllocationActualQuery allocationActuals;
+    private final NetworkDispatchCandidateEvaluator networkCandidates;
     private final NetworkPortalTechnicianQuery technicians;
     private final FrozenBundleClientCapabilityProbe clientCapabilityProbe;
     private final DispatchRuntime dispatchRuntime;
@@ -77,11 +64,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
     DefaultTaskDispatchPolicyEventConsumer(
             TaskFulfillmentContextService tasks,
             WorkOrderExpressionContextQuery workOrderContexts,
-            ProjectNetworkDirectoryQuery projectNetworks,
-            ServiceNetworkDirectoryQuery serviceNetworks,
-            ServiceNetworkCoverageQuery coverages,
-            NetworkAllocationTargetQuery allocationTargets,
-            NetworkAllocationActualQuery allocationActuals,
+            NetworkDispatchCandidateEvaluator networkCandidates,
             NetworkPortalTechnicianQuery technicians,
             FrozenBundleClientCapabilityProbe clientCapabilityProbe,
             DispatchRuntime dispatchRuntime,
@@ -93,11 +76,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
     ) {
         this.tasks = tasks;
         this.workOrderContexts = workOrderContexts;
-        this.projectNetworks = projectNetworks;
-        this.serviceNetworks = serviceNetworks;
-        this.coverages = coverages;
-        this.allocationTargets = allocationTargets;
-        this.allocationActuals = allocationActuals;
+        this.networkCandidates = networkCandidates;
         this.technicians = technicians;
         this.clientCapabilityProbe = clientCapabilityProbe;
         this.dispatchRuntime = dispatchRuntime;
@@ -160,8 +139,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
         String networkAssigneeId;
         String networkPolicyEvidence;
         if (!networkActive) {
-            NetworkActivation network = activateNetwork(
-                    message, task, wo, expressionContext, asOf);
+            NetworkActivation network = activateNetwork(message, task, wo, asOf);
             if (network == null) {
                 return;
             }
@@ -187,61 +165,12 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
             OutboxMessage message,
             TaskFulfillmentContext task,
             WorkOrderExpressionContext wo,
-            ExpressionContext expressionContext,
             Instant asOf
     ) {
         UUID taskId = task.taskId();
-        List<String> projectNetworkIds = projectNetworks.listActiveNetworkIds(
-                message.tenantId(), task.projectId(), asOf);
-        List<String> activeNetworkIds = serviceNetworks.listActiveNetworkIds(
-                message.tenantId(), projectNetworkIds);
-        List<ServiceNetworkCoverageView> coverageRows = coverages.listActiveCoverage(
-                message.tenantId(), activeNetworkIds, wo.brandCode(), wo.serviceProductCode(), asOf);
-        Map<String, Set<String>> regionsByNetwork = new LinkedHashMap<>();
-        // 省/市/区任一码命中即纳入候选；空值忽略，避免 Set.of(null) NPE 导致 Inbox 回滚。
-        Set<String> workOrderRegions = new LinkedHashSet<>();
-        if (wo.provinceCode() != null && !wo.provinceCode().isBlank()) {
-            workOrderRegions.add(wo.provinceCode().trim());
-        }
-        if (wo.cityCode() != null && !wo.cityCode().isBlank()) {
-            workOrderRegions.add(wo.cityCode().trim());
-        }
-        if (wo.districtCode() != null && !wo.districtCode().isBlank()) {
-            workOrderRegions.add(wo.districtCode().trim());
-        }
-        for (ServiceNetworkCoverageView row : coverageRows) {
-            if (row.regionCode() == null || !workOrderRegions.contains(row.regionCode())) {
-                continue;
-            }
-            String networkId = row.serviceNetworkId().toString();
-            regionsByNetwork.computeIfAbsent(networkId, ignored -> new LinkedHashSet<>())
-                    .add(row.regionCode());
-        }
-        Map<String, Double> ratioGaps = allocationRatioGaps(
-                message.tenantId(), task.projectId(), wo.brandCode(), wo.serviceProductCode(), asOf);
-        List<DispatchCandidate> candidates = new ArrayList<>();
-        for (Map.Entry<String, Set<String>> entry : regionsByNetwork.entrySet()) {
-            CapacitySnapshot capacity = capacitySnapshot(
-                    message.tenantId(), "NETWORK", entry.getKey(), wo.serviceProductCode());
-            if (capacity == null) {
-                continue;
-            }
-            candidates.add(coverageCandidate(
-                    entry.getKey(),
-                    wo.brandCode(),
-                    wo.serviceProductCode(),
-                    entry.getValue(),
-                    capacity.remaining(),
-                    ratioGaps.getOrDefault(entry.getKey(), 0.0)));
-        }
-
-        DispatchResolution resolution = dispatchRuntime.resolve(new DispatchResolveCommand(
-                message.tenantId(),
-                task.configurationBundleId(),
-                task.configurationBundleDigest(),
-                task.dispatchPolicyRef(),
-                expressionContext,
-                candidates));
+        NetworkDispatchCandidateEvaluator.Evaluation evaluation =
+                networkCandidates.evaluate(message.tenantId(), task);
+        DispatchResolution resolution = evaluation.resolution();
         String explanation = clipped(String.join("; ", resolution.explanations()));
         String policyEvidence = resolution.assetVersionId() + "|" + resolution.contentDigest();
 
@@ -254,9 +183,9 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
         }
 
         DispatchResolution.RankedCandidate top = resolution.rankedCandidates().getFirst();
-        CapacitySnapshot capacity = capacitySnapshot(
-                message.tenantId(), "NETWORK", top.candidateId(), wo.serviceProductCode());
-        if (capacity == null || capacity.remaining() <= 0) {
+        NetworkDispatchCandidateEvaluator.CandidateFacts facts =
+                evaluation.candidateFacts().get(top.candidateId());
+        if (facts == null || facts.capacity().remaining() <= 0) {
             auditManual(message, taskId, asOf, "SERVICE_DISPATCH_POLICY_MANUAL",
                     policyEvidence + "|CAPACITY_RACE", explanation);
             inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
@@ -275,7 +204,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
                         top.candidateId(),
                         wo.serviceProductCode(),
                         sourceDecisionId,
-                        capacity.version()));
+                        facts.capacity().version()));
         audit.append(new AuditEntry(
                 UUID.randomUUID(), message.tenantId(), SYSTEM_ACTOR,
                 "SERVICE_DISPATCH_POLICY_APPLIED", "dispatch.assignment.manage",
@@ -460,58 +389,6 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
                         rs.getInt("maxUnits") - rs.getInt("occupiedUnits")))
                 .optional()
                 .orElse(null);
-    }
-
-    /**
-     * gap = committedShare − actualShare；缺口越大越欠配，正权重下优先。
-     * 无目标行的网点 gap=0（中性）；当月总派单为 0 时 actualShare=0。
-     */
-    private Map<String, Double> allocationRatioGaps(
-            String tenantId,
-            UUID projectId,
-            String brandCode,
-            String businessType,
-            Instant asOf
-    ) {
-        Map<String, Double> targets = allocationTargets.listCommittedShares(
-                tenantId, projectId, brandCode, businessType, asOf);
-        if (targets.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, Long> actuals = allocationActuals.countMonthlyNetworkAssignments(
-                tenantId, projectId, brandCode, businessType, asOf);
-        long total = actuals.values().stream().mapToLong(Long::longValue).sum();
-        Map<String, Double> gaps = new LinkedHashMap<>();
-        for (Map.Entry<String, Double> target : targets.entrySet()) {
-            double actualShare = total <= 0
-                    ? 0.0
-                    : actuals.getOrDefault(target.getKey(), 0L) / (double) total;
-            gaps.put(target.getKey(), target.getValue() - actualShare);
-        }
-        return gaps;
-    }
-
-    private static DispatchCandidate coverageCandidate(
-            String candidateId,
-            String brandCode,
-            String businessType,
-            Set<String> regionCodes,
-            int remaining,
-            double allocationRatioGap
-    ) {
-        return new DispatchCandidate(
-                candidateId,
-                true,
-                false,
-                true,
-                Set.of(brandCode),
-                Set.copyOf(regionCodes),
-                Set.of(businessType),
-                remaining,
-                0.0,
-                0.0,
-                0.0,
-                allocationRatioGap);
     }
 
     private static DispatchCandidate wildcardCandidate(String candidateId, int remaining) {

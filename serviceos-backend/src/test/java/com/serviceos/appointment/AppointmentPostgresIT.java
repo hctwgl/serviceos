@@ -27,6 +27,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
@@ -99,7 +100,7 @@ class AppointmentPostgresIT {
         assertThat(surveyView.revisions().get(2).reasonCode()).isEqualTo("CUSTOMER_REQUESTED_LATER");
         assertThat(installView.status()).isEqualTo("PROPOSED");
         assertThat(installView.revisions()).hasSize(1);
-        assertThat(installView.technicianId()).isEqualTo("install-tech");
+        assertThat(installView.technicianId()).isEqualTo(principalId("install-tech"));
         assertThat(installView.assignedNetworkId()).isEqualTo("network-a");
     }
 
@@ -372,14 +373,48 @@ class AppointmentPostgresIT {
                         now(), 'fixture', now()
                     )
                     """).param("assignmentId", UUID.randomUUID()).param("tenant", tenant)
-                    .param("taskId", taskId).param("responsible", responsible).update();
+                    .param("taskId", taskId).param("responsible", principalId(responsible)).update();
         }
         return taskId;
     }
 
     private void seedServiceResponsibility(UUID taskId, String networkId, String technicianId) {
+        seedTechnicianIdentity(technicianId);
         insertServiceAssignment(taskId, "NETWORK", networkId);
-        insertServiceAssignment(taskId, "TECHNICIAN", technicianId);
+        insertServiceAssignment(taskId, "TECHNICIAN", profileId(technicianId));
+    }
+
+    private void seedTechnicianIdentity(String label) {
+        String principal = principalId(label);
+        String profile = profileId(label);
+        jdbc.sql("""
+                INSERT INTO idn_security_principal (
+                    principal_id, tenant_id, principal_type, principal_status,
+                    aggregate_version, created_at, updated_at
+                ) VALUES (:principal, :tenant, 'USER', 'ACTIVE', 1, now(), now())
+                ON CONFLICT (principal_id) DO NOTHING
+                """).param("principal", UUID.fromString(principal)).param("tenant", TENANT).update();
+        jdbc.sql("""
+                INSERT INTO net_technician_profile (
+                    technician_profile_id, tenant_id, principal_id, display_name, profile_status,
+                    aggregate_version, created_at, updated_at
+                ) VALUES (:profile, :tenant, :principal, :name, 'ACTIVE', 1, now(), now())
+                ON CONFLICT (technician_profile_id) DO NOTHING
+                """).param("profile", UUID.fromString(profile))
+                .param("tenant", TENANT)
+                .param("principal", UUID.fromString(principal))
+                .param("name", label)
+                .update();
+    }
+
+    private static String principalId(String label) {
+        return UUID.nameUUIDFromBytes(("appointment-principal:" + label)
+                .getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    private static String profileId(String label) {
+        return UUID.nameUUIDFromBytes(("appointment-profile:" + label)
+                .getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     private void insertServiceAssignment(UUID taskId, String level, String assigneeId) {

@@ -1,7 +1,5 @@
 package com.serviceos.dispatch.web;
 
-import com.serviceos.dispatch.api.ManualAssignServiceAssignmentCommand;
-import com.serviceos.dispatch.api.ManualServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ManualServiceAssignmentService;
 import com.serviceos.dispatch.api.NetworkPortalAcceptAssignmentReceipt;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -39,29 +37,11 @@ final class ManualServiceAssignmentController {
         this.principals = principals;
     }
 
-    @PostMapping("/{taskId}/service-assignments:manual-assign")
-    ResponseEntity<ManualServiceAssignmentReceipt> manualAssign(
-            @PathVariable UUID taskId,
-            @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
-            @Valid @RequestBody ManualAssignServiceAssignmentRequest request
-    ) {
-        CurrentPrincipal principal = principals.current();
-        ManualServiceAssignmentReceipt receipt = manualAssignments.manualAssign(
-                principal,
-                new CommandMetadata(correlationId, idempotencyKey),
-                new ManualAssignServiceAssignmentCommand(
-                        taskId, request.networkAssigneeId(), request.technicianAssigneeId(),
-                        request.businessType()));
-        return ResponseEntity.ok()
-                .header(CorrelationIds.HEADER_NAME, correlationId)
-                .body(receipt);
-    }
-
     /**
      * 平台初审派网点：仅激活 ACTIVE NETWORK，不强制同时指派师傅。
      * <p>
-     * 复用 {@link ManualServiceAssignmentService#manualAssignNetwork}；能力与双责任初派相同。
+     * 复用 {@link ManualServiceAssignmentService#manualAssignNetwork}；平台只能建立网点责任，
+     * 师傅责任必须由网点端在可信 NETWORK 上下文中另行建立。
      * 网点列表可见后，网点端可幂等确认接单或继续指派师傅。
      */
     @PostMapping("/{taskId}/service-assignments:manual-assign-network")

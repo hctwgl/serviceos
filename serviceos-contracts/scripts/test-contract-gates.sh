@@ -55,6 +55,19 @@ perl -0pi -e 's/required: \[code, clientId, name, startsOn\]/required: [code, cl
 expect_gate_failure "openapi-breaking-change"
 git -C "${temporary_repository}" restore -- "serviceos-contracts/src/main/resources/openapi/serviceos-core-v1.yaml"
 
+# 同一破坏性变化在明确升级 OpenAPI 主版本后允许通过，证明门禁要求的是可识别版本边界，
+# 而不是通过关闭 oasdiff 或宽泛忽略规则来隐藏不兼容变化。
+perl -0pi -e 's/required: \[code, clientId, name, startsOn\]/required: [code, clientId, name, startsOn, endsOn]/' \
+  "${openapi_file}"
+base_version="$(git -C "${temporary_repository}" show "${base_ref}:serviceos-contracts/src/main/resources/openapi/serviceos-core-v1.yaml" \
+  | sed -n 's/^[[:space:]]*version:[[:space:]]*//p' | head -1)"
+base_major="${base_version%%.*}"
+next_major="$((base_major + 1))"
+perl -0pi -e "s/version: \\Q${base_version}\\E/version: ${next_major}.0.0/" "${openapi_file}"
+run_gate >/dev/null
+echo "Versioned OpenAPI breaking evolution gate passed: ${base_version} -> ${next_major}.0.0."
+git -C "${temporary_repository}" restore -- "serviceos-contracts/src/main/resources/openapi/serviceos-core-v1.yaml"
+
 event_file="${temporary_repository}/serviceos-contracts/src/main/resources/events/project-created-v1.schema.json"
 perl -0pi -e 's/ProjectCreatedV1/ProjectCreatedV1Changed/' "${event_file}"
 expect_gate_failure "event-schema-in-place-change"

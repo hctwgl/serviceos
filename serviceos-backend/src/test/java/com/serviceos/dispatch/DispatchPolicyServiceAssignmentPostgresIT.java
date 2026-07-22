@@ -6,8 +6,16 @@ import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
+import com.serviceos.dispatch.api.NetworkAssignmentCandidateQuery;
+import com.serviceos.dispatch.api.NetworkAssignmentCandidateView;
+import com.serviceos.dispatch.api.ManualServiceAssignmentService;
+import com.serviceos.dispatch.api.NetworkPortalAcceptAssignmentReceipt;
+import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.application.OutboxWorker;
 import com.serviceos.shared.Sha256;
+import com.serviceos.shared.CommandMetadata;
+import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.ProblemCode;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderCommandService;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,9 +33,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * M324/M332/M337/M338：冻结 DISPATCH 在 task.created 后自动激活 NETWORK
@@ -61,6 +71,8 @@ class DispatchPolicyServiceAssignmentPostgresIT {
     @Autowired WorkOrderCommandService workOrders;
     @Autowired ConfigurationService configurations;
     @Autowired OutboxWorker outboxWorker;
+    @Autowired NetworkAssignmentCandidateQuery networkCandidates;
+    @Autowired ManualServiceAssignmentService manualAssignments;
     @Autowired JdbcClient jdbc;
 
     UUID projectId;
@@ -78,6 +90,7 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                     wfl_node_instance, wfl_stage_instance, wfl_workflow_instance, wo_work_order,
                     cfg_configuration_bundle_item, cfg_configuration_bundle, cfg_configuration_asset_version,
                     prj_project_network, prj_project, aud_audit_record,
+                    auth_role_field_policy, auth_role_grant, auth_role_capability, auth_role,
                     net_network_technician_membership, net_technician_profile,
                     net_service_network_coverage, net_service_network, net_partner_organization CASCADE
                 """).update();
@@ -97,6 +110,7 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 .param("createdAt", OffsetDateTime.now())
                 .update();
         seedNetworksAndCapacity();
+        seedDispatchReader();
         dispatchVersionId = publishBundleWithDispatchPolicy(false);
     }
 
@@ -228,6 +242,147 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 SELECT assignee_id FROM dsp_service_assignment
                  WHERE responsibility_level = 'NETWORK' AND status = 'ACTIVE'
                 """).query(String.class).single()).isEqualTo(NETWORK_WEAK.toString());
+    }
+
+    @Test
+    void authorizedAdminReadsProductReadyCandidatesFromAutomaticDispatchHardFilters() {
+        workOrders.receive(receiveCommand(
+                "M453-ORD-CANDIDATES",
+                "1".repeat(64),
+                "VINM4530001",
+                "corr-m453-candidates",
+                "cause-m453-candidates"));
+        drainOutbox(50);
+        UUID taskId = jdbc.sql("SELECT task_id FROM tsk_task").query(UUID.class).single();
+
+        NetworkAssignmentCandidateView view = networkCandidates.findCandidates(
+                dispatchReader(), "corr-m453-query", taskId);
+
+        assertThat(view.businessType()).isEqualTo("HOME_CHARGING_SURVEY_INSTALL");
+        assertThat(view.emptyReason()).isNull();
+        assertThat(view.candidates()).extracting(NetworkAssignmentCandidateView.Candidate::networkId)
+                .containsExactly(NETWORK_STRONG, NETWORK_WEAK);
+        assertThat(view.candidates()).allSatisfy(candidate -> {
+            assertThat(candidate.networkName()).startsWith("Network ");
+            assertThat(candidate.coverageSummary()).isEqualTo("覆盖工单所在城市");
+            assertThat(candidate.remainingCapacity()).isPositive();
+        });
+
+        jdbc.sql("""
+                UPDATE net_service_network
+                   SET network_name = ''
+                 WHERE service_network_id = :networkId
+                """)
+                .param("networkId", NETWORK_WEAK)
+                .update();
+        NetworkAssignmentCandidateView incomplete = networkCandidates.findCandidates(
+                dispatchReader(), "corr-m453-incomplete", taskId);
+        assertThat(incomplete.candidates()).isEmpty();
+        assertThat(incomplete.emptyReason()).contains("资料不完整");
+
+        CurrentPrincipal unauthorized = new CurrentPrincipal(
+                "m453-unauthorized",
+                TENANT,
+                CurrentPrincipal.PrincipalType.USER,
+                "admin-web",
+                Set.of());
+        assertThatThrownBy(() -> networkCandidates.findCandidates(
+                unauthorized, "corr-m453-denied", taskId))
+                .isInstanceOf(BusinessProblem.class);
+    }
+
+    @Test
+    void manualNetworkAssignmentRevalidatesCandidateAndNeverCreatesCapacityFallback() {
+        workOrders.receive(receiveCommand(
+                "M453-ORD-MANUAL",
+                "2".repeat(64),
+                "VINM4530002",
+                "corr-m453-manual",
+                "cause-m453-manual"));
+        drainOutbox(50);
+        UUID taskId = jdbc.sql("SELECT task_id FROM tsk_task").query(UUID.class).single();
+        clearAutomaticAssignments();
+
+        assertThatThrownBy(() -> manualAssignments.manualAssignNetwork(
+                dispatchReader(),
+                new CommandMetadata("corr-m453-wrong-type", "m453-wrong-type-command"),
+                taskId,
+                NETWORK_STRONG.toString(),
+                "INSTALLATION"))
+                .isInstanceOf(BusinessProblem.class)
+                .hasMessageContaining("与工单权威服务类型不一致");
+        assertThat(jdbc.sql("SELECT count(*) FROM dsp_service_assignment")
+                .query(Long.class).single()).isZero();
+
+        NetworkPortalAcceptAssignmentReceipt receipt = manualAssignments.manualAssignNetwork(
+                dispatchReader(),
+                new CommandMetadata("corr-m453-manual-command", "m453-manual-command"),
+                taskId,
+                NETWORK_STRONG.toString(),
+                "HOME_CHARGING_SURVEY_INSTALL");
+
+        assertThat(receipt.networkAssigneeId()).isEqualTo(NETWORK_STRONG.toString());
+        assertThat(jdbc.sql("""
+                SELECT assignee_id FROM dsp_service_assignment
+                 WHERE responsibility_level = 'NETWORK' AND status = 'ACTIVE'
+                """).query(String.class).single()).isEqualTo(NETWORK_STRONG.toString());
+
+        clearAutomaticAssignments();
+        jdbc.sql("DELETE FROM net_service_network_coverage WHERE service_network_id = :network")
+                .param("network", NETWORK_STRONG)
+                .update();
+        assertThatThrownBy(() -> manualAssignments.manualAssignNetwork(
+                dispatchReader(),
+                new CommandMetadata("corr-m453-stale", "m453-stale-command"),
+                taskId,
+                NETWORK_STRONG.toString(),
+                "HOME_CHARGING_SURVEY_INSTALL"))
+                .isInstanceOf(BusinessProblem.class)
+                .hasMessageContaining("当前不符合");
+        assertThat(jdbc.sql("SELECT count(*) FROM dsp_service_assignment")
+                .query(Long.class).single()).isZero();
+
+        jdbc.sql("DELETE FROM dsp_capacity_counter WHERE responsibility_level = 'NETWORK'").update();
+        assertThatThrownBy(() -> manualAssignments.manualAssignNetwork(
+                dispatchReader(),
+                new CommandMetadata("corr-m453-no-capacity", "m453-no-capacity-command"),
+                taskId,
+                NETWORK_WEAK.toString(),
+                "HOME_CHARGING_SURVEY_INSTALL"))
+                .isInstanceOf(BusinessProblem.class)
+                .hasMessageContaining("当前不符合");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM dsp_capacity_counter
+                 WHERE responsibility_level = 'NETWORK'
+                """).query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void manualNetworkAssignmentIdempotentReadStillRequiresManageCapability() {
+        workOrders.receive(receiveCommand(
+                "M453-ORD-IDEMPOTENT-AUTH",
+                "3".repeat(64),
+                "VINM4530003",
+                "corr-m453-idempotent-auth",
+                "cause-m453-idempotent-auth"));
+        drainOutbox(50);
+        UUID taskId = jdbc.sql("SELECT task_id FROM tsk_task").query(UUID.class).single();
+        CurrentPrincipal unauthorized = new CurrentPrincipal(
+                "m453-no-assignment-manage",
+                TENANT,
+                CurrentPrincipal.PrincipalType.USER,
+                "admin-web",
+                Set.of());
+
+        // 已存在责任的幂等收据仍包含受保护事实，必须在读取并返回之前完成授权。
+        assertThatThrownBy(() -> manualAssignments.manualAssignNetwork(
+                unauthorized,
+                new CommandMetadata("corr-m453-idempotent-denied", "m453-idempotent-denied"),
+                taskId,
+                NETWORK_STRONG.toString(),
+                "HOME_CHARGING_SURVEY_INSTALL"))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
     }
 
     private ReceiveExternalWorkOrderCommand receiveCommand(
@@ -431,6 +586,84 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 .param("assignee", assigneeId)
                 .param("maxUnits", maxUnits)
                 .param("occupied", occupied)
+                .update();
+    }
+
+    private void seedDispatchReader() {
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (
+                    role_id, tenant_id, role_code, role_name, role_status, created_at
+                ) VALUES (
+                    :roleId, :tenant, 'm453-dispatch-reader', 'M453 派单候选读取', 'ACTIVE', now()
+                )
+                """)
+                .param("roleId", roleId)
+                .param("tenant", TENANT)
+                .update();
+        jdbc.sql("""
+                INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                VALUES
+                    (:roleId, 'dispatch.read', now()),
+                    (:roleId, 'dispatch.assignment.manage', now())
+                """)
+                .param("roleId", roleId)
+                .update();
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at
+                ) VALUES (
+                    :grantId, :tenant, 'm453-reader', :roleId, 'PROJECT', :projectId,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M453-TEST', now()
+                )
+                """)
+                .param("grantId", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("roleId", roleId)
+                .param("projectId", projectId.toString())
+                .update();
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at
+                ) VALUES (
+                    :grantId, :tenant, 'm453-reader', :roleId, 'TENANT', :tenant,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M453-TEST', now()
+                )
+                """)
+                .param("grantId", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("roleId", roleId)
+                .update();
+    }
+
+    private static CurrentPrincipal dispatchReader() {
+        return new CurrentPrincipal(
+                "m453-reader",
+                TENANT,
+                CurrentPrincipal.PrincipalType.USER,
+                "admin-web",
+                Set.of("dispatch.read", "dispatch.assignment.manage"));
+    }
+
+    private void clearAutomaticAssignments() {
+        jdbc.sql("""
+                TRUNCATE TABLE dsp_assignment_command_result, dsp_capacity_reservation,
+                    dsp_service_assignment_activation_saga, dsp_service_assignment CASCADE
+                """).update();
+        jdbc.sql("""
+                UPDATE dsp_capacity_counter
+                   SET occupied_units = CASE assignee_id
+                       WHEN :strong THEN 1
+                       WHEN :weak THEN 1
+                       ELSE 0
+                   END,
+                       version = version + 1
+                 WHERE responsibility_level = 'NETWORK'
+                """)
+                .param("strong", NETWORK_STRONG.toString())
+                .param("weak", NETWORK_WEAK.toString())
                 .update();
     }
 

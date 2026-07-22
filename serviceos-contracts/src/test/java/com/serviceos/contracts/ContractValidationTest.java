@@ -29,11 +29,12 @@ class ContractValidationTest {
 
         assertThat(result.getMessages()).as("OpenAPI parser messages").isEmpty();
         assertThat(result.getOpenAPI()).isNotNull();
+        assertThat(result.getOpenAPI().getInfo().getVersion()).isEqualTo("2.0.0");
         assertThat(result.getOpenAPI().getPaths())
                 .containsKeys("/projects", "/projects/{projectId}",
                         "/projects/{projectId}/scope-revisions", "/files/upload-sessions",
                         "/tasks/{taskId}:assign-candidates",
-                        "/tasks/{taskId}/service-assignments:manual-assign",
+                        "/tasks/{taskId}/service-assignments:manual-assign-network",
                         "/tasks/{taskId}:claim",
                         "/tasks/{taskId}:start", "/tasks/{taskId}:complete", "/tasks/{taskId}:release",
                         "/tasks/{taskId}/contact-attempts",
@@ -76,6 +77,9 @@ class ContractValidationTest {
                         "/configuration/bundle-activations/{activationId}:promote",
                         "/configuration/bundle-activations/{activationId}:rollback",
                         "/configuration/bundle-activations/{activationId}:deactivate");
+        assertThat(result.getOpenAPI().getPaths())
+                .as("平台不能保留可同时指派网点和师傅的旧契约入口")
+                .doesNotContainKey("/tasks/{taskId}/service-assignments:manual-assign");
     }
 
     @Test

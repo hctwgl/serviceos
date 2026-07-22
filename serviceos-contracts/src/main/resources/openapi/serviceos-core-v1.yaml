@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.113
+  version: 2.0.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -4623,44 +4623,38 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
-  /tasks/{taskId}/service-assignments:manual-assign:
-    post:
-      operationId: manualAssignServiceAssignments
-      summary: Admin 人工初派网点与师傅服务责任
+  /tasks/{taskId}/network-assignment-candidates:
+    get:
+      operationId: getNetworkAssignmentCandidates
+      summary: 查询责任网点候选
       description: >-
-        窄化试点命令：确保容量后经 ServiceAssignment 激活 saga 同事务落到 ACTIVE NETWORK +
-        TECHNICIAN。不执行评分/硬过滤/DispatchRequest，不支持改派；能力为
-        dispatch.assignment.manage 与 dispatch.capacity.configure。
+        根据 Task 权威项目、工单服务区域与业务类型、冻结派单配置以及当前网点状态、覆盖和容量，
+        返回 Admin 可选择的责任网点。需要 dispatch.read 的 PROJECT Scope；客户端不得提交 tenant、
+        project、区域或业务类型参与候选计算。候选为空时返回明确中文原因，不自动跨区或扩容。
       parameters:
         - $ref: '#/components/parameters/TaskId'
-        - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/ManualAssignServiceAssignmentRequest' }
       responses:
         '200':
-          description: 双责任已激活或幂等回放
+          description: 当前可分配责任网点候选；无候选时 candidates 为空且 emptyReason 非空
           headers:
             X-Correlation-Id: { required: true, schema: { type: string } }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ManualServiceAssignmentReceipt' }
-        '400': { $ref: '#/components/responses/Problem' }
+              schema: { $ref: '#/components/schemas/NetworkAssignmentCandidateView' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
-        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /tasks/{taskId}/service-assignments:manual-assign-network:
     post:
       operationId: manualAssignNetworkServiceAssignment
       summary: Admin 初审派网点（仅 NETWORK 责任）
       description: >-
-        产品可用性：确保容量后仅激活 ACTIVE NETWORK，不强制同时指派师傅。
-        复用 ManualAssignNetwork 编排；能力为 dispatch.assignment.manage 与
-        dispatch.capacity.configure。已有相同网点 ACTIVE NETWORK 时幂等回放；
+        产品可用性：服务端依据 Task 冻结配置和工单权威事实重新执行项目、网点状态、服务覆盖、
+        业务类型、容量与派单策略校验，仅允许当前仍合格的候选激活 ACTIVE NETWORK，
+        不自动创建或扩容。能力为 dispatch.assignment.manage；
+        已有相同网点 ACTIVE NETWORK 时幂等回放；
         其他网点 ACTIVE 返回 SERVICE_ASSIGNMENT_CONFLICT（409）。
         派网点后网点端列表可见，可再确认接单或指派师傅。
       parameters:
@@ -11556,14 +11550,6 @@ components:
           items: { type: string, minLength: 1, maxLength: 128 }
         sourceType: { enum: [ASSIGNEE_POLICY, MANUAL] }
         sourceId: { type: string, minLength: 1, maxLength: 160 }
-    ManualAssignServiceAssignmentRequest:
-      type: object
-      additionalProperties: false
-      required: [networkAssigneeId, technicianAssigneeId, businessType]
-      properties:
-        networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
-        technicianAssigneeId: { type: string, minLength: 1, maxLength: 128 }
-        businessType: { type: string, minLength: 1, maxLength: 100 }
     ManualAssignNetworkRequest:
       type: object
       additionalProperties: false
@@ -11571,6 +11557,43 @@ components:
       properties:
         networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
         businessType: { type: string, minLength: 1, maxLength: 100 }
+    NetworkAssignmentCandidateView:
+      type: object
+      additionalProperties: false
+      required: [taskId, workOrderId, businessType, generatedAt, rankingExplanation, candidates]
+      properties:
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        businessType:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: 工单权威服务产品编码；只用于后续派网点命令，不由客户端编辑
+        generatedAt: { type: string, format: date-time }
+        rankingExplanation: { type: string, minLength: 1, maxLength: 500 }
+        emptyReason:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 500
+        candidates:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkAssignmentCandidate' }
+    NetworkAssignmentCandidate:
+      type: object
+      additionalProperties: false
+      required: [networkId, networkName, rank, coverageSummary, remainingCapacity,
+        recommendationSummary]
+      properties:
+        networkId:
+          type: string
+          format: uuid
+          description: 后续派网点命令使用的机器标识，普通页面不得作为显示名称
+        networkName: { type: string, minLength: 1, maxLength: 200 }
+        rank: { type: integer, minimum: 1 }
+        coverageSummary: { type: string, minLength: 1, maxLength: 200 }
+        remainingCapacity: { type: integer, minimum: 1 }
+        recommendationSummary: { type: string, minLength: 1, maxLength: 500 }
     NetworkPortalAcceptAssignmentRequest:
       type: object
       additionalProperties: false

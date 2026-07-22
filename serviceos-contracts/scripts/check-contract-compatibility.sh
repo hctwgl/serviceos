@@ -52,8 +52,19 @@ while IFS= read -r published_openapi; do
       --color never \
       "${base_file}" \
       "${current_openapi}"; then
-    echo "Breaking OpenAPI change detected: ${published_openapi}" >&2
-    openapi_failure=1
+    base_version="$(sed -n 's/^[[:space:]]*version:[[:space:]]*//p' "${base_file}" | head -1)"
+    current_version="$(sed -n 's/^[[:space:]]*version:[[:space:]]*//p' "${current_openapi}" | head -1)"
+    base_major="${base_version%%.*}"
+    current_major="${current_version%%.*}"
+    # 新系统允许经明确批准直接修正契约，但破坏性变化必须通过主版本升级显式表达。
+    # 同一主版本仍严格失败，避免把普通里程碑版本递增误当成兼容门禁豁免。
+    if [[ "${base_major}" =~ ^[0-9]+$ && "${current_major}" =~ ^[0-9]+$ \
+        && "${current_major}" -gt "${base_major}" ]]; then
+      echo "Versioned breaking OpenAPI evolution accepted: ${published_openapi} ${base_version} -> ${current_version}."
+    else
+      echo "Breaking OpenAPI change detected without a major version upgrade: ${published_openapi}" >&2
+      openapi_failure=1
+    fi
   fi
 done < <(git -C "${repository_root}" ls-tree -r --name-only "${base_ref}" -- "${openapi_directory}" \
   | LC_ALL=C sort \

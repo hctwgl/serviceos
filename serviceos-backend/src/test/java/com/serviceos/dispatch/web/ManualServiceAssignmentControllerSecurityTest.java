@@ -1,8 +1,6 @@
 package com.serviceos.dispatch.web;
 
 import com.serviceos.bootstrap.SecurityConfiguration;
-import com.serviceos.dispatch.api.ManualAssignServiceAssignmentCommand;
-import com.serviceos.dispatch.api.ManualServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ManualServiceAssignmentService;
 import com.serviceos.dispatch.api.NetworkPortalAcceptAssignmentReceipt;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -29,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** M144：人工初派 HTTP 只信任 JWT 主体，忽略可伪造 Actor 头。 */
+/** M453：平台派网点 HTTP 只信任 JWT 主体，且不再暴露平台同时派师傅的旧入口。 */
 @WebMvcTest(ManualServiceAssignmentController.class)
 @Import(SecurityConfiguration.class)
 class ManualServiceAssignmentControllerSecurityTest {
@@ -41,58 +39,29 @@ class ManualServiceAssignmentControllerSecurityTest {
     @MockitoBean CurrentPrincipalProvider principals;
 
     @Test
-    void unauthenticatedManualAssignIsRejected() throws Exception {
-        mvc.perform(post("/api/v1/tasks/{taskId}/service-assignments:manual-assign", TASK_ID)
-                        .header("Idempotency-Key", "manual-1")
+    void unauthenticatedManualAssignNetworkIsRejected() throws Exception {
+        mvc.perform(post("/api/v1/tasks/{taskId}/service-assignments:manual-assign-network", TASK_ID)
+                        .header("Idempotency-Key", "manual-net-unauthenticated")
                         .contentType("application/json")
                         .content("""
-                                {"networkAssigneeId":"network-1",
-                                 "technicianAssigneeId":"tech-1",
-                                 "businessType":"INSTALLATION"}
+                                {"networkAssigneeId":"network-1","businessType":"INSTALLATION"}
                                 """))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void trustedPrincipalReachesManualAssignBoundary() throws Exception {
-        CurrentPrincipal principal = new CurrentPrincipal(
-                "dispatch-admin", "tenant-trusted", CurrentPrincipal.PrincipalType.USER,
-                "admin-web", Set.of("dispatch.assignment.manage", "dispatch.capacity.configure"));
-        ManualServiceAssignmentReceipt receipt = new ManualServiceAssignmentReceipt(
-                TASK_ID, WORK_ORDER_ID,
-                UUID.fromString("61111111-1111-4111-8111-111111111111"),
-                UUID.fromString("62222222-2222-4222-8222-222222222222"),
-                "network-1", "tech-1", Instant.parse("2026-07-17T02:00:00Z"));
-        when(principals.current()).thenReturn(principal);
-        when(manualAssignments.manualAssign(eq(principal),
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-                .thenReturn(receipt);
-
+    void legacyAdminDualAssignmentEndpointDoesNotExist() throws Exception {
         mvc.perform(post("/api/v1/tasks/{taskId}/service-assignments:manual-assign", TASK_ID)
                         .with(jwt().jwt(token -> token.subject("dispatch-admin")
                                 .claim("tenant_id", "tenant-trusted")))
-                        .header("Idempotency-Key", "manual-1")
-                        .header("X-Correlation-Id", "corr-manual-1")
-                        .header("X-Actor-Id", "spoofed")
+                        .header("Idempotency-Key", "legacy-dual-assignment")
                         .contentType("application/json")
                         .content("""
                                 {"networkAssigneeId":"network-1",
                                  "technicianAssigneeId":"tech-1",
                                  "businessType":"INSTALLATION"}
                                 """))
-                .andExpect(status().isOk())
-                .andExpect(header().string("X-Correlation-Id", "corr-manual-1"))
-                .andExpect(jsonPath("$.networkAssigneeId").value("network-1"))
-                .andExpect(jsonPath("$.technicianAssigneeId").value("tech-1"));
-
-        verify(manualAssignments).manualAssign(
-                eq(principal),
-                argThat((CommandMetadata metadata) -> metadata.idempotencyKey().equals("manual-1")),
-                argThat((ManualAssignServiceAssignmentCommand command) ->
-                        command.taskId().equals(TASK_ID)
-                                && command.networkAssigneeId().equals("network-1")
-                                && command.technicianAssigneeId().equals("tech-1")
-                                && command.businessType().equals("INSTALLATION")));
+                .andExpect(status().isNotFound());
     }
 
     @Test
