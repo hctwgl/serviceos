@@ -108,9 +108,10 @@ ServiceOS 采用 **A+：经典专业任务型** 产品设计方向：
 28. 原生 iOS 提交前检查；
 29. 原生 iOS 上传中心；
 30. 原生 iOS 离线恢复；
-31. 原生 iOS 同步冲突。
+31. 原生 iOS 同步冲突；
+32. 通用管理页面模式。
 
-Admin 首批 A 级页面规格、NW-001 至 NW-007 网点履约链路和 IOS-001 至 IOS-010 原生 iOS 核心链路已完成第一轮收口。iOS 规格已经明确今日任务、现场作业、动态表单、不可变资料、提交门禁、后台上传、WorkPackage、OfflineCommand、离线恢复、冲突分类、版本对比、受控解决、改派隔离和多设备并发的产品边界。精确离线与冲突机器契约仍需后续工程评审，不能据此声明运行时已经实现。下一步进入通用管理页面收口。
+Admin 首批 A 级页面规格、NW-001 至 NW-007 网点履约链路和 IOS-001 至 IOS-010 原生 iOS 核心链路已完成第一轮收口。通用管理页面已经建立 B/C 级目录、详情、表单、状态变更、关系、选择器、记录、权限和页面状态基线，同时明确禁止通用动态 CRUD、技术字段兜底和前端多接口 Join。下一步进入 GM-002“项目管理”。
 
 ## 已接受跨模块决策
 
@@ -140,6 +141,7 @@ Admin 首批 A 级页面规格、NW-001 至 NW-007 网点履约链路和 IOS-001
 - `01-design-baseline.md`：A+ 设计原则和通用页面模式；
 - `02-screen-inventory.md`：页面清单、设计等级和完成状态；
 - `03-configuration-center-information-architecture.md`：历史文件名，内容为项目管理、履约配置与工单责任关系的信息架构；
+- `04-common-management-page-patterns.md`：B/C 级通用管理页面的目录、详情、表单、状态、关系、权限和完成门禁；
 - `specifications/admin/`：Admin 页面与流程正式产品规格；
 - `specifications/site/`：网点 Portal 页面与流程正式产品规格；
 - `prototypes/`：经确认的少量关键高保真原型及说明；
