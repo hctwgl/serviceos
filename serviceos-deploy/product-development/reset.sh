@@ -7,6 +7,17 @@ runtime_directory="${repository_root}/target/product-development"
 backend_pid_file="${runtime_directory}/backend.pid"
 backend_log="${runtime_directory}/backend.log"
 
+stop_process_tree() {
+  local process_id="$1"
+  local child_id
+
+  while IFS= read -r child_id; do
+    [[ -n "${child_id}" ]] && stop_process_tree "${child_id}"
+  done < <(pgrep -P "${process_id}" 2>/dev/null || true)
+
+  kill "${process_id}" 2>/dev/null || true
+}
+
 if [[ "${SERVICEOS_ENVIRONMENT:-local}" != "local" ]]; then
   echo "拒绝执行：product-data:reset 只允许 SERVICEOS_ENVIRONMENT=local。" >&2
   exit 1
@@ -17,7 +28,9 @@ mkdir -p "${runtime_directory}"
 if [[ -f "${backend_pid_file}" ]]; then
   previous_pid="$(tr -d '[:space:]' < "${backend_pid_file}")"
   if [[ "${previous_pid}" =~ ^[0-9]+$ ]] && kill -0 "${previous_pid}" 2>/dev/null; then
-    kill "${previous_pid}"
+    # spring-boot:run 会派生真正监听端口的 Java 子进程，只停止 Maven 父进程会留下旧后端。
+    # 必须先递归停止整棵进程树，避免旧健康检查被误判为本轮后端已经启动。
+    stop_process_tree "${previous_pid}"
     for _ in {1..30}; do
       kill -0 "${previous_pid}" 2>/dev/null || break
       sleep 0.2

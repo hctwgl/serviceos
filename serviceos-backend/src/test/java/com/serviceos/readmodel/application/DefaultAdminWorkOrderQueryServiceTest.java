@@ -79,7 +79,7 @@ class DefaultAdminWorkOrderQueryServiceTest {
                         taskId, "INSTALLATION", "HUMAN", "READY", "PILOT_INSTALLATION", null, 2),
                 Map.of("TASKS", "AVAILABLE"),
                 "/api/v1/tasks/" + taskId + "/allowed-actions",
-                null, null, null, "FRESH",
+                null, null, null, List.of(), "FRESH",
                 new WorkOrderWorkspace.WorkOrderWorkspaceSourceVersions(3),
                 new WorkOrderWorkspace.WorkOrderWorkspaceMeta(NOW, "checkpoint", "FRESH", "query"),
                 "王*", "*******5678", "山东省济南市历城区***");

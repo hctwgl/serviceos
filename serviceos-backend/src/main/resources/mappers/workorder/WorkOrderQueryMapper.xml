@@ -131,4 +131,25 @@
       FROM wo_work_order
      WHERE tenant_id=#{tenantId} AND id=#{workOrderId}
   </select>
+  <select id="findProjectPersonnel" resultType="map">
+    SELECT position_code AS "positionCode",
+           principal_id AS "principalId",
+           principal_name AS "displayName",
+           requested_region_code AS "requestedRegionCode",
+           matched_region_code AS "matchedRegionCode",
+           matched_region_name AS "matchedRegionName",
+           match_status AS "matchStatus",
+           inherited,
+           matched_at AS "matchedAt",
+           adjustment_reason AS "adjustmentReason"
+      FROM wo_project_personnel_snapshot
+     WHERE tenant_id=#{tenantId}
+       AND work_order_id=#{workOrderId}
+       AND snapshot_status='CURRENT'
+     ORDER BY CASE position_code
+       WHEN 'CUSTOMER_SERVICE_MANAGER' THEN 1
+       WHEN 'PROJECT_MANAGER' THEN 2
+       WHEN 'PROJECT_ASSISTANT' THEN 3
+       ELSE 99 END
+  </select>
 </mapper>

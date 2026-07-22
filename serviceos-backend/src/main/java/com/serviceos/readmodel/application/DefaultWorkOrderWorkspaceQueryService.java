@@ -219,6 +219,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 serviceAssignmentSummary,
                 slaSummary,
                 exceptionSummary,
+                workOrders.getProjectPersonnel(principal, correlationId, workOrderId),
                 timelineFreshness,
                 new WorkOrderWorkspaceSourceVersions(detail.workOrder().version()),
                 meta(timelineFreshness),

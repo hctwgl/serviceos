@@ -47,13 +47,13 @@ await request('/project-clients/BYD/brands', {
 
 const staff = {}
 for (const item of [
-  ['customerManager', '张伟', 'SO-CS-001', 'INTERNAL_EMPLOYEE'],
-  ['projectManager', '王芳', 'SO-PM-001', 'INTERNAL_EMPLOYEE'],
-  ['projectAssistant', '刘敏', 'SO-PA-001', 'INTERNAL_EMPLOYEE'],
-  ['reviewer', '陈静', 'SO-QA-001', 'INTERNAL_EMPLOYEE'],
-  ['technicianA', '李师傅', 'SO-TECH-001', 'TECHNICIAN'],
-  ['technicianB', '赵师傅', 'SO-TECH-002', 'TECHNICIAN'],
-  ['technicianC', '周师傅', 'SO-TECH-003', 'TECHNICIAN'],
+  ['customerManager', '周雨桐', 'SO-CS-018', 'INTERNAL_EMPLOYEE'],
+  ['projectManager', '陈昊', 'SO-PM-006', 'INTERNAL_EMPLOYEE'],
+  ['projectAssistant', '林晓雯', 'SO-PA-012', 'INTERNAL_EMPLOYEE'],
+  ['reviewer', '沈清妍', 'SO-QA-008', 'INTERNAL_EMPLOYEE'],
+  ['technicianA', '李建国', 'SO-TECH-031', 'TECHNICIAN'],
+  ['technicianB', '赵海峰', 'SO-TECH-027', 'TECHNICIAN'],
+  ['technicianC', '周志强', 'SO-TECH-044', 'TECHNICIAN'],
 ]) {
   staff[item[0]] = await registerPrincipal(item[1], item[2], item[3])
 }
@@ -166,6 +166,51 @@ await request(`/projects/${project.id}:activate`, {
   idempotencyKey: key('project-activate'),
   headers: { 'If-Match': `"${project.version}"` },
 })
+
+// 项目团队与区域分工是项目日常运营主数据，不进入履约配置版本。全部通过正式命令建立，
+// 后续新工单按“项目 + 标准行政区”匹配并冻结客服经理、项目经理和项目助理。
+for (const staffKey of ['customerManager', 'projectManager', 'projectAssistant']) {
+  await request(`/projects/${project.id}/team-members`, {
+    method: 'POST',
+    idempotencyKey: key(`project-member-${staffKey}`),
+    body: { principalId: staff[staffKey].id },
+  })
+}
+for (const assignment of [
+  {
+    key: 'customer-province', regionCode: '370000', positionCode: 'CUSTOMER_SERVICE_MANAGER',
+    principalId: staff.customerManager.id, allowInheritance: true,
+    reason: '周雨桐负责山东省比亚迪家充客户服务协调，下级区域未配置时允许继承。',
+  },
+  {
+    key: 'customer-lixia', regionCode: '370102', positionCode: 'CUSTOMER_SERVICE_MANAGER',
+    principalId: staff.customerManager.id, allowInheritance: false,
+    reason: '济南历下区试点工单由周雨桐直接负责客户沟通。',
+  },
+  {
+    key: 'manager-jinan', regionCode: '370100', positionCode: 'PROJECT_MANAGER',
+    principalId: staff.projectManager.id, allowInheritance: true,
+    reason: '陈昊负责济南市比亚迪家充项目履约结果与重大异常协调。',
+  },
+  {
+    key: 'assistant-jinan', regionCode: '370100', positionCode: 'PROJECT_ASSISTANT',
+    principalId: staff.projectAssistant.id, allowInheritance: true,
+    reason: '林晓雯负责济南市项目资料、履约进度和跨方协同。',
+  },
+]) {
+  await request(`/projects/${project.id}/region-personnel:assign`, {
+    method: 'POST',
+    idempotencyKey: key(`project-region-${assignment.key}`),
+    body: {
+      regionCode: assignment.regionCode,
+      positionCode: assignment.positionCode,
+      principalId: assignment.principalId,
+      expectedCurrentAssignmentId: null,
+      allowInheritance: assignment.allowInheritance,
+      reason: assignment.reason,
+    },
+  })
+}
 
 const configurationFoundation = (await request(
   `/product-development/projects/${project.id}/configuration-foundation`,
@@ -306,6 +351,7 @@ for (const [index, technicianProfile] of technicianProfiles.entries()) {
 }
 
 console.log(`已通过正式业务接口创建项目：${project.name}`)
+console.log('已配置项目团队：周雨桐（客服经理）、陈昊（项目经理）、林晓雯（项目助理）')
 console.log(`已建立企业组织：${organization.name}（客户服务部、项目履约部、质量审核部）`)
 console.log(`已创建服务网点：${network.networkName}`)
 console.log(`已登记 ${Object.keys(staff).length} 名项目人员和师傅，并创建 ${customers.length} 张真实工单。`)

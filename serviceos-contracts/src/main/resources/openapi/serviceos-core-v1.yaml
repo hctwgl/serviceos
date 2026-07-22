@@ -4191,6 +4191,125 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/team-regions:
+    get:
+      operationId: getProjectTeamWorkspace
+      summary: 读取项目团队与区域分工工作区
+      description: >-
+        需要 project.read。返回当前项目成员、固定岗位区域分工、可选人员、项目服务范围内行政区和
+        服务端允许动作；该数据属于项目日常运营主数据，不进入履约配置版本。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 项目团队与区域分工页面级读模型
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectTeamWorkspace' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/team-regions:match:
+    get:
+      operationId: matchProjectRegionPersonnel
+      summary: 预览工单行政区对应的项目岗位人员
+      description: >-
+        需要 project.read。固定返回客服经理、项目经理、项目助理的命中或缺失结果；先匹配精确行政区，
+        只有上级分工明确允许继承时才逐级向上匹配，不使用默认人员兜底。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: regionCode
+          in: query
+          required: true
+          description: 工单服务地址解析出的标准行政区编码
+          schema: { type: string, minLength: 1, maxLength: 32 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 区域岗位人员匹配结果
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectRegionPersonnelMatchResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/team-members:
+    post:
+      operationId: addProjectTeamMember
+      summary: 将有效人员加入项目团队
+      description: >-
+        需要 project.team.manage。成员关系属于项目日常运营主数据；同一项目不能存在重复的当前成员关系。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddProjectTeamMemberRequest' }
+      responses:
+        '201':
+          description: 人员已加入项目团队或返回幂等重放结果
+          headers:
+            Location: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectTeamMember' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/region-personnel:assign:
+    post:
+      operationId: assignProjectRegionPersonnel
+      summary: 设置项目行政区固定岗位负责人
+      description: >-
+        需要 project.team.manage。替换已有负责人时必须提交 expectedCurrentAssignmentId；服务端在同一事务中
+        锁定并结束旧分工后创建新分工，历史工单人员快照不会被静默改写。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignProjectRegionPersonnelRequest' }
+      responses:
+        '200':
+          description: 当前行政区岗位负责人
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectRegionPersonnelAssignment' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /projects/{projectId}:activate:
     post:
       operationId: activateProject
@@ -10714,7 +10833,7 @@ components:
       type: object
       additionalProperties: false
       required: [header, currentTaskSummary, sectionAvailability, allowedActionLink,
-        serviceAssignmentSummary, slaSummary, exceptionSummary, timelineFreshnessStatus,
+        serviceAssignmentSummary, slaSummary, exceptionSummary, projectPersonnel, timelineFreshnessStatus,
         sourceVersions, meta, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress]
       properties:
         header: { $ref: '#/components/schemas/WorkOrder' }
@@ -10739,6 +10858,12 @@ components:
           oneOf:
             - { $ref: '#/components/schemas/WorkOrderWorkspaceExceptionSummary' }
             - { type: 'null' }
+        projectPersonnel:
+          type: array
+          minItems: 3
+          maxItems: 3
+          description: 工单创建时固化的客服经理、项目经理和项目助理；页面不得重新按行政区匹配
+          items: { $ref: '#/components/schemas/WorkOrderProjectPersonnel' }
         timelineFreshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
         sourceVersions: { $ref: '#/components/schemas/WorkOrderWorkspaceSourceVersions' }
         meta: { $ref: '#/components/schemas/WorkOrderWorkspaceMeta' }
@@ -10754,6 +10879,26 @@ components:
           type: [string, 'null']
           maxLength: 200
           description: M423：服务端脱敏服务地址；不得返回完整地址
+    WorkOrderProjectPersonnel:
+      type: object
+      additionalProperties: false
+      required: [positionCode, positionName, principalId, displayName, requestedRegionCode,
+        matchedRegionCode, matchedRegionName, matchStatus, inherited, matchedAt, adjustmentReason]
+      properties:
+        positionCode:
+          enum: [CUSTOMER_SERVICE_MANAGER, PROJECT_MANAGER, PROJECT_ASSISTANT]
+        positionName: { type: string, minLength: 2, maxLength: 20 }
+        principalId: { type: [string, 'null'], format: uuid }
+        displayName: { type: [string, 'null'], minLength: 1, maxLength: 200 }
+        requestedRegionCode: { type: string, pattern: '^[0-9]{6}$' }
+        matchedRegionCode: { type: [string, 'null'], pattern: '^[0-9]{6}$' }
+        matchedRegionName: { type: [string, 'null'], minLength: 1, maxLength: 120 }
+        matchStatus: { enum: [ASSIGNED, MISSING, DATA_INCOMPLETE] }
+        inherited:
+          type: boolean
+          description: 是否通过上级行政区域分工继承命中
+        matchedAt: { type: string, format: date-time }
+        adjustmentReason: { type: [string, 'null'], maxLength: 500 }
     WorkOrderWorkspaceTasksSectionData:
       type: object
       additionalProperties: false
@@ -11816,6 +11961,189 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Project' }
         nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+    ProjectPositionCode:
+      type: string
+      description: 系统统一定义的项目岗位，项目不能自行创建或改名
+      enum: [CUSTOMER_SERVICE_MANAGER, PROJECT_MANAGER, PROJECT_ASSISTANT]
+    AddProjectTeamMemberRequest:
+      type: object
+      additionalProperties: false
+      required: [principalId]
+      properties:
+        principalId:
+          type: string
+          format: uuid
+          description: 当前租户内有效用户主体标识
+    AssignProjectRegionPersonnelRequest:
+      type: object
+      additionalProperties: false
+      required: [regionCode, positionCode, principalId, allowInheritance, reason]
+      properties:
+        regionCode:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: 当前项目服务范围内的标准行政区编码
+        positionCode: { $ref: '#/components/schemas/ProjectPositionCode' }
+        principalId:
+          type: string
+          format: uuid
+          description: 已加入当前项目团队的有效人员
+        expectedCurrentAssignmentId:
+          type: [string, 'null']
+          format: uuid
+          description: 替换已有负责人时必填，用于防止并发覆盖；首次设置时为空
+        allowInheritance:
+          type: boolean
+          description: 下级行政区未配置该岗位时，是否允许继承当前分工
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: 本次设置或替换负责人的中文业务原因
+    ProjectTeamMember:
+      type: object
+      additionalProperties: false
+      required: [memberId, principalId, displayName, employeeNumber, status, validFrom, version, dataComplete]
+      properties:
+        memberId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        displayName:
+          type: [string, 'null']
+          description: 人员中文显示名；为空时 dataComplete=false，页面不得显示主体标识兜底
+        employeeNumber: { type: [string, 'null'] }
+        status: { enum: [ACTIVE, ENDED] }
+        validFrom: { type: string, format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        dataComplete: { type: boolean }
+    ProjectTeamCandidate:
+      type: object
+      additionalProperties: false
+      required: [principalId, displayName, employeeNumber, alreadyMember]
+      properties:
+        principalId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        employeeNumber: { type: [string, 'null'] }
+        alreadyMember: { type: boolean }
+    ProjectTeamRegionOption:
+      type: object
+      additionalProperties: false
+      required: [code, name, level, parentCode]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 32 }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        level: { enum: [COUNTRY, PROVINCE, CITY, DISTRICT] }
+        parentCode: { type: [string, 'null'], maxLength: 32 }
+    ProjectRegionPersonnelAssignment:
+      type: object
+      additionalProperties: false
+      required:
+        - assignmentId
+        - regionCode
+        - regionName
+        - regionLevel
+        - position
+        - positionName
+        - memberId
+        - principalId
+        - displayName
+        - allowInheritance
+        - validFrom
+        - version
+        - changeReason
+        - dataComplete
+      properties:
+        assignmentId: { type: string, format: uuid }
+        regionCode: { type: string }
+        regionName: { type: string }
+        regionLevel: { enum: [COUNTRY, PROVINCE, CITY, DISTRICT] }
+        position: { $ref: '#/components/schemas/ProjectPositionCode' }
+        positionName: { type: string, enum: [客服经理, 项目经理, 项目助理] }
+        memberId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        displayName: { type: [string, 'null'] }
+        allowInheritance: { type: boolean }
+        validFrom: { type: string, format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        changeReason: { type: string, minLength: 1, maxLength: 500 }
+        dataComplete: { type: boolean }
+    ProjectRegionPersonnelMatch:
+      type: object
+      additionalProperties: false
+      required:
+        - position
+        - positionName
+        - assignmentId
+        - principalId
+        - displayName
+        - matchedRegionCode
+        - matchedRegionName
+        - inherited
+        - dataComplete
+      properties:
+        position: { $ref: '#/components/schemas/ProjectPositionCode' }
+        positionName: { type: string, enum: [客服经理, 项目经理, 项目助理] }
+        assignmentId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        displayName: { type: [string, 'null'] }
+        matchedRegionCode: { type: string }
+        matchedRegionName: { type: string }
+        inherited: { type: boolean }
+        dataComplete: { type: boolean }
+    ProjectRegionPersonnelMatchResult:
+      type: object
+      additionalProperties: false
+      required: [projectId, requestedRegionCode, requestedRegionName, matches, missingPositions, matchedAt]
+      properties:
+        projectId: { type: string, format: uuid }
+        requestedRegionCode: { type: string }
+        requestedRegionName: { type: string }
+        matches:
+          type: array
+          maxItems: 3
+          items: { $ref: '#/components/schemas/ProjectRegionPersonnelMatch' }
+        missingPositions:
+          type: array
+          uniqueItems: true
+          maxItems: 3
+          items: { $ref: '#/components/schemas/ProjectPositionCode' }
+        matchedAt: { type: string, format: date-time }
+    ProjectTeamWorkspace:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - projectCode
+        - projectName
+        - projectStatus
+        - members
+        - assignments
+        - candidates
+        - regions
+        - allowedActions
+        - asOf
+      properties:
+        projectId: { type: string, format: uuid }
+        projectCode: { type: string }
+        projectName: { type: string }
+        projectStatus: { enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED] }
+        members:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectTeamMember' }
+        assignments:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectRegionPersonnelAssignment' }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectTeamCandidate' }
+        regions:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectTeamRegionOption' }
+        allowedActions:
+          type: array
+          uniqueItems: true
+          items: { enum: [ADD_MEMBER, ASSIGN_REGION_PERSONNEL] }
         asOf: { type: string, format: date-time }
     ProjectClientOption:
       type: object

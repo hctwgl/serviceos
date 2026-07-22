@@ -4,7 +4,9 @@ import com.serviceos.workorder.api.WorkOrderView;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.List;
 import java.util.UUID;
+import com.serviceos.workorder.api.WorkOrderProjectPersonnelView;
 
 /**
  * 工单工作区顶层快照。
@@ -20,6 +22,7 @@ public record WorkOrderWorkspace(
         WorkOrderWorkspaceServiceAssignmentSummary serviceAssignmentSummary,
         WorkOrderWorkspaceSlaSummary slaSummary,
         WorkOrderWorkspaceExceptionSummary exceptionSummary,
+        List<WorkOrderProjectPersonnelView> projectPersonnel,
         String timelineFreshnessStatus,
         WorkOrderWorkspaceSourceVersions sourceVersions,
         WorkOrderWorkspaceMeta meta,
@@ -29,6 +32,7 @@ public record WorkOrderWorkspace(
 ) {
     public WorkOrderWorkspace {
         sectionAvailability = Map.copyOf(sectionAvailability);
+        projectPersonnel = projectPersonnel == null ? List.of() : List.copyOf(projectPersonnel);
     }
 
     public record WorkOrderWorkspaceTaskSummary(

@@ -61,6 +61,7 @@ INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
 VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.create', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.team.manage', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'workOrder.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.assign', now()),

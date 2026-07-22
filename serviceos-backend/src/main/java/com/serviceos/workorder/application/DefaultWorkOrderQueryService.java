@@ -25,6 +25,7 @@ import com.serviceos.workorder.api.WorkOrderMaskedContactView;
 import com.serviceos.workorder.api.WorkOrderPage;
 import com.serviceos.workorder.api.WorkOrderQuery;
 import com.serviceos.workorder.api.WorkOrderQueryService;
+import com.serviceos.workorder.api.WorkOrderProjectPersonnelView;
 import com.serviceos.workorder.api.WorkOrderView;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -94,6 +95,22 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         this.reviewCorrectionQuery = reviewCorrectionQuery;
         this.exceptionQuery = exceptionQuery;
         this.personas = personas; this.clock = clock;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WorkOrderProjectPersonnelView> getProjectPersonnel(
+            CurrentPrincipal principal, String correlationId, UUID workOrderId
+    ) {
+        WorkOrderView workOrder = queries.findById(principal.tenantId(), workOrderId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "工单不存在"));
+        authorization.require(
+                principal,
+                AuthorizationRequest.projectCapability(
+                        READ, principal.tenantId(), "WorkOrder", workOrderId.toString(),
+                        workOrder.projectId().toString()),
+                correlationId);
+        return queries.findProjectPersonnel(principal.tenantId(), workOrderId);
     }
 
     @Override @Transactional(readOnly = true)

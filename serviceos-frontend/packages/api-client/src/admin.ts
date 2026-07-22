@@ -65,6 +65,19 @@ export type WorkOrderWorkspace = {
   } | null
   slaSummary: { openCount: number; breachedCount: number } | null
   exceptionSummary: { openCount: number } | null
+  projectPersonnel: Array<{
+    positionCode: 'CUSTOMER_SERVICE_MANAGER' | 'PROJECT_MANAGER' | 'PROJECT_ASSISTANT'
+    positionName: string
+    principalId: string | null
+    displayName: string | null
+    requestedRegionCode: string
+    matchedRegionCode: string | null
+    matchedRegionName: string | null
+    matchStatus: 'ASSIGNED' | 'MISSING' | 'DATA_INCOMPLETE'
+    inherited: boolean
+    matchedAt: string
+    adjustmentReason: string | null
+  }>
   maskedCustomerName: string | null
   maskedCustomerPhone: string | null
   maskedServiceAddress: string | null

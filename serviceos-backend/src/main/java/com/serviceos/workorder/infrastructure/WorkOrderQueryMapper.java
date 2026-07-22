@@ -61,4 +61,7 @@ interface WorkOrderQueryMapper {
 
     Map<String,Object> findRawCustomerContact(
             @Param("tenantId") String tenantId, @Param("workOrderId") UUID workOrderId);
+
+    List<Map<String,Object>> findProjectPersonnel(
+            @Param("tenantId") String tenantId, @Param("workOrderId") UUID workOrderId);
 }

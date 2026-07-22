@@ -1,8 +1,8 @@
 import { defineOverridesPreferences } from '@vben/preferences'
 
 /**
- * ServiceOS 固定使用 A+ 浅色企业布局。这里直接锁定 Vben 运行时偏好，不向业务用户开放主题、
- * 暗色、布局切换或页面密度偏好，避免同一产品出现多套无法验收的视觉结果。
+ * ServiceOS 使用 Vben Admin 5 的原生浅色主题和侧栏布局。这里只关闭产品当前不提供的个性化
+ * 入口，不再重定义品牌色、圆角和组件密度，避免形成一套与 Vben 冲突的第二主题。
  */
 export const overridesPreferences = defineOverridesPreferences({
   app: {
@@ -21,7 +21,7 @@ export const overridesPreferences = defineOverridesPreferences({
   breadcrumb: { enable: false },
   copyright: { enable: false },
   footer: { enable: false },
-  header: { enable: true, height: 54, mode: 'fixed' },
+  header: { enable: true, height: 50, mode: 'fixed' },
   logo: { enable: true, fit: 'contain', source: '/favicon.svg' },
   navigation: { accordion: true, split: false, styleType: 'rounded' },
   shortcutKeys: {
@@ -41,15 +41,12 @@ export const overridesPreferences = defineOverridesPreferences({
     expandOnHover: false,
     fixedButton: false,
     hidden: false,
-    width: 176,
+    width: 224,
   },
   tabbar: { enable: false, persist: false },
   theme: {
     builtinType: 'default',
-    colorPrimary: 'hsl(217 100% 55%)',
-    fontSize: 14,
     mode: 'light',
-    radius: '0.4375',
     semiDarkHeader: false,
     semiDarkSidebar: false,
     semiDarkSidebarSub: false,

@@ -1,6 +1,7 @@
 package com.serviceos.workorder.application;
 
 import com.serviceos.workorder.api.WorkOrderView;
+import com.serviceos.workorder.api.WorkOrderProjectPersonnelView;
 
 import java.time.Instant;
 import java.util.List;
@@ -41,6 +42,8 @@ public interface WorkOrderQueryRepository {
 
     /** 读取客户联系原文供模块内脱敏；不得跨模块直接暴露。 */
     Optional<RawCustomerContact> findRawCustomerContact(String tenantId, UUID workOrderId);
+
+    List<WorkOrderProjectPersonnelView> findProjectPersonnel(String tenantId, UUID workOrderId);
 
     record RawCustomerContact(
             UUID workOrderId,

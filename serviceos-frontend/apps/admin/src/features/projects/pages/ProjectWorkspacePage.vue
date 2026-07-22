@@ -37,7 +37,7 @@ function profileStatus(status: string) {
         <div><span>使用中工单</span><strong>{{ project.activeWorkOrderCount === null ? '无权查看' : `${project.activeWorkOrderCount}${project.activeWorkOrderCountTruncated ? '+' : ''} 单` }}</strong></div>
       </section>
       <section class="project-workspace-shell">
-        <nav class="project-subnav"><button class="active">项目概览</button><button>服务与合同</button><button>项目团队与区域分工</button><button>履约配置</button><button>项目工单</button><button>操作记录</button></nav>
+        <nav class="project-subnav"><button class="active">项目概览</button><button>服务与合同</button><RouterLink :to="`/projects/${project.projectId}/team-regions`">项目团队与区域分工</RouterLink><RouterLink :to="`/projects/${project.projectId}/fulfillment`">履约配置</RouterLink><RouterLink :to="`/work-orders?projectId=${project.projectId}`">项目工单</RouterLink><button>操作记录</button></nav>
         <main class="project-workspace-content">
           <div class="project-section-heading"><div><p>履约配置</p><h2>工单类型与履约方案</h2><span>每套方案定义一种服务产品的流程、表单、资料、SLA、派单和审核规则。</span></div><StatusPill v-if="project.configurationReadable" tone="blue" :label="`${project.fulfillmentProfiles.length} 套方案`" /></div>
           <div v-if="!project.configurationReadable" class="permission-state"><h3>无权查看履约配置</h3><p>项目基本信息可见，但当前角色没有项目履约配置读取权限。</p></div>
@@ -52,7 +52,7 @@ function profileStatus(status: string) {
             </article>
           </div>
         </main>
-        <aside class="project-context-rail"><section><h3>项目责任</h3><p>项目团队与行政区域分工将在下一切片接入工单岗位人员匹配。</p></section><section><h3>版本规则</h3><p>新工单使用当前生效配置，进行中的工单继续使用创建时冻结的履约版本。</p></section><section><h3>数据更新时间</h3><p>{{ formatDateTime(project.asOf) }}</p></section></aside>
+        <aside class="project-context-rail"><section><h3>项目责任</h3><p>项目团队与区域分工负责解析客服经理、项目经理和项目助理，新工单创建时冻结人员快照。</p><RouterLink :to="`/projects/${project.projectId}/team-regions`">维护项目团队与区域分工</RouterLink></section><section><h3>版本规则</h3><p>新工单使用当前生效配置，进行中的工单继续使用创建时冻结的履约版本。</p></section><section><h3>数据更新时间</h3><p>{{ formatDateTime(project.asOf) }}</p></section></aside>
       </section>
     </template>
   </div>

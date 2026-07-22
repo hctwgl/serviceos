@@ -13,7 +13,7 @@ import { overridesPreferences } from './preferences'
 import { router } from './router'
 
 async function bootstrap() {
-  const namespace = 'serviceos-admin-vben-5-7-0'
+  const namespace = 'serviceos-frontend-vben-5-7-0'
   await initPreferences({ namespace, overrides: overridesPreferences })
 
   const app = createApp(App)

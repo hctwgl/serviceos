@@ -49,6 +49,7 @@ const section = useQuery({
 const currentTask = computed(() => workspace.data.value?.workspace.currentTaskSummary ?? null)
 const stageOrder = ['PILOT_INTAKE', 'PILOT_DISPATCH', 'PILOT_APPOINTMENT', 'PILOT_SURVEY', 'PILOT_INSTALLATION', 'FINAL_REVIEW', 'CLIENT_CALLBACK']
 const activeStageIndex = computed(() => Math.max(0, stageOrder.indexOf(currentTask.value?.stageCode ?? '')))
+const projectPersonnel = computed(() => workspace.data.value?.workspace.projectPersonnel ?? [])
 
 function taskTitle(task: WorkOrderWorkspaceTask | null): string {
   return task ? taskLabel(task.taskType) : '暂无进行中的任务'
@@ -259,7 +260,19 @@ function isAssignmentAction(code: string): boolean {
           </section>
           <section>
             <h2>当前责任链</h2><div class="responsibility">
-              <b>当前责任人</b><strong>{{ workspace.data.value.workspace.header.currentAssigneeDisplayName ?? '待确认' }}</strong><b>责任网点</b><strong>{{ workspace.data.value.workspace.header.currentNetworkDisplayName ?? '待分配' }}</strong><b>责任师傅</b><strong>{{ workspace.data.value.workspace.header.currentTechnicianDisplayName ?? '待分配' }}</strong>
+              <template
+                v-for="person in projectPersonnel"
+                :key="person.positionCode"
+              >
+                <b>{{ person.positionName }}</b>
+                <strong :class="{ 'responsibility-missing': person.matchStatus !== 'ASSIGNED' }">
+                  {{ person.displayName ?? '项目人员待确认' }}
+                  <small v-if="person.matchedRegionName">
+                    {{ person.inherited ? `继承 ${person.matchedRegionName}` : `命中 ${person.matchedRegionName}` }}
+                  </small>
+                </strong>
+              </template>
+              <b>当前任务处理人</b><strong>{{ workspace.data.value.workspace.header.currentAssigneeDisplayName ?? '待确认' }}</strong><b>责任网点</b><strong>{{ workspace.data.value.workspace.header.currentNetworkDisplayName ?? '待分配' }}</strong><b>责任师傅</b><strong>{{ workspace.data.value.workspace.header.currentTechnicianDisplayName ?? '待分配' }}</strong>
             </div>
           </section>
           <section><h2>外部集成信息</h2><dl><div><dt>来源系统</dt><dd>{{ workspace.data.value.clientName }}</dd></div><div><dt>配置版本</dt><dd>{{ workspace.data.value.workspace.header.configurationBundleVersion }}</dd></div></dl></section>

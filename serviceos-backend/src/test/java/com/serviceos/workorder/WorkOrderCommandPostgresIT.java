@@ -92,6 +92,12 @@ class WorkOrderCommandPostgresIT {
                 .query(Long.class).single()).isEqualTo(2);
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type = 'workorder.received'")
                 .query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT count(*) FROM wo_project_personnel_snapshot")
+                .query(Long.class).single()).isEqualTo(6);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM wo_project_personnel_snapshot
+                 WHERE match_status = 'MISSING' AND snapshot_status = 'CURRENT'
+                """).query(Long.class).single()).isEqualTo(6);
 
         assertThatThrownBy(() -> workOrders.receive(command(tenantA, "c".repeat(64))))
                 .isInstanceOf(ExternalWorkOrderConflictException.class)
@@ -169,8 +175,8 @@ class WorkOrderCommandPostgresIT {
 
     @Test
     void migrationSetIsCurrentAndRepeatable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("146");
-        assertThat(flyway.info().applied()).hasSize(148);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("149");
+        assertThat(flyway.info().applied()).hasSize(151);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 

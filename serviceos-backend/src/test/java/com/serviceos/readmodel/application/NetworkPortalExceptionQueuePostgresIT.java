@@ -88,8 +88,8 @@ class NetworkPortalExceptionQueuePostgresIT {
                     prj_project,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("146");
-        assertThat(flyway.info().applied()).hasSize(148);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("149");
+        assertThat(flyway.info().applied()).hasSize(151);
 
         jdbc.sql("""
                 INSERT INTO prj_project (

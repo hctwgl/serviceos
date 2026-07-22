@@ -3,11 +3,20 @@ package com.serviceos.workorder.api;
 import com.serviceos.identity.api.CurrentPrincipal;
 
 import java.util.UUID;
+import java.util.List;
 
 /** WorkOrder 授权只读用例。 */
 public interface WorkOrderQueryService {
     WorkOrderPage list(CurrentPrincipal principal, String correlationId, WorkOrderQuery query);
     WorkOrderDetail get(CurrentPrincipal principal, String correlationId, UUID workOrderId);
+
+    /**
+     * 返回工单创建时固化的客服经理、项目经理和项目助理。
+     *
+     * <p>本查询只读取工单快照，不得重新执行项目行政区域人员匹配。</p>
+     */
+    List<WorkOrderProjectPersonnelView> getProjectPersonnel(
+            CurrentPrincipal principal, String correlationId, UUID workOrderId);
 
     /**
      * M351：返回服务端脱敏后的客户联系摘要；完整原文永不离开 workorder 模块边界。

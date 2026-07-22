@@ -87,8 +87,8 @@ class NetworkPortalNoShowContactPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, rel_outbox_event, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("146");
-        assertThat(flyway.info().applied()).hasSize(148);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("149");
+        assertThat(flyway.info().applied()).hasSize(151);
 
         seedPrincipal(PRINCIPAL, "Portal Member");
         seedPrincipal(OTHER_PRINCIPAL, "Other Member");
