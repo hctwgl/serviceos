@@ -23,8 +23,8 @@ INSERT INTO cfg_configuration_asset_version (
 (
     '20000000-0000-4000-8000-000000000001', 'tenant-local', 'WORKFLOW',
     'ADMIN-PILOT-WORKFLOW', '1.0.0', '1.0.0',
-    '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE","formRef":"admin.pilot-inbound-form"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
-    '73bf5f7e929cfd98fc25e0f8e332ae14cc6da8a1e4fcc3b2782dae51fe777c37',
+    '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE","formRef":"admin.pilot-inbound-form","dispatchPolicyRef":"admin-pilot-dispatch"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
+    'babb98de19cbffcde0326b396f19566dd0a291282b0b18f8c82c5e8b52227662',
     'PUBLISHED', now()
 ),
 (
@@ -32,17 +32,26 @@ INSERT INTO cfg_configuration_asset_version (
     'PILOT_RESPONSE', '1.0.0', '1.0.0',
     '{"policyKey":"PILOT_RESPONSE","version":"1.0.0","subjectType":"TASK","taskTypes":["PILOT_SURVEY"],"startEvent":"TASK_CREATED","stopEvent":"TASK_COMPLETED","clockMode":"ELAPSED","targetDurationSeconds":14400}',
     '3ca27e3a4ce99cf98cacf1d2c8203f5aa353cc86cfa96749bd8595803cc1ceb5', 'PUBLISHED', now()
+),
+(
+    '20000000-0000-4000-8000-000000000010', 'tenant-local', 'DISPATCH',
+    'admin-pilot-dispatch', '1.0.0', '1.0.0',
+    '{"policyKey":"admin-pilot-dispatch","version":"1.0.0","scope":{"brandCodes":["BYD_OCEAN"],"businessTypes":["HOME_CHARGING_SURVEY_INSTALL","ADMIN_PILOT_COMPLETION"],"regionCodes":["370000"]},"hardFilters":[{"filterKey":"ENABLED","order":1,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"NETWORK_DISABLED"},{"filterKey":"BRAND_SCOPE","order":2,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"BRAND_UNSUPPORTED"},{"filterKey":"REGION_SCOPE","order":3,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"REGION_UNSUPPORTED"},{"filterKey":"BUSINESS_CAPABILITY","order":4,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"BUSINESS_UNSUPPORTED"},{"filterKey":"QUALIFICATION","order":5,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"NETWORK_UNQUALIFIED"},{"filterKey":"CAPACITY","order":6,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"NO_CAPACITY"}],"scoring":[{"factorKey":"REMAINING_CAPACITY","weight":1.0,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""}}],"capacity":{"reservationRequired":true},"fallback":{"onNoCandidate":"MANUAL_INTERVENTION","manualRole":"OPS","resolutionHours":4}}',
+    '2c4bad148cb0e2f281b08e8e17722f6c0af110d94883fc006121b5adc051f2db', 'PUBLISHED', now()
 ) ON CONFLICT DO NOTHING;
 
 -- bundle_item 以 (version_id, content_digest) FK 绑定资产；替换 digest 前必须先断开再重建。
 DELETE FROM cfg_configuration_bundle_item
  WHERE tenant_id = 'tenant-local'
-   AND bundle_id = '30000000-0000-4000-8000-000000000001'
-   AND asset_type IN ('WORKFLOW', 'FORM', 'EVIDENCE', 'SLA', 'INTEGRATION');
+   AND (
+       bundle_id = '30000000-0000-4000-8000-000000000001'
+       OR asset_version_id = '20000000-0000-4000-8000-000000000010'
+   )
+   AND asset_type IN ('WORKFLOW', 'FORM', 'EVIDENCE', 'SLA', 'DISPATCH', 'INTEGRATION');
 
 UPDATE cfg_configuration_asset_version
-   SET definition = '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE","formRef":"admin.pilot-inbound-form"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
-       content_digest = '73bf5f7e929cfd98fc25e0f8e332ae14cc6da8a1e4fcc3b2782dae51fe777c37',
+   SET definition = '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE","formRef":"admin.pilot-inbound-form","dispatchPolicyRef":"admin-pilot-dispatch"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
+       content_digest = 'babb98de19cbffcde0326b396f19566dd0a291282b0b18f8c82c5e8b52227662',
        published_at = now()
  WHERE version_id = '20000000-0000-4000-8000-000000000001'
    AND tenant_id = 'tenant-local';
@@ -53,6 +62,13 @@ UPDATE cfg_configuration_asset_version
        content_digest = '3ca27e3a4ce99cf98cacf1d2c8203f5aa353cc86cfa96749bd8595803cc1ceb5',
        published_at = now()
  WHERE version_id = '20000000-0000-4000-8000-000000000002'
+   AND tenant_id = 'tenant-local';
+
+UPDATE cfg_configuration_asset_version
+   SET definition = '{"policyKey":"admin-pilot-dispatch","version":"1.0.0","scope":{"brandCodes":["BYD_OCEAN"],"businessTypes":["HOME_CHARGING_SURVEY_INSTALL","ADMIN_PILOT_COMPLETION"],"regionCodes":["370000"]},"hardFilters":[{"filterKey":"ENABLED","order":1,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"NETWORK_DISABLED"},{"filterKey":"BRAND_SCOPE","order":2,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"BRAND_UNSUPPORTED"},{"filterKey":"REGION_SCOPE","order":3,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"REGION_UNSUPPORTED"},{"filterKey":"BUSINESS_CAPABILITY","order":4,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"BUSINESS_UNSUPPORTED"},{"filterKey":"QUALIFICATION","order":5,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"NETWORK_UNQUALIFIED"},{"filterKey":"CAPACITY","order":6,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""},"failureCode":"NO_CAPACITY"}],"scoring":[{"factorKey":"REMAINING_CAPACITY","weight":1.0,"expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \"BYD_OCEAN\""}}],"capacity":{"reservationRequired":true},"fallback":{"onNoCandidate":"MANUAL_INTERVENTION","manualRole":"OPS","resolutionHours":4}}',
+       content_digest = '2c4bad148cb0e2f281b08e8e17722f6c0af110d94883fc006121b5adc051f2db',
+       published_at = now()
+ WHERE version_id = '20000000-0000-4000-8000-000000000010'
    AND tenant_id = 'tenant-local';
 
 INSERT INTO cfg_configuration_asset_version (
@@ -120,12 +136,17 @@ INSERT INTO cfg_configuration_bundle_item (
 (
     'tenant-local', '30000000-0000-4000-8000-000000000001', 'WORKFLOW',
     '20000000-0000-4000-8000-000000000001',
-    '73bf5f7e929cfd98fc25e0f8e332ae14cc6da8a1e4fcc3b2782dae51fe777c37'
+    'babb98de19cbffcde0326b396f19566dd0a291282b0b18f8c82c5e8b52227662'
 ),
 (
     'tenant-local', '30000000-0000-4000-8000-000000000001', 'SLA',
     '20000000-0000-4000-8000-000000000002',
     '3ca27e3a4ce99cf98cacf1d2c8203f5aa353cc86cfa96749bd8595803cc1ceb5'
+),
+(
+    'tenant-local', '30000000-0000-4000-8000-000000000001', 'DISPATCH',
+    '20000000-0000-4000-8000-000000000010',
+    '2c4bad148cb0e2f281b08e8e17722f6c0af110d94883fc006121b5adc051f2db'
 ),
 (
     'tenant-local', '30000000-0000-4000-8000-000000000001', 'FORM',
@@ -231,7 +252,7 @@ INSERT INTO wfl_workflow_instance (
     '50000000-0000-4000-8000-000000000001', 'tenant-local',
     '10000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001',
     '30000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001',
-    'ADMIN_PILOT', '1.0.0', repeat('a', 64), 'ACTIVE',
+    'ADMIN_PILOT', '1.0.0', 'babb98de19cbffcde0326b396f19566dd0a291282b0b18f8c82c5e8b52227662', 'ACTIVE',
     '51000000-0000-4000-8000-000000000001', 'admin-pilot-seed', 1,
     now() - interval '110 minutes', repeat('c', 64)
 ) ON CONFLICT DO NOTHING;
@@ -252,7 +273,7 @@ INSERT INTO tsk_task (
     created_at, updated_at, project_id, work_order_id, workflow_instance_id,
     stage_instance_id, workflow_node_instance_id, workflow_node_id,
     workflow_definition_version_id, workflow_definition_digest, configuration_bundle_id,
-    configuration_bundle_digest, stage_code, sla_ref
+    configuration_bundle_digest, stage_code, sla_ref, dispatch_policy_ref
 ) VALUES (
     '70000000-0000-4000-8000-000000000001', 'tenant-local', 'PILOT_SURVEY',
     'HUMAN', 'admin-pilot:survey', repeat('e', 64), 500, 'READY',
@@ -261,9 +282,9 @@ INSERT INTO tsk_task (
     '10000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001',
     '50000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000001',
     '65000000-0000-4000-8000-000000000001', 'PILOT_SURVEY_NODE',
-    '20000000-0000-4000-8000-000000000001', repeat('a', 64),
+    '20000000-0000-4000-8000-000000000001', 'babb98de19cbffcde0326b396f19566dd0a291282b0b18f8c82c5e8b52227662',
     '30000000-0000-4000-8000-000000000001', repeat('c', 64), 'PILOT_SURVEY',
-    'PILOT_RESPONSE'
+    'PILOT_RESPONSE', 'admin-pilot-dispatch'
 ) ON CONFLICT DO NOTHING;
 
 -- 每轮浏览器冒烟必须通过真实 assign-candidates 命令建立候选快照，不能依赖数据库预置 ACTIVE 候选。

@@ -21,7 +21,7 @@ test.describe('M377 Admin productization mock smoke', () => {
     await expect(page.getByText('吉利汽车')).toBeVisible()
 
     await page.getByRole('button', { name: '打开详情' }).click()
-    await expect(page.getByRole('heading', { name: '工单详情' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'WO-DEMO-001' })).toBeVisible()
     await expect(page.getByText('返回工单中心')).toBeVisible()
     await expect(page.getByText('allowed-actions')).toHaveCount(0)
 

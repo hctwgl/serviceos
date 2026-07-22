@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { Button, Tabs, TabPane, Alert, Select, Input, Descriptions, Space, Card } from 'ant-design-vue'
+import { Button, Tabs, TabPane, Alert, Select, Descriptions, Space, Card } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import DetailPageLayout from '../patterns/templates/DetailPageLayout.vue'
 import BusinessProgress, { type BusinessProgressStep } from '../patterns/BusinessProgress.vue'
@@ -19,7 +19,6 @@ import { formatDateTimeDisplay } from '../presentation/date-time.presenter'
 import { presentEmptyValue } from '../presentation/empty-value.presenter'
 import { labelAction } from '../presentation/action-labels'
 import { useDeveloperDiagnostics } from '../composables/useDeveloperDiagnostics'
-import { listServiceNetworks, type ServiceNetwork } from '../api/networks'
 import {
   getWorkOrderActivitySummary,
   getWorkOrderWorkspace,
@@ -49,8 +48,9 @@ import {
   type WorkOrderFulfillmentSnapshot,
 } from '../api/fulfillmentProfiles'
 import {
+  getNetworkAssignmentCandidates,
   manualAssignNetworkServiceAssignment,
-  manualAssignServiceAssignments,
+  type NetworkAssignmentCandidateView,
 } from '../api/dispatch'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -63,25 +63,9 @@ const route = useRoute()
 const router = useRouter()
 const diagnostics = useDeveloperDiagnostics()
 const workOrderId = computed(() => String(route.params.id ?? ''))
-const networkOptions = ref<ServiceNetwork[]>([])
 const showTechTab = import.meta.env.DEV
 const productTab = ref('overview')
 const fulfillmentSnapshot = ref<WorkOrderFulfillmentSnapshot | null>(null)
-
-async function loadNetworks() {
-  try {
-    const page = await listServiceNetworks()
-    networkOptions.value = page.items.filter((n) => n.status === 'ACTIVE')
-  } catch (err) {
-    networkOptions.value = []
-    diagnostics.pushDiagnostic({
-      title: '网点目录加载失败',
-      fields: {
-        message: err instanceof Error ? err.message : 'unknown',
-      },
-    })
-  }
-}
 
 function onProductTabChange(key: string | number) {
   const k = String(key)
@@ -108,15 +92,10 @@ const stages = ref<WorkflowExecutionProjection | null>(null)
 const taskPage = ref<WorkOrderTaskPage | null>(null)
 const timelinePage = ref<WorkOrderTimelinePage | null>(null)
 const authorityError = ref<string | null>(null)
-/** 本地演示默认：济南恒通网点 / 张师傅档案（见 serviceos-deploy/demo）。 */
-const DEMO_NETWORK_ID = 'd3500000-1000-4000-8000-000000000002'
-const DEMO_TECHNICIAN_PROFILE_ID = 'd3500000-1000-4000-8000-000000000004'
-const networkAssigneeId = ref(DEMO_NETWORK_ID)
-const technicianAssigneeId = ref(DEMO_TECHNICIAN_PROFILE_ID)
-const assignBusinessType = ref('INSTALLATION')
-const manualAssignBusy = ref(false)
-const manualAssignError = ref<string | null>(null)
-const manualAssignMessage = ref<string | null>(null)
+const networkAssigneeId = ref<string>()
+const networkCandidates = ref<NetworkAssignmentCandidateView | null>(null)
+const networkCandidatesLoading = ref(false)
+const networkCandidatesError = ref<string | null>(null)
 const assignNetworkBusy = ref(false)
 const assignNetworkError = ref<string | null>(null)
 const assignNetworkMessage = ref<string | null>(null)
@@ -172,12 +151,19 @@ async function runAssignNetwork() {
   assignNetworkError.value = null
   assignNetworkMessage.value = null
   try {
-    const result = await manualAssignNetworkServiceAssignment(taskId, {
-      networkAssigneeId: networkAssigneeId.value.trim(),
-      businessType: assignBusinessType.value.trim(),
+    const candidate = networkCandidates.value?.candidates.find(
+      (item) => item.networkId === networkAssigneeId.value,
+    )
+    if (!candidate || !networkCandidates.value) {
+      assignNetworkError.value = '请先选择当前可分配的责任网点'
+      return
+    }
+    await manualAssignNetworkServiceAssignment(taskId, {
+      networkAssigneeId: candidate.networkId,
+      businessType: networkCandidates.value.businessType,
     })
     assignNetworkMessage.value =
-      `初审派网点成功：${result.data.networkAssigneeId}。网点端任务列表应可见，可继续确认接单或指派师傅。`
+      `责任网点已分配给“${candidate.networkName}”，网点端可继续接单并安排师傅。`
     await loadWorkspace()
   } catch (err) {
     assignNetworkError.value = err instanceof Error ? err.message : '派网点失败'
@@ -186,29 +172,18 @@ async function runAssignNetwork() {
   }
 }
 
-async function runManualAssign() {
-  const taskId = workspace.value?.currentTaskSummary?.taskId
-  if (!taskId) {
-    manualAssignError.value = '无当前任务，无法人工初派'
-    return
-  }
-  manualAssignBusy.value = true
-  manualAssignError.value = null
-  manualAssignMessage.value = null
+async function loadNetworkCandidates(taskId: string | undefined) {
+  networkAssigneeId.value = undefined
+  networkCandidates.value = null
+  networkCandidatesError.value = null
+  if (!taskId) return
+  networkCandidatesLoading.value = true
   try {
-    const result = await manualAssignServiceAssignments(taskId, {
-      networkAssigneeId: networkAssigneeId.value.trim(),
-      technicianAssigneeId: technicianAssigneeId.value.trim(),
-      businessType: assignBusinessType.value.trim(),
-    })
-    const receipt = result.data
-    manualAssignMessage.value =
-      `已初派：网点 ${receipt.networkAssigneeId}，师傅 ${receipt.technicianAssigneeId}`
-    await loadWorkspace()
+    networkCandidates.value = await getNetworkAssignmentCandidates(taskId)
   } catch (err) {
-    manualAssignError.value = err instanceof Error ? err.message : '人工初派失败'
+    networkCandidatesError.value = err instanceof Error ? err.message : '加载责任网点候选失败'
   } finally {
-    manualAssignBusy.value = false
+    networkCandidatesLoading.value = false
   }
 }
 
@@ -309,6 +284,7 @@ async function loadWorkspace() {
     activity.value = act
     await Promise.all([
       loadAllowedActions(ws.currentTaskSummary?.taskId),
+      loadNetworkCandidates(ws.currentTaskSummary?.taskId),
       loadSlaInstances(),
       loadAuthorityProjections(),
       loadPricingSnapshots(),
@@ -1212,10 +1188,15 @@ const projectPresentation = computed(() =>
 )
 const clientLabel = computed(() => labelClientCode(workOrderDetail.value?.workOrder.clientCode ?? workspace.value?.header.clientCode as string | undefined))
 const networkSelectOptions = computed(() =>
-  networkOptions.value.map((n) => ({
-    value: n.id,
-    label: `${n.networkName}（${n.networkCode}）`,
+  (networkCandidates.value?.candidates ?? []).map((candidate) => ({
+    value: candidate.networkId,
+    label: candidate.networkName,
   })),
+)
+const selectedNetworkCandidate = computed(() =>
+  networkCandidates.value?.candidates.find(
+    (candidate) => candidate.networkId === networkAssigneeId.value,
+  ),
 )
 const slaSummaryText = computed(() => {
   const sla = workspace.value?.slaSummary
@@ -1276,7 +1257,6 @@ watch(workOrderId, () => {
 })
 
 onMounted(() => {
-  void loadNetworks()
   if (workOrderId.value) {
     void loadWorkspace()
   }
@@ -1506,7 +1486,23 @@ onMounted(() => {
             <p v-else class="muted">配置来源暂不可用（可能缺少 snapshot 读权限）。</p>
           </Card>
           <Card title="分配服务网点" size="small">
-            <p class="muted">系统推荐：当前目录未返回推荐原因时，请搜索并确认网点（UI_DATA_GAP）。</p>
+            <Alert
+              v-if="networkCandidatesError"
+              type="error"
+              show-icon
+              :message="networkCandidatesError"
+              style="margin-bottom: 12px"
+            />
+            <Alert
+              v-else-if="networkCandidates?.emptyReason"
+              type="warning"
+              show-icon
+              :message="networkCandidates.emptyReason"
+              style="margin-bottom: 12px"
+            />
+            <p v-else class="muted">
+              {{ networkCandidates?.rankingExplanation || '正在读取责任网点候选…' }}
+            </p>
             <label class="field">
               <span>服务网点</span>
               <Select
@@ -1514,26 +1510,28 @@ onMounted(() => {
                 show-search
                 allow-clear
                 style="width: 100%; max-width: 420px"
-                placeholder="搜索网点名称"
+                placeholder="搜索可分配网点"
+                :loading="networkCandidatesLoading"
                 :options="networkSelectOptions"
                 :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
               />
-              <!-- 保留 smoke 使用的可访问名称；值与上方选择同步 -->
-              <Input
-                v-model:value="networkAssigneeId"
-                aria-label="assign-network networkAssigneeId"
-                class="sr-sync"
-              />
             </label>
-            <label class="field">
-              <span>业务类型</span>
-              <Input v-model:value="assignBusinessType" aria-label="assign-network businessType" />
-            </label>
+            <Descriptions
+              v-if="selectedNetworkCandidate"
+              bordered
+              size="small"
+              :column="2"
+              style="margin-bottom: 12px"
+            >
+              <Descriptions.Item label="覆盖情况">{{ selectedNetworkCandidate.coverageSummary }}</Descriptions.Item>
+              <Descriptions.Item label="剩余容量">{{ selectedNetworkCandidate.remainingCapacity }}</Descriptions.Item>
+              <Descriptions.Item label="推荐说明" :span="2">{{ selectedNetworkCandidate.recommendationSummary }}</Descriptions.Item>
+            </Descriptions>
             <Space>
               <Button
                 type="primary"
                 data-testid="assign-network"
-                :disabled="assignNetworkBusy || !workspace.currentTaskSummary"
+                :disabled="assignNetworkBusy || !workspace.currentTaskSummary || !selectedNetworkCandidate"
                 @click="runAssignNetwork"
               >
                 {{ assignNetworkBusy ? '分配中…' : '确认分配网点' }}
@@ -1545,18 +1543,6 @@ onMounted(() => {
             </Space>
             <Alert v-if="assignNetworkError" type="error" show-icon :message="assignNetworkError" style="margin-top: 8px" />
             <Alert v-if="assignNetworkMessage" type="success" show-icon :message="assignNetworkMessage" style="margin-top: 8px" />
-            <details class="assign-advanced">
-              <summary>高级：一次分配网点与师傅（跳过网点接单）</summary>
-              <label class="field">
-                <span>服务师傅</span>
-                <Input v-model:value="technicianAssigneeId" aria-label="manual-assign technicianAssigneeId" />
-              </label>
-              <Button :disabled="manualAssignBusy || !workspace.currentTaskSummary" @click="runManualAssign">
-                确认双责任分配
-              </Button>
-              <Alert v-if="manualAssignError" type="error" show-icon :message="manualAssignError" />
-              <Alert v-if="manualAssignMessage" type="success" show-icon :message="manualAssignMessage" />
-            </details>
           </Card>
 
           <Card title="影子试算（非正式）" size="small" data-testid="pricing-shadow-panel">
@@ -2229,7 +2215,6 @@ onMounted(() => {
   border-radius: 6px;
 }
 .pricing-list { margin: 8px 0 0; padding-left: 18px; }
-.assign-advanced { margin-top: 12px; }
 .handoff-link { font-size: 13px; }
 .error { color: var(--sos-color-status-critical-fg); }
 .wo-workspace-body :deep(h3) {
@@ -2239,7 +2224,6 @@ onMounted(() => {
 .wo-workspace-body section + section {
   margin-top: 14px;
 }
-.sr-sync { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .card { background: #fff; padding: 12px; border-radius: 8px; }
 .legacy-section-links { margin-top: 12px; }
 </style>

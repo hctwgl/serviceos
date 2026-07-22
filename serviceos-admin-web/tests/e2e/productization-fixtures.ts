@@ -1306,6 +1306,29 @@ export async function mockProductizationApis(
       })
       return
     }
+    if (
+      url.includes('/tasks/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/network-assignment-candidates')
+    ) {
+      await fulfillJson(route, {
+        taskId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        workOrderId: '11111111-1111-4111-8111-111111111111',
+        businessType: 'INSTALLATION',
+        generatedAt: '2026-07-20T04:00:00Z',
+        rankingExplanation: '候选已通过硬规则校验，并按项目当前派单策略排序',
+        emptyReason: null,
+        candidates: [
+          {
+            networkId: '55555555-5555-4555-8555-555555555555',
+            networkName: '杭州西湖服务网点',
+            rank: 1,
+            coverageSummary: '覆盖工单所在区县',
+            remainingCapacity: 8,
+            recommendationSummary: '符合项目、服务区域、业务类型和容量要求，当前推荐顺序第 1 位',
+          },
+        ],
+      })
+      return
+    }
     if (url.includes('/work-orders/11111111-1111-4111-8111-111111111111/stages')) {
       await fulfillJson(route, {
         workflow: {

@@ -49,22 +49,20 @@ PY
   fi
 }
 
-# M144：断言 Admin HTTP 人工初派留下的 ACTIVE 责任 / CONFIRMED reservation / COMPLETED saga。
-assert_manual_service_assignment() {
+# M453：断言两阶段正式责任链留下的 ACTIVE 责任 / CONFIRMED reservation / COMPLETED saga。
+assert_service_assignment_chain() {
   local task_id="$1"
   local run_key="$2"
   local sa_state
   sa_state="$(query_db "
     SELECT count(DISTINCT CASE WHEN a.responsibility_level = 'NETWORK'
-                                AND a.assignee_id = 'admin-pilot-network-1'
+                                AND a.assignee_id = 'd3500000-1000-4000-8000-000000000002'
                                 AND a.status = 'ACTIVE' THEN a.service_assignment_id END) || ':' ||
            count(DISTINCT CASE WHEN a.responsibility_level = 'TECHNICIAN'
-                                AND a.assignee_id = '06b612f3-a901-4b0e-bd90-86b4259cc087'
+                                AND a.assignee_id = 'd3500000-1000-4000-8000-000000000004'
                                 AND a.status = 'ACTIVE' THEN a.service_assignment_id END) || ':' ||
            count(DISTINCT CASE WHEN r.status = 'CONFIRMED' THEN r.capacity_reservation_id END) || ':' ||
-           count(DISTINCT CASE WHEN s.stage = 'COMPLETED' THEN s.activation_saga_id END) || ':' ||
-           count(DISTINCT CASE WHEN a.created_by = '06b612f3-a901-4b0e-bd90-86b4259cc087'
-                                THEN a.service_assignment_id END)
+           count(DISTINCT CASE WHEN s.stage = 'COMPLETED' THEN s.activation_saga_id END)
       FROM dsp_service_assignment a
       LEFT JOIN dsp_capacity_reservation r
         ON r.tenant_id = a.tenant_id
@@ -76,8 +74,8 @@ assert_manual_service_assignment() {
      WHERE a.tenant_id = 'tenant-local'
        AND a.task_id = '${task_id}'
   ")"
-  [[ "${sa_state}" == "1:1:2:2:2" ]] || {
-    echo "Admin HTTP ServiceAssignment 不完整 (${run_key}): ${sa_state}" >&2
+  [[ "${sa_state}" == "1:1:2:2" ]] || {
+    echo "平台派网点、网点派师傅责任链不完整 (${run_key}): ${sa_state}" >&2
     exit 1
   }
 }
@@ -228,6 +226,10 @@ ensure_m187_viewer
 docker compose -f "${compose_file}" exec -T postgres \
   psql -U serviceos_app -d serviceos \
   < serviceos-deploy/admin-pilot/seed-admin-pilot.sql
+# 现场闭环必须消费正式项目网点、覆盖、容量、成员和师傅资格，不能再用旧双责任接口绕过候选。
+docker compose -f "${compose_file}" exec -T postgres \
+  psql -U serviceos_app -d serviceos \
+  < serviceos-deploy/demo/seed-demo-network-portal.sql
 
 # 终态验证每轮创建全新的 WorkOrder/Workflow/Stage/Node/Task，绝不通过 SQL 回退终态事实。
 completion_work_order_id="$(new_uuid)"
@@ -286,7 +288,7 @@ resubmit_task_created_event_id="$(new_uuid)"
 resubmit_external_code="ADMIN-PILOT-RESUBMIT-${resubmit_work_order_id%%-*}"
 resubmit_correlation_id="admin-pilot-resubmit-${resubmit_task_id}"
 
-# 预约/上门写链路使用第五个独立 Task，并注入 ACTIVE ServiceAssignment 以对齐 Visit 责任。
+# 预约/上门写链路使用第五个独立 Task，并通过正式两阶段命令建立 ServiceAssignment。
 field_ops_work_order_id="$(new_uuid)"
 field_ops_workflow_id="$(new_uuid)"
 field_ops_stage_id="$(new_uuid)"
@@ -425,7 +427,7 @@ fi
 wait_http "http://127.0.0.1:5173" "ServiceOS Admin Web"
 
 # M140/M144：真实 CPIM 入站创建工单 → Outbox 激活 Workflow/Task；Playwright 经 Admin HTTP
-# 人工初派后证明领取/预约上门/整改外发完结（ADMIN-PILOT-09）。
+# 两阶段责任分配后证明领取/预约上门/整改外发完结（ADMIN-PILOT-09）。
 inbound_order_uuid="$(new_uuid)"
 inbound_order_code="ADMIN-PILOT-IN-${inbound_order_uuid%%-*}"
 
@@ -541,11 +543,30 @@ export ADMIN_PILOT_OUTBOUND_WORK_ORDER_CODE="${outbound_external_code}"
 export ADMIN_PILOT_OUTBOUND_TASK_ID="${outbound_task_id}"
 export ADMIN_PILOT_INBOUND_ORDER_CODE="${inbound_order_code}"
 export ADMIN_PILOT_INBOUND_TASK_ID="${inbound_task_id}"
-# M360：真实 OIDC 冒烟 + 终审 Mock 功能回归 + 8 态视觉基线同门禁
-npm run test:e2e -- \
-  tests/e2e/admin-pilot-smoke.spec.ts \
-  tests/e2e/final-review-workspace.spec.ts \
+# M360：真实 OIDC 冒烟 + 终审 Mock 功能回归 + 8 态视觉基线同门禁。
+# 精准回归可以通过 SERVICEOS_ADMIN_PILOT_GREP 仅筛选当前变更涉及的场景；默认值为空时仍执行
+# 全量门禁，避免日常精准验证为了节省时间而永久削弱发布候选的覆盖范围。
+e2e_args=(
+  tests/e2e/admin-pilot-smoke.spec.ts
+  tests/e2e/final-review-workspace.spec.ts
   tests/e2e/final-review-visual.spec.ts
+)
+if [[ -n "${SERVICEOS_ADMIN_PILOT_GREP:-}" ]]; then
+  e2e_args+=(--grep "${SERVICEOS_ADMIN_PILOT_GREP}")
+fi
+npm run test:e2e -- "${e2e_args[@]}"
+
+if [[ -n "${SERVICEOS_ADMIN_PILOT_GREP:-}" ]]; then
+  # 精准场景只断言本轮实际执行所产生的权威数据库事实，不能继续套用全量场景的终态断言。
+  if [[ "${SERVICEOS_ADMIN_PILOT_GREP}" == *"预约提议确认与上门签到签退"* ]]; then
+    assert_service_assignment_chain "${field_ops_task_id}" "field-ops"
+  fi
+  if [[ "${SERVICEOS_ADMIN_PILOT_GREP}" == *"入站工单上完成领取"* ]]; then
+    assert_service_assignment_chain "${inbound_task_id}" "inbound"
+  fi
+  echo "Admin 试点精准场景验证通过: ${SERVICEOS_ADMIN_PILOT_GREP}"
+  exit 0
+fi
 
 task_state="$(query_db "
   SELECT status || ':' || version || ':' || COALESCE(claimed_by, '')
@@ -1291,7 +1312,7 @@ done
   exit 1
 }
 
-assert_manual_service_assignment "${field_ops_task_id}" "field-ops"
-assert_manual_service_assignment "${inbound_task_id}" "inbound"
+assert_service_assignment_chain "${field_ops_task_id}" "field-ops"
+assert_service_assignment_chain "${inbound_task_id}" "inbound"
 
 echo "Admin 试点冒烟通过：真实 Keycloak、Backend、PostgreSQL 与浏览器链路均已验证"
