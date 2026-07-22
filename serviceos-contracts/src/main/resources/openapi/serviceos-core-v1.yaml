@@ -100,6 +100,22 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/AdminResourceDirectoryPage' } } }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /admin/client-project-directory:
+    get:
+      operationId: getAdminClientProjectDirectory
+      summary: Admin 客户与项目页面目录
+      description: >-
+        需要 project.read。服务端组合客户、品牌、项目、服务区域和履约配置摘要，
+        前端不得根据编码或内部标识自行拼接多个领域接口。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 客户与项目页面目录
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AdminClientProjectDirectoryView' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /security-principals/{principalId}:
     get:
       operationId: getSecurityPrincipal
@@ -7745,6 +7761,46 @@ components:
       properties:
         networks: { type: array, items: { $ref: '#/components/schemas/AdminServiceNetworkDirectoryItem' } }
         technicians: { type: array, items: { $ref: '#/components/schemas/AdminTechnicianDirectoryItem' } }
+        asOf: { type: string, format: date-time }
+    AdminClientDirectoryItem:
+      type: object
+      additionalProperties: false
+      required: [clientCode, clientName, status, brandNames, projectCount]
+      properties:
+        clientCode: { type: string, minLength: 1, maxLength: 128 }
+        clientName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+        brandNames: { type: array, items: { type: string, minLength: 1, maxLength: 200 } }
+        projectCount: { type: integer, minimum: 0 }
+    AdminProjectDirectoryItem:
+      type: object
+      additionalProperties: false
+      required: [id, projectCode, projectName, clientCode, startsOn, regionNames, networkCount,
+        status, configurationStatus, dataComplete]
+      properties:
+        id: { type: string, format: uuid }
+        projectCode: { type: string, minLength: 1, maxLength: 128 }
+        projectName: { type: string, minLength: 1, maxLength: 200 }
+        clientCode: { type: string, minLength: 1, maxLength: 128 }
+        clientName: { type: [string, 'null'], maxLength: 200 }
+        startsOn: { type: string, format: date }
+        endsOn: { type: [string, 'null'], format: date }
+        regionNames: { type: array, items: { type: string, minLength: 1, maxLength: 200 } }
+        networkCount: { type: integer, minimum: 0 }
+        status: { enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED] }
+        publishedConfigurationCount: { type: [integer, 'null'], minimum: 0 }
+        draftConfigurationCount: { type: [integer, 'null'], minimum: 0 }
+        configurationStatus:
+          enum: [NOT_CONFIGURED, DRAFT, PUBLISHED, UNPUBLISHED_CHANGES, NO_PERMISSION]
+        dataComplete: { type: boolean }
+        dataProblem: { type: [string, 'null'] }
+    AdminClientProjectDirectoryView:
+      type: object
+      additionalProperties: false
+      required: [clients, projects, asOf]
+      properties:
+        clients: { type: array, items: { $ref: '#/components/schemas/AdminClientDirectoryItem' } }
+        projects: { type: array, items: { $ref: '#/components/schemas/AdminProjectDirectoryItem' } }
         asOf: { type: string, format: date-time }
     PrincipalPersona:
       type: object

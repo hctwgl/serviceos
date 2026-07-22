@@ -22,6 +22,8 @@ export const router = createRouter({
         { path: 'resources/organizations', name: 'organizations', meta: { title: '组织架构' }, component: () => import('./features/organizations/pages/OrganizationDirectoryPage.vue') },
         { path: 'resources/networks', name: 'service-networks', meta: { title: '服务网点' }, component: () => import('./features/resources/pages/ServiceNetworkDirectoryPage.vue') },
         { path: 'resources/technicians', name: 'technicians', meta: { title: '师傅档案' }, component: () => import('./features/resources/pages/TechnicianDirectoryPage.vue') },
+        { path: 'clients', name: 'clients', meta: { title: '客户品牌' }, component: () => import('./features/projects/pages/ClientDirectoryPage.vue') },
+        { path: 'projects', name: 'projects', meta: { title: '项目管理' }, component: () => import('./features/projects/pages/ProjectDirectoryPage.vue') },
       ],
     },
   ],
