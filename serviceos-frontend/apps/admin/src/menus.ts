@@ -25,6 +25,7 @@ export const serviceOsMenus: MenuRecordRaw[] = [
     order: 70,
     children: [
       { name: '用户管理', path: '/system/users' },
+      { name: '角色与授权', path: '/system/roles' },
     ],
   },
   { name: '审计与监控', path: '/work-orders?view=audit', icon: 'lucide:chart-no-axes-combined', order: 80 },
