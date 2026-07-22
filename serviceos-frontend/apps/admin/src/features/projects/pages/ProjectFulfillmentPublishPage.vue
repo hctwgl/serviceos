@@ -232,6 +232,7 @@ async function publishRevision() {
               <article v-for="revision in preparation.revisions.data.value" :key="revision.revisionId">
                 <header><strong>V{{ revision.versionNo }}</strong><Tag color="success">已发布</Tag></header>
                 <p>{{ formatDateTime(revision.publishedAt || revision.createdAt) }}</p>
+                <span v-if="revision.publishedByDisplayName">{{ revision.publishedByDisplayName }}</span>
               </article>
             </div>
             <div v-else class="product-empty-inline">尚无已发布版本。</div>

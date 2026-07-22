@@ -154,6 +154,7 @@ export type ProjectFulfillmentRevision = {
   profileId: string
   publishedAt?: string | null
   publishedBy?: string | null
+  publishedByDisplayName?: string | null
   revisionId: string
   revisionStatus: 'DRAFT' | 'PUBLISHED'
   versionNo: number

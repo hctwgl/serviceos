@@ -35,6 +35,9 @@ const project = useProjectWorkspaceQuery(projectId)
 const profiles = useProjectFulfillmentProfilesQuery(projectId)
 const selectedProfileId = ref<string>()
 const selectedProfile = useProjectFulfillmentProfileQuery(projectId, selectedProfileId)
+const selectedSummary = computed(() => (
+  profiles.data.value?.find((item) => item.profileId === selectedProfileId.value)
+))
 const createOpen = ref(false)
 const createdProfileName = ref<string>()
 const form = reactive<CreateProjectFulfillmentProfileInput>({
@@ -165,7 +168,7 @@ async function createProfile() {
             </template>
             <template v-else-if="column.key === 'stages'">{{ record.stageCount }} 个</template>
             <template v-else-if="column.key === 'assets'">{{ record.formCount }} 份 / {{ record.evidenceCount }} 项</template>
-            <template v-else-if="column.key === 'version'">{{ record.activeVersion ?? '尚未发布' }}</template>
+            <template v-else-if="column.key === 'version'">{{ record.activeVersion ? `V${record.activeVersion}` : '尚未发布' }}</template>
             <template v-else-if="column.key === 'updatedAt'">{{ formatDateTime(record.updatedAt) }}</template>
             <template v-else-if="column.key === 'action'">
               <Button type="link" size="small" @click.stop="selectProfile(record.profileId)">查看</Button>
@@ -195,11 +198,37 @@ async function createProfile() {
             </Tag>
           </header>
           <dl class="fulfillment-detail-facts">
-            <div><dt>当前版本</dt><dd>{{ selectedProfile.data.value.activeVersion ?? '尚未发布' }}</dd></div>
+            <div><dt>当前版本</dt><dd>{{ selectedProfile.data.value.activeVersion ? `V${selectedProfile.data.value.activeVersion}` : '尚未发布' }}</dd></div>
             <div><dt>活动草稿</dt><dd>{{ selectedProfile.data.value.draftRevisionId ? '存在未发布草稿' : '无草稿' }}</dd></div>
             <div><dt>生效时间</dt><dd>{{ selectedProfile.data.value.activeEffectiveFrom ? formatDateTime(selectedProfile.data.value.activeEffectiveFrom) : '尚未生效' }}</dd></div>
             <div><dt>最近更新</dt><dd>{{ formatDateTime(selectedProfile.data.value.updatedAt) }}</dd></div>
           </dl>
+          <section v-if="selectedSummary" class="fulfillment-module-overview">
+            <header>
+              <div><h3>配置模块</h3><p>从业务模块理解当前履约方案，所有模块统一形成不可变发布版本。</p></div>
+              <Tag v-if="selectedProfile.data.value.draftRevisionId" color="warning">存在待发布草稿</Tag>
+            </header>
+            <div class="fulfillment-module-grid">
+              <article>
+                <div class="module-index">01</div>
+                <div><strong>流程设计</strong><p>{{ selectedSummary.stageCount }} 个履约阶段</p><span>{{ selectedSummary.workflowSummary || '尚未生成流程摘要' }}</span></div>
+                <RouterLink v-if="selectedProfile.data.value.draftRevisionId" :to="`/projects/${projectId}/fulfillment/${selectedProfile.data.value.profileId}/draft`">配置流程</RouterLink>
+              </article>
+              <article>
+                <div class="module-index">02</div>
+                <div><strong>表单与资料</strong><p>{{ selectedSummary.formCount }} 份表单 · {{ selectedSummary.evidenceCount }} 项资料</p><span>随履约阶段冻结引用关系</span></div>
+              </article>
+              <article>
+                <div class="module-index">03</div>
+                <div><strong>SLA 与预约</strong><p>{{ selectedSummary.slaSummary || '尚未配置时效规则' }}</p><span>统一使用项目服务日历计算</span></div>
+              </article>
+              <article>
+                <div class="module-index">04</div>
+                <div><strong>版本与发布</strong><p>{{ selectedProfile.data.value.activeVersion ? `当前 V${selectedProfile.data.value.activeVersion}` : '尚无生效版本' }}</p><span>校验、比较影响后原子发布</span></div>
+                <RouterLink v-if="selectedProfile.data.value.draftRevisionId" :to="`/projects/${projectId}/fulfillment/${selectedProfile.data.value.profileId}/publish`">发布准备</RouterLink>
+              </article>
+            </div>
+          </section>
           <section class="fulfillment-next-actions">
             <h3>当前配置范围</h3>
             <p>流程、表单资料、SLA、派单与审核规则必须作为完整履约版本统一校验和发布，不能单独生效。</p>

@@ -13551,6 +13551,10 @@ components:
         effectiveTo: { type: string, format: date-time, nullable: true }
         supersedesRevisionId: { type: string, format: uuid, nullable: true }
         publishedBy: { type: string, nullable: true }
+        publishedByDisplayName:
+          type: string
+          nullable: true
+          description: 发布人的业务显示名；无法解析时为空，产品页面不得以 publishedBy 代替
         publishedAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
     ProjectFulfillmentManifest:

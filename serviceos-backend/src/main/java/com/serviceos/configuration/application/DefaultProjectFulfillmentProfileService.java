@@ -20,6 +20,7 @@ import com.serviceos.configuration.api.ProjectFulfillmentUsageSummary;
 import com.serviceos.configuration.api.ProjectFulfillmentValidationIssue;
 import com.serviceos.configuration.api.UpdateProjectFulfillmentDraftCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.identity.api.PrincipalPersonaQuery;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
@@ -75,6 +76,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
     private final ProjectFulfillmentCompareAnalyzer compareAnalyzer;
     private final ProjectFulfillmentDocumentMapper documentMapper;
     private final WorkOrderQueryService workOrders;
+    private final PrincipalPersonaQuery personas;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -88,6 +90,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
             ProjectFulfillmentCompareAnalyzer compareAnalyzer,
             ProjectFulfillmentDocumentMapper documentMapper,
             WorkOrderQueryService workOrders,
+            PrincipalPersonaQuery personas,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -100,6 +103,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         this.compareAnalyzer = compareAnalyzer;
         this.documentMapper = documentMapper;
         this.workOrders = workOrders;
+        this.personas = personas;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -743,7 +747,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         authorization.require(principal, AuthorizationRequest.projectCapability(
                 REVISION_READ, principal.tenantId(), RESOURCE, profileId.toString(),
                 projectId.toString()), correlationId);
-        return jdbc.sql("""
+        List<ProjectFulfillmentRevisionView> revisions = jdbc.sql("""
                 SELECT *
                   FROM cfg_project_fulfillment_revision
                  WHERE tenant_id = :tenantId AND profile_id = :profileId
@@ -754,6 +758,9 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 .param("profileId", profileId)
                 .query((rs, n) -> mapRevision(rs))
                 .list();
+        return revisions.stream()
+                .map(revision -> enrichPublisherDisplayName(principal.tenantId(), revision))
+                .toList();
     }
 
     @Override
@@ -769,7 +776,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         authorization.require(principal, AuthorizationRequest.projectCapability(
                 REVISION_READ, principal.tenantId(), RESOURCE, profileId.toString(),
                 projectId.toString()), correlationId);
-        return jdbc.sql("""
+        ProjectFulfillmentRevisionView revision = jdbc.sql("""
                 SELECT *
                   FROM cfg_project_fulfillment_revision
                  WHERE tenant_id = :tenantId AND profile_id = :profileId AND revision_id = :revisionId
@@ -780,6 +787,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 .query((rs, n) -> mapRevision(rs))
                 .optional()
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "履约配置版本不存在"));
+        return enrichPublisherDisplayName(principal.tenantId(), revision);
     }
 
     @Override
@@ -1130,8 +1138,48 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 toInstant(rs.getObject("effective_to", OffsetDateTime.class)),
                 rs.getObject("supersedes_revision_id", UUID.class),
                 rs.getString("published_by"),
+                null,
                 toInstant(rs.getObject("published_at", OffsetDateTime.class)),
                 toInstant(rs.getObject("created_at", OffsetDateTime.class)));
+    }
+
+    /**
+     * 发布记录持久化稳定的主体标识，产品读模型在读取时通过 identity 公开端口解析当前显示名。
+     * 解析失败时保持为空，禁止把主体 UUID 当作人员名称返回给产品页面。
+     */
+    private ProjectFulfillmentRevisionView enrichPublisherDisplayName(
+            String tenantId,
+            ProjectFulfillmentRevisionView revision
+    ) {
+        UUID publisherId;
+        try {
+            publisherId = revision.publishedBy() == null
+                    ? null
+                    : UUID.fromString(revision.publishedBy());
+        } catch (IllegalArgumentException ignored) {
+            publisherId = null;
+        }
+        String displayName = publisherId == null
+                ? null
+                : personas.displayName(tenantId, publisherId).orElse(null);
+        return new ProjectFulfillmentRevisionView(
+                revision.revisionId(),
+                revision.profileId(),
+                revision.versionNo(),
+                revision.revisionStatus(),
+                revision.documentJson(),
+                revision.manifestJson(),
+                revision.validationJson(),
+                revision.contentDigest(),
+                revision.sourceBundleId(),
+                revision.workflowAssetVersionId(),
+                revision.effectiveFrom(),
+                revision.effectiveTo(),
+                revision.supersedesRevisionId(),
+                revision.publishedBy(),
+                displayName,
+                revision.publishedAt(),
+                revision.createdAt());
     }
 
 
