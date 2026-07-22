@@ -40,7 +40,7 @@ export function currentSession(): { authenticated: boolean; expiresAt: number | 
   const token = localStorage.getItem(ACCESS_TOKEN_KEY)
   const expiresAt = Number(localStorage.getItem(ACCESS_TOKEN_EXPIRY_KEY))
   if (!token || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-    clearSession()
+    clearAccessSession()
     return { authenticated: false, expiresAt: null }
   }
   return { authenticated: true, expiresAt }
@@ -69,9 +69,17 @@ export function currentIdentity(): { displayName: string; initials: string } {
   }
 }
 
-export function clearSession(): void {
+function clearAccessSession(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY)
   localStorage.removeItem(ACCESS_TOKEN_EXPIRY_KEY)
+}
+
+/**
+ * 显式退出或登录失败时才清理 PKCE 事务。访问令牌自然过期时只能清理访问会话；如果同时删除
+ * verifier 和 state，正在进行的重新登录会在摘要计算与页面跳转之间被并发 API 请求破坏。
+ */
+export function clearSession(): void {
+  clearAccessSession()
   sessionStorage.removeItem(PKCE_VERIFIER_KEY)
   sessionStorage.removeItem(OIDC_STATE_KEY)
 }
