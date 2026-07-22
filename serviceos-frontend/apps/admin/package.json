@@ -18,6 +18,7 @@
     "@tanstack/vue-query": "^5.90.5",
     "@vben/hooks": "workspace:*",
     "@vben/icons": "workspace:*",
+    "@vben/common-ui": "workspace:*",
     "@vben/layouts": "workspace:*",
     "@vben/locales": "workspace:*",
     "@vben/preferences": "workspace:*",

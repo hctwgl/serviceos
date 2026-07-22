@@ -1,7 +1,35 @@
 import type { ThemeConfig } from 'ant-design-vue/es/config-provider/context'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 
-export { Button, ConfigProvider, Drawer, Empty, Input, Radio, Select } from 'ant-design-vue'
+export {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  ConfigProvider,
+  Divider,
+  Drawer,
+  Dropdown,
+  Empty,
+  Flex,
+  Form,
+  Input,
+  Menu,
+  Pagination,
+  Radio,
+  Result,
+  Row,
+  Col,
+  Select,
+  Skeleton,
+  Space,
+  Statistic,
+  Table,
+  Tabs,
+  Tag,
+  Tooltip,
+} from 'ant-design-vue'
+export type { TableColumnsType } from 'ant-design-vue'
 export {
   AppstoreOutlined,
   AuditOutlined,
