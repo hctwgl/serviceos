@@ -381,7 +381,7 @@ onMounted(async () => {
                   :danger="record.status === 'ACTIVE'"
                   data-testid="client-toggle-status"
                   :disabled="clientBusy"
-                  @click.stop="toggleClientStatus(record)"
+                  @click.stop="toggleClientStatus(record as ProjectClientDirectoryItem)"
                 >
                   {{ record.status === 'ACTIVE' ? '停用' : '启用' }}
                 </Button>
@@ -451,7 +451,7 @@ onMounted(async () => {
                   :danger="record.status === 'ACTIVE'"
                   data-testid="brand-toggle-status"
                   :disabled="brandBusy"
-                  @click="toggleBrandStatus(record)"
+                  @click="toggleBrandStatus(record as ProjectClientBrandItem)"
                 >
                   {{ record.status === 'ACTIVE' ? '停用' : '启用' }}
                 </Button>
