@@ -45,11 +45,11 @@ const tasksQuery = useQuery({
 
 const summary = computed(() => summaryQuery.data.value)
 const queueTabs = computed(() => [
-  { key: 'mine', label: `我的待办 ${summary.value?.priorityCount ?? '—'}` },
+  { key: 'all', label: `全部工单 ${tasksQuery.data.value?.totalCount ?? '—'}` },
+  { key: 'dispatch', label: `待派责任网点 ${summary.value?.dispatchCount ?? '—'}` },
   { key: 'sla', label: `SLA 风险 ${summary.value?.slaRiskCount ?? '—'}` },
-  { key: 'exceptions', label: `异常阻塞 ${summary.value?.exceptionCount ?? '—'}` },
-  { key: 'external', label: `等待外部处理 ${summary.value?.waitingExternalCount ?? '—'}` },
-  { key: 'unassigned', label: `待派责任网点 ${summary.value?.unassignedCount ?? '—'}` },
+  { key: 'review', label: `待审核 ${summary.value?.reviewCount ?? '—'}` },
+  { key: 'correction', label: `待整改 ${summary.value?.correctionCount ?? '—'}` },
 ])
 
 const columns: TableColumnsType<AdminWorkOrderDirectoryItem> = [
@@ -143,7 +143,7 @@ function slaColor(level: string) {
 
       <Card class="workbench-operations-card" :bordered="false">
         <template #title>
-          <Tabs :active-key="'mine'" @change="openQueue">
+          <Tabs :active-key="'all'" @change="openQueue">
             <Tabs.TabPane v-for="tab in queueTabs" :key="tab.key" :tab="tab.label" />
           </Tabs>
         </template>
