@@ -15,7 +15,7 @@ const MigrationTestEntry = defineComponent({
 
 export const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/', redirect: '/technician-portal/task-feed' },
-  // 双运行迁移期复用既有 Playwright 登录 helper；不显示 Admin 页面或接受手工 Token。
+  // OIDC 回调只处理当前 Portal 的正式登录，不显示 Admin 页面或接受手工 Token。
   { path: '/settings/token', component: MigrationTestEntry },
   { path: '/work-orders', component: MigrationTestEntry },
   { path: '/technician-portal', redirect: '/technician-portal/task-feed' },

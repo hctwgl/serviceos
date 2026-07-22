@@ -123,6 +123,16 @@ class DefaultProjectCommandServiceTest {
         }
 
         @Override
+        public boolean activate(String tenantId, UUID projectId, long expectedVersion) {
+            if (project == null || !project.tenantId().equals(tenantId)
+                    || !project.id().equals(projectId) || project.version() != expectedVersion) {
+                return false;
+            }
+            project = project.activate();
+            return true;
+        }
+
+        @Override
         public void reviseRegionBindings(
                 String tenantId, UUID projectId, List<String> removed, List<String> added,
                 String actorId, Instant revisedAt

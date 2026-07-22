@@ -29,8 +29,11 @@ class GeneratedClientContractTest {
         JsonNode packageNode = objectMapper.readTree(packageJson.toFile());
         assertThat(packageNode.path("name").asText()).isEqualTo("@serviceos/core-client");
         assertThat(packageNode.path("version").asText()).isEqualTo("0.4.0");
-        assertThat(packageNode.path("scripts").path("build").asText())
+        assertThat(packageNode.path("scripts").path("build:client").asText())
                 .isEqualTo("tsc && tsc -p tsconfig.esm.json");
+        assertThat(packageNode.path("scripts").has("build"))
+                .as("file: 依赖安装期不得通过 npm build 生命周期隐式编译生成客户端")
+                .isFalse();
         assertThat(packageNode.path("scripts").has("prepare"))
                 .as("file: 依赖安装期不得隐式编译生成客户端，编译由仓库门禁和 Admin 启动脚本显式负责")
                 .isFalse();

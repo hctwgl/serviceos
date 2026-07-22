@@ -1,0 +1,58 @@
+:root {
+  --sos-brand: #1769ff;
+  --sos-brand-soft: #edf4ff;
+  --sos-canvas: #f5f7fb;
+  --sos-surface: #ffffff;
+  --sos-border: #e7ebf2;
+  --sos-border-soft: #edf0f5;
+  --sos-text: #172033;
+  --sos-text-secondary: #667085;
+  --sos-text-tertiary: #98a2b3;
+  --sos-text-heading: #101828;
+  --sos-text-strong: #344054;
+  --sos-text-muted: #7a8495;
+  --sos-text-subtle: #8a94a5;
+  --sos-text-disabled: #a3aab5;
+  --sos-success: #20b26b;
+  --sos-success-strong: #15915e;
+  --sos-success-soft: #eafaf2;
+  --sos-warning: #f59e0b;
+  --sos-warning-strong: #d97706;
+  --sos-warning-soft: #fff5e5;
+  --sos-danger: #ef4444;
+  --sos-danger-strong: #d92d20;
+  --sos-danger-accent: #e32323;
+  --sos-danger-soft: #fff0f0;
+  --sos-danger-surface: #fff6f6;
+  --sos-danger-border: #fecaca;
+  --sos-danger-card-border: #ffc4c4;
+  --sos-danger-card-soft: #fff5f4;
+  --sos-danger-text: #9f1239;
+  --sos-orange: #f97316;
+  --sos-canvas-hover: #f7f9fc;
+  --sos-canvas-subtle: #fafbfc;
+  --sos-canvas-table-hover: #fafcff;
+  --sos-brand-hover: #f8fbff;
+  --sos-brand-border: #b8d0ff;
+  --sos-brand-panel: #f3f7ff;
+  --sos-brand-panel-text: #31517e;
+  --sos-border-muted: #e9edf4;
+  --sos-border-control: #eef1f5;
+  --sos-border-row: #f0f2f5;
+  --sos-step-border: #dce2ea;
+  --sos-step-line: #dfe4eb;
+  --sos-badge-soft: #eef3fb;
+  --sos-avatar: #e5eaf1;
+  --sos-neutral-soft: #f2f4f7;
+  --sos-popover-shadow: 0 10px 30px rgba(16, 24, 40, .12);
+  --sos-sidebar-width: 176px;
+  --sos-header-height: 54px;
+  --sos-page-gap: 14px;
+  --sos-radius: 7px;
+  --sos-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body, #app { min-height: 100%; margin: 0; }
+body { color: var(--sos-text); background: var(--sos-canvas); font-family: var(--sos-font); }
+button, input, select, textarea { font: inherit; }

@@ -13,6 +13,7 @@ import com.serviceos.network.api.NetworkTechnicianMembershipView;
 import com.serviceos.network.api.PartnerOrganizationPage;
 import com.serviceos.network.api.PartnerOrganizationView;
 import com.serviceos.network.api.ServiceNetworkPage;
+import com.serviceos.network.api.ServiceNetworkCoverageView;
 import com.serviceos.network.api.ServiceNetworkView;
 import com.serviceos.network.api.TechnicianProfilePage;
 import com.serviceos.network.api.TechnicianProfileView;
@@ -113,6 +114,19 @@ final class NetworkController {
     ) {
         ServiceNetworkView result = queries.getServiceNetwork(principals.current(), correlationId, networkId);
         return versionedResponse(result, result.version(), correlationId);
+    }
+
+    @PostMapping("/service-networks/{networkId}/coverages")
+    ResponseEntity<ServiceNetworkCoverageView> createServiceNetworkCoverage(
+            @PathVariable UUID networkId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody CreateServiceNetworkCoverageRequest request
+    ) {
+        ServiceNetworkCoverageView result = commands.createServiceNetworkCoverage(
+                principals.current(), metadata(correlationId, idempotencyKey), networkId,
+                request.brandCode(), request.businessType(), request.regionCode(), request.validFrom());
+        return response(result, correlationId);
     }
 
     @PostMapping("/service-networks/{networkId}:deactivate")
@@ -356,11 +370,18 @@ record CreatePartnerRequest(
         @NotBlank @Size(max = 200) String name
 ) {}
 
-record CreateServiceNetworkRequest(
+    record CreateServiceNetworkRequest(
         @NotNull UUID partnerOrganizationId,
         @NotBlank @Size(max = 64) String networkCode,
         @NotBlank @Size(max = 200) String networkName
-) {}
+    ) {}
+
+    record CreateServiceNetworkCoverageRequest(
+            @NotBlank @Size(max = 64) String brandCode,
+            @NotBlank @Size(max = 96) String businessType,
+            @NotBlank @Size(max = 16) String regionCode,
+            @NotNull Instant validFrom
+    ) {}
 
 record InviteMemberRequest(
         @NotNull UUID principalId,

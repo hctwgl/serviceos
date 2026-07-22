@@ -146,6 +146,22 @@ final class ProjectController {
                 .body(result);
     }
 
+    @PostMapping("/{projectId}:activate")
+    ResponseEntity<ProjectView> activate(
+            @PathVariable UUID projectId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        ProjectView result = commands.activate(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                projectId, version(ifMatch));
+        return ResponseEntity.ok()
+                .eTag(Long.toString(result.version()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(result);
+    }
+
     private static long version(String ifMatch) {
         if (ifMatch == null || !ifMatch.matches("\\\"[1-9][0-9]*\\\"")) {
             throw new IllegalArgumentException("If-Match must contain one quoted positive aggregate version");

@@ -1,0 +1,23 @@
+{
+  "workflowKey": "platform.home-charging.survey-install",
+  "semanticVersion": "1.0.0",
+  "name": "比亚迪家充勘测安装履约",
+  "startNodeId": "START",
+  "nodes": [
+    {"nodeId": "START", "nodeType": "START", "name": "开始"},
+    {"nodeId": "ASSIGN_NETWORK", "nodeType": "USER_TASK", "name": "分配责任网点", "stageCode": "PILOT_DISPATCH", "taskType": "ASSIGN_COORDINATORS", "slaRef": "platform.home-charging.task-elapsed", "dispatchPolicyRef": "product.byd-ocean.network-dispatch"},
+    {"nodeId": "SURVEY_TASK", "nodeType": "USER_TASK", "name": "上门勘测", "stageCode": "PILOT_SURVEY", "taskType": "FIELD_SURVEY", "slaRef": "platform.home-charging.task-elapsed"},
+    {"nodeId": "INSTALL_TASK", "nodeType": "USER_TASK", "name": "上门安装", "stageCode": "PILOT_INSTALLATION", "taskType": "FIELD_INSTALL", "slaRef": "platform.home-charging.task-elapsed"},
+    {"nodeId": "REVIEW_TASK", "nodeType": "REVIEW_TASK", "name": "资料审核", "stageCode": "FINAL_REVIEW"},
+    {"nodeId": "WAIT_OEM_ACK", "nodeType": "WAIT_EVENT", "name": "等待车企确认", "stageCode": "CLIENT_CALLBACK", "waitEventType": "platform.oem.acknowledged", "correlationKeyTemplate": "workOrder:{workOrderId}"},
+    {"nodeId": "END", "nodeType": "END", "name": "结束"}
+  ],
+  "transitions": [
+    {"transitionId": "t_start_assign", "from": "START", "to": "ASSIGN_NETWORK"},
+    {"transitionId": "t_assign_survey", "from": "ASSIGN_NETWORK", "to": "SURVEY_TASK"},
+    {"transitionId": "t_survey_install", "from": "SURVEY_TASK", "to": "INSTALL_TASK"},
+    {"transitionId": "t_install_review", "from": "INSTALL_TASK", "to": "REVIEW_TASK"},
+    {"transitionId": "t_review_oem", "from": "REVIEW_TASK", "to": "WAIT_OEM_ACK"},
+    {"transitionId": "t_oem_end", "from": "WAIT_OEM_ACK", "to": "END"}
+  ]
+}

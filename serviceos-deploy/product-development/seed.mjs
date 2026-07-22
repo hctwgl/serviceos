@@ -1,0 +1,268 @@
+import { createHash, randomUUID } from 'node:crypto'
+
+const baseUrl = process.env.SERVICEOS_PRODUCT_API_URL ?? 'http://localhost:8080/api/v1'
+const accessToken = process.env.SERVICEOS_PRODUCT_ACCESS_TOKEN
+if (!accessToken) throw new Error('缺少 SERVICEOS_PRODUCT_ACCESS_TOKEN')
+
+let sequence = 0
+const key = (purpose) => `product-data-${purpose}-${++sequence}`
+
+async function request(path, { method = 'GET', body, idempotencyKey, headers = {} } = {}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      ...headers,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const text = await response.text()
+  const result = text ? JSON.parse(text) : null
+  if (!response.ok) {
+    throw new Error(`${method} ${path} 失败（HTTP ${response.status}）：${text}`)
+  }
+  return { body: result, etag: response.headers.get('etag') }
+}
+
+async function registerPrincipal(displayName, employeeNumber, personaType) {
+  return (await request('/security-principals', {
+    method: 'POST',
+    idempotencyKey: key(`principal-${employeeNumber}`),
+    body: { displayName, employeeNumber, personaType },
+  })).body
+}
+
+await request('/project-clients', {
+  method: 'POST',
+  idempotencyKey: key('client-byd'),
+  body: { clientCode: 'BYD', displayName: '比亚迪' },
+})
+await request('/project-clients/BYD/brands', {
+  method: 'POST',
+  idempotencyKey: key('brand-ocean'),
+  body: { brandCode: 'BYD_OCEAN', displayName: '比亚迪海洋', sortOrder: 10 },
+})
+
+const staff = {}
+for (const item of [
+  ['customerManager', '张伟', 'SO-CS-001', 'INTERNAL_EMPLOYEE'],
+  ['projectManager', '王芳', 'SO-PM-001', 'INTERNAL_EMPLOYEE'],
+  ['projectAssistant', '刘敏', 'SO-PA-001', 'INTERNAL_EMPLOYEE'],
+  ['reviewer', '陈静', 'SO-QA-001', 'INTERNAL_EMPLOYEE'],
+  ['technicianA', '李师傅', 'SO-TECH-001', 'TECHNICIAN'],
+  ['technicianB', '赵师傅', 'SO-TECH-002', 'TECHNICIAN'],
+  ['technicianC', '周师傅', 'SO-TECH-003', 'TECHNICIAN'],
+]) {
+  staff[item[0]] = await registerPrincipal(item[1], item[2], item[3])
+}
+
+const partner = (await request('/partner-organizations', {
+  method: 'POST', idempotencyKey: key('partner-jinan'),
+  body: { code: 'JINAN-HENGTONG', name: '济南恒通新能源服务有限公司' },
+})).body
+const network = (await request('/service-networks', {
+  method: 'POST', idempotencyKey: key('network-jinan'),
+  body: {
+    partnerOrganizationId: partner.id,
+    networkCode: 'JINAN-LIXIA',
+    networkName: '济南历下服务中心',
+  },
+})).body
+
+const technicianProfiles = []
+for (const [index, staffKey] of ['technicianA', 'technicianB', 'technicianC'].entries()) {
+  const profile = (await request('/technician-profiles', {
+    method: 'POST', idempotencyKey: key(`technician-${index + 1}`),
+    body: {
+      principalId: staff[staffKey].id,
+      displayName: staff[staffKey].displayName,
+      supportedClientKinds: ['TECHNICIAN_IOS'],
+    },
+  })).body
+  technicianProfiles.push(profile)
+  await request('/network-technician-memberships', {
+    method: 'POST', idempotencyKey: key(`membership-${index + 1}`),
+    body: {
+      networkId: network.id,
+      technicianProfileId: profile.id,
+      validFrom: new Date(Date.now() - 86_400_000).toISOString(),
+    },
+  })
+  const qualification = (await request('/technician-qualifications', {
+    method: 'POST', idempotencyKey: key(`qualification-${index + 1}`),
+    body: {
+      technicianProfileId: profile.id,
+      qualificationCode: 'HOME_CHARGING_INSTALLATION',
+      validFrom: new Date(Date.now() - 86_400_000).toISOString(),
+      validTo: new Date(Date.now() + 365 * 86_400_000).toISOString(),
+    },
+  })).body
+  await request(`/technician-qualifications/${qualification.id}:decide`, {
+    method: 'POST', idempotencyKey: key(`qualification-decision-${index + 1}`),
+    body: { decision: 'APPROVED', reason: '本地产品场景固定资质' },
+    // 资格刚创建时聚合版本固定为 1；服务端继续校验并发版本。
+    headers: { 'If-Match': '"1"' },
+  })
+}
+
+const project = (await request('/projects', {
+  method: 'POST', idempotencyKey: key('project-byd-ocean'),
+  body: {
+    code: 'BYD-OCEAN-SD-PILOT',
+    clientId: 'BYD',
+    name: '比亚迪山东家充项目',
+    startsOn: new Date().toISOString().slice(0, 10),
+    endsOn: null,
+    regionCodes: ['370000', '370100', '370102'],
+    networkIds: [network.id],
+  },
+})).body
+await request(`/projects/${project.id}:activate`, {
+  method: 'POST',
+  idempotencyKey: key('project-activate'),
+  headers: { 'If-Match': `"${project.version}"` },
+})
+
+const configurationFoundation = (await request(
+  `/product-development/projects/${project.id}/configuration-foundation`,
+  { method: 'POST' },
+)).body
+
+const profile = (await request(`/projects/${project.id}/fulfillment-profiles`, {
+  method: 'POST', idempotencyKey: key('fulfillment-profile'),
+  body: {
+    serviceProductCode: 'HOME_CHARGING_SURVEY_INSTALL',
+    profileName: '家充勘测安装标准履约',
+    description: '覆盖预约、勘测、安装、资料审核与车企回传的本地产品场景。',
+    templateCode: 'HOME_CHARGING_SURVEY_INSTALL',
+    copyFromProfileId: null,
+  },
+})).body
+const profileDraft = (await request(
+  `/projects/${project.id}/fulfillment-profiles/${profile.profileId}/draft`,
+)).body
+await request(`/projects/${project.id}/fulfillment-profiles/${profile.profileId}/draft`, {
+  method: 'PUT',
+  idempotencyKey: key('fulfillment-bind-foundation'),
+  headers: { 'If-Match': `"${profileDraft.aggregateVersion}"` },
+  body: {
+    profileName: profile.profileName,
+    description: profile.description,
+    document: profileDraft.document,
+    workflowAssetVersionId: configurationFoundation.workflowAssetVersionId,
+    sourceBundleId: configurationFoundation.sourceBundleId,
+  },
+})
+const validation = (await request(`/projects/${project.id}/fulfillment-profiles/${profile.profileId}:validate`, {
+  method: 'POST', idempotencyKey: key('fulfillment-validate'),
+})).body
+const blocking = validation.filter((item) => item.severity === 'ERROR')
+if (blocking.length) {
+  throw new Error(`履约配置校验失败：${JSON.stringify(blocking)}`)
+}
+// 校验会更新草稿校验事实，发布必须读取服务端最新并发版本，不能沿用创建时版本。
+const validatedProfile = (await request(
+  `/projects/${project.id}/fulfillment-profiles/${profile.profileId}`,
+)).body
+await request(`/projects/${project.id}/fulfillment-profiles/${profile.profileId}:publish`, {
+  method: 'POST',
+  idempotencyKey: key('fulfillment-publish'),
+  body: { effectiveFrom: new Date().toISOString(), publishNote: '本地产品场景初始化' },
+  headers: { 'If-Match': `"${validatedProfile.aggregateVersion}"` },
+})
+
+function signByd(parameters, nonce, currentDate) {
+  const values = Object.entries(parameters)
+    .filter(([, value]) => value !== null && value !== undefined)
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([name, value]) => `${name}=${String(value)}`)
+    .join('&')
+  return createHash('sha256')
+    .update(`local-byd-app-secret-change-me&${nonce}&${currentDate}&${values}`, 'utf8')
+    .digest('hex')
+}
+
+async function createInstallOrder(index, customerName, districtCode, districtName) {
+  const suffix = String(index).padStart(3, '0')
+  const parameters = {
+    orderCode: `BYD20260722${suffix}`,
+    contactName: customerName,
+    contactMobile: `13800001${String(index).padStart(3, '0')}`,
+    contactAddress: `山东省济南市${districtName}经十路${100 + index}号`,
+    provinceCode: '370000', provinceName: '山东省',
+    cityCode: '370100', cityName: '济南市',
+    areaCode: districtCode, areaName: districtName,
+    wallboxName: '比亚迪 7kW 交流充电桩', wallboxPower: '7kW', bringWallbox: '1',
+    dispatchTime: `2026-07-${String(22 + (index % 5)).padStart(2, '0')}T09:00:00`,
+    carOwnerType: '1', type: '1', carBrand: '40', carSeries: '海豹', carModel: '海豹 06 DM-i',
+    vin: `LGXCE6CB${String(100000000 + index).slice(-9)}`,
+    dealerName: '比亚迪汽车济南经销商', rightCode: `RIGHT-${suffix}`,
+    orderAmount: 1280 + index * 20, source: '1', channel: 'CPIM',
+  }
+  const currentDate = new Date().toISOString().slice(0, 10)
+  const nonce = randomUUID().replaceAll('-', '')
+  const response = await fetch(`${baseUrl}/integrations/byd/cpim/v7.3.1/install-orders`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      APP_KEY: 'local-byd-app-key', Nonce: nonce, Cur_Time: currentDate,
+      Sign: signByd(parameters, nonce, currentDate),
+    },
+    body: JSON.stringify(parameters),
+  })
+  const result = await response.json()
+  if (!response.ok || result.success !== true) {
+    throw new Error(`创建产品工单 ${parameters.orderCode} 失败：${JSON.stringify(result)}`)
+  }
+}
+
+const customers = [
+  ['王先生', '370102', '历下区'], ['李女士', '370103', '市中区'],
+  ['周先生', '370104', '槐荫区'], ['赵女士', '370105', '天桥区'],
+  ['孙先生', '370112', '历城区'], ['陈女士', '370114', '章丘区'],
+  ['刘先生', '370102', '历下区'], ['张女士', '370103', '市中区'],
+]
+for (const [index, customer] of customers.entries()) {
+  await createInstallOrder(index + 1, ...customer)
+}
+
+// 先让入站工单在“尚无可用产能”的真实状态下进入人工派单任务，
+// 再通过正式命令登记覆盖和产能。这样人工黄金链路有可解释候选，也不会被自动派单抢先处理。
+await new Promise((resolve) => setTimeout(resolve, 2000))
+await request(`/service-networks/${network.id}/coverages`, {
+  method: 'POST', idempotencyKey: key('network-coverage-jinan'),
+  body: {
+    brandCode: 'BYD_OCEAN',
+    businessType: 'HOME_CHARGING_SURVEY_INSTALL',
+    regionCode: '370100',
+    validFrom: new Date(Date.now() - 86_400_000).toISOString(),
+  },
+})
+await request('/dispatch/capacities', {
+  method: 'POST', idempotencyKey: key('network-capacity-jinan'),
+  body: {
+    responsibilityLevel: 'NETWORK',
+    assigneeId: network.id,
+    businessType: 'HOME_CHARGING_SURVEY_INSTALL',
+    maxUnits: 30,
+    expectedVersion: 0,
+  },
+})
+for (const [index, technicianProfile] of technicianProfiles.entries()) {
+  await request('/dispatch/capacities', {
+    method: 'POST', idempotencyKey: key(`technician-capacity-${index + 1}`),
+    body: {
+      responsibilityLevel: 'TECHNICIAN',
+      assigneeId: technicianProfile.id,
+      businessType: 'HOME_CHARGING_SURVEY_INSTALL',
+      maxUnits: index === 0 ? 8 : 6,
+      expectedVersion: 0,
+    },
+  })
+}
+
+console.log(`已通过正式业务接口创建项目：${project.name}`)
+console.log(`已创建服务网点：${network.networkName}`)
+console.log(`已登记 ${Object.keys(staff).length} 名项目人员和师傅，并创建 ${customers.length} 张真实工单。`)

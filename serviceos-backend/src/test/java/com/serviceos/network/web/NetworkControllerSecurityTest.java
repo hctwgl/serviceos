@@ -8,6 +8,7 @@ import com.serviceos.network.api.NetworkQueryService;
 import com.serviceos.network.api.PartnerOrganizationPage;
 import com.serviceos.network.api.PartnerOrganizationView;
 import com.serviceos.network.api.ServiceNetworkView;
+import com.serviceos.network.api.ServiceNetworkCoverageView;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -105,6 +106,34 @@ class NetworkControllerSecurityTest {
                         .content("{\"code\":\"ACME\",\"name\":\"Acme Partner\"}"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("ETag", "\"1\""));
+    }
+
+    @Test
+    void createCoverageUsesAuthenticatedPrincipalAndFormalCommand() throws Exception {
+        CurrentPrincipal actor = actor();
+        UUID coverageId = UUID.fromString("019f7022-17ea-7f8c-9505-36fe5c0e8846");
+        Instant validFrom = Instant.parse("2026-07-22T08:00:00Z");
+        when(principals.current()).thenReturn(actor);
+        when(commands.createServiceNetworkCoverage(
+                eq(actor), any(), eq(NETWORK_ID), eq("BYD"),
+                eq("HOME_CHARGING_SURVEY_INSTALL"), eq("370100"), eq(validFrom)))
+                .thenReturn(new ServiceNetworkCoverageView(
+                        coverageId, NETWORK_ID, "BYD", "HOME_CHARGING_SURVEY_INSTALL", "370100"));
+
+        mvc.perform(post("/api/v1/service-networks/{networkId}/coverages", NETWORK_ID)
+                        .with(jwt().jwt(token -> token.subject("external-subject").claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "corr-coverage")
+                        .header("Idempotency-Key", "idem-coverage")
+                        .contentType("application/json")
+                        .content("""
+                                {"brandCode":"BYD","businessType":"HOME_CHARGING_SURVEY_INSTALL",
+                                 "regionCode":"370100","validFrom":"2026-07-22T08:00:00Z"}
+                                """))
+                .andExpect(status().isOk());
+
+        verify(commands).createServiceNetworkCoverage(
+                eq(actor), any(), eq(NETWORK_ID), eq("BYD"),
+                eq("HOME_CHARGING_SURVEY_INSTALL"), eq("370100"), eq(validFrom));
     }
 
     private static CurrentPrincipal actor() {

@@ -1,0 +1,37 @@
+{
+  "name": "@serviceos/admin",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint src --max-warnings=0",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@serviceos/api-client": "workspace:*",
+    "@serviceos/auth-context": "workspace:*",
+    "@serviceos/design-system": "workspace:*",
+    "@serviceos/product-language": "workspace:*",
+    "@tanstack/vue-query": "^5.90.5",
+    "dayjs": "^1.11.19",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.39",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/node": "^24.10.4",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "@vue/eslint-config-typescript": "^14.6.0",
+    "@vue/tsconfig": "^0.9.1",
+    "eslint": "^9.39.2",
+    "eslint-plugin-vue": "^10.6.2",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "vitest": "^4.0.18",
+    "vue-tsc": "^3.3.5"
+  }
+}

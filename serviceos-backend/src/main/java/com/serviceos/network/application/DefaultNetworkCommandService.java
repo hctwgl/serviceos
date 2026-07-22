@@ -13,6 +13,7 @@ import com.serviceos.network.api.NetworkTechnicianMembershipView;
 import com.serviceos.network.api.NetworkWorkImpact;
 import com.serviceos.network.api.PartnerOrganizationView;
 import com.serviceos.network.api.ServiceNetworkView;
+import com.serviceos.network.api.ServiceNetworkCoverageView;
 import com.serviceos.network.api.TechnicianProfileView;
 import com.serviceos.network.api.TechnicianQualificationView;
 import com.serviceos.network.domain.NetworkMembership;
@@ -125,6 +126,42 @@ final class DefaultNetworkCommandService implements NetworkCommandService {
         complete(actor, metadata, execution, networkId, 1, "NETWORK_CREATED", "ServiceNetwork",
                 "network.manageNetwork", null, now);
         return network.toView();
+    }
+
+    @Override
+    @Transactional
+    public ServiceNetworkCoverageView createServiceNetworkCoverage(
+            CurrentPrincipal actor,
+            CommandMetadata metadata,
+            UUID networkId,
+            String brandCode,
+            String businessType,
+            String regionCode,
+            Instant validFrom
+    ) {
+        brandCode = requireText(brandCode, "brandCode", 64);
+        businessType = requireText(businessType, "businessType", 96);
+        regionCode = requireText(regionCode, "regionCode", 16);
+        if (validFrom == null) throw new IllegalArgumentException("validFrom is invalid");
+        var input = new CreateCoverageInput(networkId, brandCode, businessType, regionCode, validFrom);
+        CommandExecution execution = begin(
+                actor, metadata, "network.createCoverage", "network.manageNetwork",
+                networkId.toString(), input);
+        if (execution.replay()) {
+            UUID coverageId = UUID.fromString(execution.decision().resourceId().orElseThrow());
+            return directory.findCoverage(actor.tenantId(), coverageId)
+                    .orElseThrow(() -> new IllegalStateException("幂等结果引用的网点覆盖范围不存在"));
+        }
+        ServiceNetwork network = requireNetwork(actor.tenantId(), networkId);
+        network.requireActive();
+        Instant now = clock.instant();
+        ServiceNetworkCoverageView coverage = new ServiceNetworkCoverageView(
+                UUID.randomUUID(), networkId, brandCode, businessType, regionCode);
+        directory.insertCoverage(actor.tenantId(), coverage, validFrom, now);
+        complete(actor, metadata, execution, coverage.coverageId(), 1,
+                "NETWORK_COVERAGE_CREATED", "ServiceNetworkCoverage",
+                "network.manageNetwork", null, now);
+        return coverage;
     }
 
     @Override
@@ -661,6 +698,9 @@ final class DefaultNetworkCommandService implements NetworkCommandService {
 
     private record CreatePartnerInput(String code, String name) {}
     private record CreateNetworkInput(UUID partnerOrganizationId, String networkCode, String networkName) {}
+    private record CreateCoverageInput(
+            UUID networkId, String brandCode, String businessType, String regionCode, Instant validFrom
+    ) {}
     private record InviteMemberInput(UUID networkId, Long expectedNetworkVersion, UUID principalId, String role, Instant validFrom) {}
     private record TerminateMemberInput(UUID membershipId, long expectedVersion, String reason) {}
     private record DeactivateNetworkInput(UUID networkId, long expectedVersion, String reason) {}

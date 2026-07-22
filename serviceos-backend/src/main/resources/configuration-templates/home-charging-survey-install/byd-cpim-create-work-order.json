@@ -1,0 +1,20 @@
+{
+  "mappingKey": "platform.byd-cpim.create-work-order",
+  "version": "1.0.0",
+  "connectorCode": "BYD_CPIM",
+  "direction": "INBOUND",
+  "messageType": "CREATE_WORK_ORDER",
+  "fieldMappings": [
+    {"mappingId": "order", "externalPath": "orderCode", "internalPath": "externalOrderCode", "required": true, "transform": "UPPER"},
+    {"mappingId": "brand", "internalPath": "brandCode", "required": true, "constantValue": "BYD_OCEAN", "transform": "NONE"},
+    {"mappingId": "product", "internalPath": "serviceProductCode", "required": true, "constantValue": "HOME_CHARGING_SURVEY_INSTALL", "transform": "NONE"},
+    {"mappingId": "province", "externalPath": "provinceCode", "internalPath": "provinceCode", "required": true, "transform": "NONE"},
+    {"mappingId": "city", "externalPath": "cityCode", "internalPath": "cityCode", "required": true, "transform": "NONE"},
+    {"mappingId": "district", "externalPath": "areaCode", "internalPath": "districtCode", "required": true, "transform": "NONE"},
+    {"mappingId": "name", "externalPath": "contactName", "internalPath": "customerName", "required": false, "transform": "TRIM"},
+    {"mappingId": "mobile", "externalPath": "contactMobile", "internalPath": "customerMobile", "required": true, "transform": "NONE"},
+    {"mappingId": "address", "externalPath": "contactAddress", "internalPath": "serviceAddress", "required": false, "transform": "TRIM"},
+    {"mappingId": "vin", "externalPath": "vin", "internalPath": "vehicleVin", "required": false, "transform": "UPPER"},
+    {"mappingId": "dispatch", "externalPath": "dispatchTime", "internalPath": "dispatchedAt", "required": false, "transform": "DATE_ISO"}
+  ]
+}

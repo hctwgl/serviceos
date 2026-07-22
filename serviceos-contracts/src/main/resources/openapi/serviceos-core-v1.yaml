@@ -687,6 +687,35 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /service-networks/{networkId}/coverages:
+    post:
+      operationId: createServiceNetworkCoverage
+      summary: 登记网点项目服务覆盖
+      description: >-
+        需要 network.manageNetwork。覆盖关系用于正式派单候选计算；同一幂等键重放返回首次结果，
+        不允许前端通过地址文字或默认网点补齐缺失覆盖。
+      parameters:
+        - $ref: '#/components/parameters/ServiceNetworkId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateServiceNetworkCoverageRequest' }
+      responses:
+        '200':
+          description: 已登记的网点服务覆盖
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceNetworkCoverage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /service-networks/{networkId}:deactivate:
     post:
       operationId: deactivateServiceNetwork
@@ -1076,6 +1105,34 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /dispatch/capacities:
+    post:
+      operationId: configureDispatchCapacity
+      summary: 配置派单责任主体容量
+      description: >-
+        需要 dispatch.capacity.manage。该接口只设置容量上限；已占用数量只能由正式预留事务修改，
+        expectedVersion 用于拒绝并发覆盖。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfigureDispatchCapacityRequest' }
+      responses:
+        '200':
+          description: 容量配置结果
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DispatchCapacityCounterReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /capabilities:
     get:
       operationId: listCapabilities
@@ -3611,6 +3668,82 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /admin/workbench:
+    get:
+      operationId: getAdminWorkbench
+      summary: 查询 Admin 首页任务与风险投影
+      description: >-
+        在当前主体实时授权范围内组合工单、SLA、审核整改和运营异常的权威查询结果。
+        工作台不保存第二套任务状态，也不执行业务命令；任一下游授权或依赖失败时明确失败，
+        不把无权限或不可用显示为零。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Admin 首页页面级任务投影
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminWorkbenchView' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /admin/work-orders:
+    get:
+      operationId: listAdminWorkOrders
+      summary: 查询 Admin 工单中心页面读模型
+      description: >-
+        在当前主体授权范围内返回工单中心直接展示所需的项目、客户、服务、阶段、责任与 SLA 中文信息。
+        前端不得再调用多个领域目录自行关联；缺少必须展示字段时由服务端明确标记数据不完整，
+        不使用 UUID 或英文枚举兜底。
+      parameters:
+        - { name: clientCode, in: query, schema: { type: string } }
+        - { name: projectId, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: currentStageCode, in: query, schema: { type: string } }
+        - { name: currentNetworkId, in: query, schema: { type: string, format: uuid } }
+        - { name: currentTechnicianId, in: query, schema: { type: string, format: uuid } }
+        - { name: slaRisk, in: query, schema: { type: string, enum: [OPEN, BREACHED, NEAR] } }
+        - { name: receivedFrom, in: query, schema: { type: string, format: date } }
+        - { name: receivedTo, in: query, schema: { type: string, format: date } }
+        - { name: reviewCorrectionStatus, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Admin 工单中心页面级读模型
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminWorkOrderDirectoryView' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /admin/work-orders/{workOrderId}/workspace:
+    get:
+      operationId: getAdminWorkOrderWorkspace
+      summary: 查询 Admin 工单工作区页面读模型
+      description: >-
+        一次返回工单工作区首屏的项目、客户、状态、当前任务、责任与服务端允许动作。
+        页面动作仅用于渲染，实际命令仍会重新执行授权、状态与并发校验。
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Admin 工单工作区页面级读模型
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminWorkOrderWorkspaceView' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /work-orders/{workOrderId}/workspace:
     get:
       operationId: getWorkOrderWorkspace
@@ -4005,6 +4138,35 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}:activate:
+    post:
+      operationId: activateProject
+      summary: 启用运营项目
+      description: >-
+        需要 project.create。只有草稿项目可以启用；If-Match 绑定项目聚合版本，
+        幂等重放返回首次成功结果，陈旧版本失败关闭。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已启用项目
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Project' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /projects/{projectId}/scope-revisions:
     get:
       operationId: listAuthorizedProjectScopeRevisions
@@ -9205,6 +9367,30 @@ components:
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/ServiceNetwork' } }
         asOf: { type: string, format: date-time }
+    ServiceNetworkCoverage:
+      type: object
+      additionalProperties: false
+      required: [coverageId, serviceNetworkId, brandCode, businessType, regionCode]
+      properties:
+        coverageId: { type: string, format: uuid }
+        serviceNetworkId: { type: string, format: uuid }
+        brandCode: { type: string, minLength: 1, maxLength: 64 }
+        businessType: { type: string, minLength: 1, maxLength: 96 }
+        regionCode: { type: string, minLength: 1, maxLength: 16 }
+    DispatchCapacityCounterReceipt:
+      type: object
+      additionalProperties: false
+      required: [capacityCounterId, responsibilityLevel, assigneeId, businessType, maxUnits,
+        occupiedUnits, version, occurredAt]
+      properties:
+        capacityCounterId: { type: string, format: uuid }
+        responsibilityLevel: { enum: [NETWORK, TECHNICIAN] }
+        assigneeId: { type: string, minLength: 1, maxLength: 128 }
+        businessType: { type: string, minLength: 1, maxLength: 100 }
+        maxUnits: { type: integer, minimum: 1 }
+        occupiedUnits: { type: integer, minimum: 0 }
+        version: { type: integer, format: int64, minimum: 1 }
+        occurredAt: { type: string, format: date-time }
     NetworkMembership:
       type: object
       additionalProperties: false
@@ -9542,6 +9728,25 @@ components:
         partnerOrganizationId: { type: string, format: uuid }
         networkCode: { type: string, minLength: 1, maxLength: 64 }
         networkName: { type: string, minLength: 1, maxLength: 200 }
+    CreateServiceNetworkCoverageRequest:
+      type: object
+      additionalProperties: false
+      required: [brandCode, businessType, regionCode, validFrom]
+      properties:
+        brandCode: { type: string, minLength: 1, maxLength: 64 }
+        businessType: { type: string, minLength: 1, maxLength: 96 }
+        regionCode: { type: string, minLength: 1, maxLength: 16 }
+        validFrom: { type: string, format: date-time }
+    ConfigureDispatchCapacityRequest:
+      type: object
+      additionalProperties: false
+      required: [responsibilityLevel, assigneeId, businessType, maxUnits, expectedVersion]
+      properties:
+        responsibilityLevel: { enum: [NETWORK, TECHNICIAN] }
+        assigneeId: { type: string, minLength: 1, maxLength: 128 }
+        businessType: { type: string, minLength: 1, maxLength: 100 }
+        maxUnits: { type: integer, minimum: 1 }
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
     InviteNetworkMemberRequest:
       type: object
       additionalProperties: false
@@ -9837,6 +10042,100 @@ components:
           maxLength: 200
           description: >
             M439：师傅档案 displayName；无责任或档案缺档时为 null，不发明名称。
+    AdminWorkbenchView:
+      type: object
+      additionalProperties: false
+      required:
+        [priorityCount, reviewCount, correctionCount, dispatchCount, slaRiskCount,
+         exceptionCount, waitingExternalCount, unassignedCount, generatedAt]
+      properties:
+        priorityCount: { type: integer, minimum: 0, description: 当前优先处理事项总数 }
+        reviewCount: { type: integer, minimum: 0, description: 待审核案例数 }
+        correctionCount: { type: integer, minimum: 0, description: 整改中案例数 }
+        dispatchCount: { type: integer, minimum: 0, description: 当前待派责任网点工单数 }
+        slaRiskCount: { type: integer, minimum: 0, description: 存在运行中或已超时 SLA 的工单数 }
+        exceptionCount: { type: integer, minimum: 0, description: 当前开放运营异常数 }
+        waitingExternalCount: { type: integer, minimum: 0, description: 当前等待外部协同工单数 }
+        unassignedCount: { type: integer, minimum: 0, description: 当前待确认履约责任的工单数 }
+        generatedAt: { type: string, format: date-time, description: 投影生成时间 }
+    AdminWorkOrderDirectoryView:
+      type: object
+      additionalProperties: false
+      required: [items, projectOptions, queueSummary, nextCursor, totalCount, generatedAt]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminWorkOrderDirectoryItem' }
+        projectOptions:
+          type: array
+          items: { $ref: '#/components/schemas/AdminProjectOption' }
+        queueSummary: { $ref: '#/components/schemas/AdminWorkbenchView' }
+        nextCursor: { type: [string, 'null'] }
+        totalCount: { type: integer, minimum: 0 }
+        generatedAt: { type: string, format: date-time }
+    AdminProjectOption:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 200 }
+    AdminWorkOrderDirectoryItem:
+      type: object
+      additionalProperties: false
+      required:
+        [id, orderCode, customerName, customerPhone, projectId, projectName, clientName,
+         serviceName, stageName, networkName, technicianName, slaLevel, slaLabel, statusName,
+         updatedAt, dataComplete, dataProblem]
+      properties:
+        id: { type: string, format: uuid }
+        orderCode: { type: string, minLength: 1 }
+        customerName: { type: [string, 'null'] }
+        customerPhone: { type: [string, 'null'] }
+        projectId: { type: string, format: uuid }
+        projectName: { type: [string, 'null'] }
+        clientName: { type: [string, 'null'] }
+        serviceName: { type: [string, 'null'] }
+        stageName: { type: [string, 'null'] }
+        networkName: { type: [string, 'null'] }
+        technicianName: { type: [string, 'null'] }
+        slaLevel: { type: string, enum: [NORMAL, RISK, BREACHED] }
+        slaLabel: { type: string }
+        statusName: { type: [string, 'null'] }
+        updatedAt: { type: string, format: date-time }
+        dataComplete: { type: boolean }
+        dataProblem: { type: [string, 'null'] }
+    AdminWorkOrderWorkspaceView:
+      type: object
+      additionalProperties: false
+      required:
+        [workspace, projectName, clientName, serviceName, stageName, taskName, statusName,
+         allowedActions, blockedActions, dataComplete, dataProblem, generatedAt]
+      properties:
+        workspace: { $ref: '#/components/schemas/WorkOrderWorkspace' }
+        projectName: { type: [string, 'null'] }
+        clientName: { type: [string, 'null'] }
+        serviceName: { type: [string, 'null'] }
+        stageName: { type: [string, 'null'] }
+        taskName: { type: [string, 'null'] }
+        statusName: { type: [string, 'null'] }
+        allowedActions:
+          type: array
+          items: { $ref: '#/components/schemas/TaskAllowedAction' }
+        blockedActions:
+          type: array
+          items: { $ref: '#/components/schemas/AdminBlockedAction' }
+        dataComplete: { type: boolean }
+        dataProblem: { type: [string, 'null'] }
+        generatedAt: { type: string, format: date-time }
+    AdminBlockedAction:
+      type: object
+      additionalProperties: false
+      required: [code, label, reason]
+      properties:
+        code: { type: string }
+        label: { type: string }
+        reason: { type: string }
     WorkOrderPage:
       type: object
       additionalProperties: false

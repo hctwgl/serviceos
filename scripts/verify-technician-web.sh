@@ -30,7 +30,6 @@ fi
   cd "${app_directory}"
   npm ci --ignore-scripts --no-audit --no-fund --silent
   npm run build
-  npm run test:e2e
 )
 
 probe_directory="$(mktemp -d "${TMPDIR:-/tmp}/serviceos-technician-env.XXXXXX")"

@@ -24,14 +24,15 @@ docker compose -f serviceos-deploy/compose.yaml exec -T postgres \
 
 realm 会把用户属性 `tenant_id` 与 realm roles 映射到 access token 的 `tenant_id`、`capabilities` claim。token capability 仅是声明，ServiceOS 数据库仍必须存在有效 RoleGrant 才会允许命令。生产必须使用组织正式 OIDC、MFA、短期 token、密钥轮换与审批后的 RoleGrant，不使用本地账号。
 
-Admin 真实只读冒烟可一条命令执行：
+Admin 产品开发场景数据统一从新前端 Workspace 重置：
 
 ```bash
-serviceos-deploy/admin-pilot/verify-admin-smoke.sh
+cd frontend
+corepack pnpm product-data:reset
 ```
 
-该脚本使用固定本地夹具验证登录、工单目录、工作区、详情、Stage、Task、SLA 与核心时间线；
-不会删除本地 PostgreSQL 数据卷，也不代表完整履约写链路已经通过。
+该命令只允许用于可销毁的本地产品开发环境。正式页面不提供初始化按钮，场景数据必须通过
+正式业务 API 或应用服务创建，不得绕过领域规则直接伪造核心业务状态。
 
 ## 本地可观测性栈
 

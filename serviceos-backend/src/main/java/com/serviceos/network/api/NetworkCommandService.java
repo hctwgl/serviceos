@@ -15,6 +15,12 @@ public interface NetworkCommandService {
             CurrentPrincipal actor, CommandMetadata metadata,
             UUID partnerOrganizationId, String networkCode, String networkName);
 
+    /** 为网点登记可参与派单候选计算的服务覆盖范围。 */
+    ServiceNetworkCoverageView createServiceNetworkCoverage(
+            CurrentPrincipal actor, CommandMetadata metadata,
+            UUID networkId, String brandCode, String businessType,
+            String regionCode, Instant validFrom);
+
     NetworkMembershipView inviteNetworkMember(
             CurrentPrincipal actor, CommandMetadata metadata,
             UUID networkId, Long expectedNetworkVersion, UUID principalId,

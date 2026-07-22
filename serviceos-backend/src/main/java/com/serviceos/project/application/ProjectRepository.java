@@ -23,6 +23,8 @@ public interface ProjectRepository {
 
     boolean advanceVersion(String tenantId, UUID projectId, long expectedVersion);
 
+    boolean activate(String tenantId, UUID projectId, long expectedVersion);
+
     void reviseRegionBindings(
             String tenantId, UUID projectId, List<String> removed, List<String> added,
             String actorId, Instant revisedAt);

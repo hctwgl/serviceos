@@ -23,7 +23,7 @@ const MigrationTestEntry = defineComponent({
 
 export const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/', redirect: '/network-portal/workbench' },
-  // 迁移期只为复用原 Network Playwright 登录 helper；不显示 Admin 页面或接受手工 Token。
+  // OIDC 回调只处理当前 Portal 的正式登录，不显示 Admin 页面或接受手工 Token。
   { path: '/settings/token', component: MigrationTestEntry },
   { path: '/work-orders', component: MigrationTestEntry },
   { path: '/network-portal/workbench', component: NetworkPortalWorkbenchPage },
