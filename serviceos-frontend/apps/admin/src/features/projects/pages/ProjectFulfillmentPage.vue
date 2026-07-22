@@ -67,6 +67,11 @@ function presentStatus(status: unknown) {
   return statusPresentation[normalized] ?? { color: 'default', label: '状态异常' }
 }
 
+function serviceProductLabel(code: string) {
+  if (code === 'HOME_CHARGING_SURVEY_INSTALL') return '家充勘测安装服务'
+  return '项目服务产品'
+}
+
 watch(
   () => profiles.data.value,
   (items) => {
@@ -150,7 +155,7 @@ async function createProfile() {
             <template v-if="column.key === 'profile'">
               <div class="table-primary-cell">
                 <strong>{{ record.profileName }}</strong>
-                <span>{{ record.serviceProductCode }}</span>
+                <span>{{ serviceProductLabel(record.serviceProductCode) }}</span>
               </div>
             </template>
             <template v-else-if="column.key === 'status'">
@@ -181,7 +186,7 @@ async function createProfile() {
         <template v-else-if="selectedProfile.data.value">
           <header class="fulfillment-detail-heading">
             <div>
-              <span>{{ selectedProfile.data.value.serviceProductCode }}</span>
+              <span>{{ serviceProductLabel(selectedProfile.data.value.serviceProductCode) }}</span>
               <h2>{{ selectedProfile.data.value.profileName }}</h2>
               <p>{{ selectedProfile.data.value.description || '尚未填写方案说明' }}</p>
             </div>
@@ -201,6 +206,13 @@ async function createProfile() {
             <div class="fulfillment-scope-list">
               <span>流程设计</span><span>表单与资料</span><span>SLA 与预约</span><span>网点与资源</span><span>审核与整改</span><span>版本与发布</span>
             </div>
+            <RouterLink
+              v-if="selectedProfile.data.value.draftRevisionId"
+              class="fulfillment-edit-link"
+              :to="`/projects/${projectId}/fulfillment/${selectedProfile.data.value.profileId}/draft`"
+            >
+              进入结构化草稿编辑
+            </RouterLink>
           </section>
         </template>
         <div v-else class="workbench-empty-state">

@@ -1,6 +1,7 @@
 import {
   loadProjectFulfillmentProfile,
   loadProjectFulfillmentProfiles,
+  loadProjectFulfillmentDraft,
 } from '@serviceos/api-client'
 import { useQuery } from '@tanstack/vue-query'
 import type { Ref } from 'vue'
@@ -11,6 +12,17 @@ export function useProjectFulfillmentProfilesQuery(projectId: Ref<string>) {
     queryKey: computed(() => ['project-fulfillment-profiles', projectId.value]),
     queryFn: () => loadProjectFulfillmentProfiles(projectId.value),
     enabled: computed(() => Boolean(projectId.value)),
+  })
+}
+
+export function useProjectFulfillmentDraftQuery(
+  projectId: Ref<string>,
+  profileId: Ref<string>,
+) {
+  return useQuery({
+    queryKey: computed(() => ['project-fulfillment-draft', projectId.value, profileId.value]),
+    queryFn: () => loadProjectFulfillmentDraft(projectId.value, profileId.value),
+    enabled: computed(() => Boolean(projectId.value && profileId.value)),
   })
 }
 
