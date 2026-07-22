@@ -15,6 +15,11 @@ npm run dev
 npm run build
 ```
 
+`npm run dev` 与 `npm run build` 都会先依据当前 Core OpenAPI 生成并编译
+`@serviceos/core-client`。生成物位于 `serviceos-contracts/target/generated-clients`，属于可复现的
+本地构建产物，不提交 Git；不要跳过 npm 脚本直接执行 `vite`，否则全量验证清理 `target` 后会留下
+无法解析的本地依赖链接。
+
 ## 本地 OIDC
 
 复制 `.env.development.example` 为 `.env.development.local`，启动
