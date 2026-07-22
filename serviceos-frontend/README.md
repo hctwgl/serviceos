@@ -18,7 +18,8 @@ pnpm dev
 
 ## 上游工程基线
 
-工程目录和应用分层参考 Vue Vben Admin 5.7.0 `web-antd`，保留 Vue、Vite、Pinia、路由和
-Ant Design Vue 技术方向；没有复制其 Demo、Mock、多 UI 适配、多主题或示例业务。
+工程固定采用 Vue Vben Admin 5.7.0 `web-antd` 作为真实运行底座，直接复用其布局、导航、页面容器、
+主题变量和 Ant Design Vue 适配，不再自行重写一套仿 Vben 应用壳。删除 Demo、Mock、其他 UI
+应用、多主题、暗色模式、偏好中心和示例业务；A+ 金标仍是 ServiceOS 页面布局、信息层级和业务视觉的验收事实源。
 
 Vue Vben Admin 使用 MIT License：<https://github.com/vbenjs/vue-vben-admin>。

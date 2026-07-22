@@ -3,7 +3,7 @@
 唯一入口：
 
 ```bash
-cd frontend
+cd serviceos-frontend
 pnpm product-data:reset
 ```
 

@@ -27,7 +27,7 @@ realm 会把用户属性 `tenant_id` 与 realm roles 映射到 access token 的 
 Admin 产品开发场景数据统一从新前端 Workspace 重置：
 
 ```bash
-cd frontend
+cd serviceos-frontend
 corepack pnpm product-data:reset
 ```
 

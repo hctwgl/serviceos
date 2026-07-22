@@ -1,7 +1,7 @@
 # ServiceOS 旧 Admin Web（已冻结）
 
 该工程只保留到新 Admin 黄金链路完成人工验收并原子切换。禁止继续新增页面、路由和产品功能；
-新的 Web 产品实现位于 `frontend/apps/admin`。旧工程不再维护 Playwright、视觉截图或浏览器 E2E。
+新的 Web 产品实现位于 `serviceos-frontend/apps/admin`。旧工程不再维护 Playwright、视觉截图或浏览器 E2E。
 
 ```bash
 npm ci
