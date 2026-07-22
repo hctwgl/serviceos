@@ -40,7 +40,7 @@ body { overflow: hidden; }
 .serviceos-user-menu button:hover { color: var(--sos-brand); border-color: var(--sos-brand-border); }
 
 .page-main { width: 100%; padding: 18px 20px 28px; }
-.workbench-page, .directory-page, .workspace-page { width: 100%; min-height: calc(100vh - var(--sos-header-height)); padding: 18px 20px 28px; }
+.workbench-page, .directory-page, .workspace-page, .user-directory-page { width: 100%; min-height: calc(100vh - var(--sos-header-height)); padding: 18px 20px 28px; }
 .page-heading { margin-bottom: 14px; }
 .page-heading.inline { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .page-heading h1 { margin: 3px 0 4px; font-size: 23px; line-height: 1.35; color: var(--sos-text-heading); }
@@ -118,9 +118,15 @@ body { overflow: hidden; }
 .page-error { padding: 18px; border: 1px solid var(--sos-danger-border); border-radius: 7px; background: var(--sos-danger-surface); color: var(--sos-danger-text); }
 .status-pill { display: inline-flex; width: fit-content; align-items: center; min-height: 22px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }.status-pill.tone-blue { background: var(--sos-brand-soft); color: var(--sos-brand); }.status-pill.tone-green { background: var(--sos-success-soft); color: var(--sos-success-strong); }.status-pill.tone-orange { background: var(--sos-warning-soft); color: var(--sos-warning-strong); }.status-pill.tone-red { background: var(--sos-danger-soft); color: var(--sos-danger-strong); }.status-pill.tone-gray { background: var(--sos-neutral-soft); color: var(--sos-text-secondary); }
 
+.product-notice { margin-bottom: 12px; padding: 11px 14px; border: 1px solid var(--sos-border); border-radius: 6px; font-size: 13px; }.product-notice.success { border-color: var(--sos-success-border); background: var(--sos-success-soft); color: var(--sos-success-strong); }
+.user-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }.user-summary-grid > div { display: grid; gap: 8px; min-height: 82px; align-content: center; padding: 14px 18px; border: 1px solid var(--sos-border); border-radius: var(--sos-radius); background: var(--sos-surface); }.user-summary-grid span { color: var(--sos-text-secondary); font-size: 12px; }.user-summary-grid strong { color: var(--sos-text-heading); font-size: 24px; line-height: 1; }
+.user-filter-bar { display: grid; grid-template-columns: minmax(280px, 1fr) 180px auto auto; gap: 10px; padding: 13px 14px; border-bottom: 1px solid var(--sos-border); }.user-directory-table { min-width: 1120px; }.table-link { padding: 0; border: 0; background: transparent; color: var(--sos-brand); cursor: pointer; }.create-user-intro { margin-bottom: 18px; padding: 12px; border-radius: 6px; background: var(--sos-brand-panel); color: var(--sos-brand-panel-text); font-size: 13px; line-height: 1.6; }.create-user-form { display: grid; gap: 16px; }.create-user-form label { display: grid; gap: 7px; }.create-user-form label > span { color: var(--sos-text-strong); font-size: 13px; font-weight: 600; }
+.user-detail-heading { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--sos-border); }.user-detail-heading h2, .user-detail-heading p { margin: 0; }.user-detail-heading p { margin-top: 4px; color: var(--sos-text-secondary); }.user-detail-avatar { display: grid; width: 52px; height: 52px; place-items: center; border-radius: 50%; color: var(--sos-brand); background: var(--sos-brand-soft); font-size: 20px; font-weight: 700; }.user-detail-list { display: grid; gap: 0; margin: 20px 0; }.user-detail-list > div { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--sos-border-subtle); }.user-detail-list dt { color: var(--sos-text-secondary); }.user-detail-list dd { margin: 0; color: var(--sos-text); font-weight: 500; }
+
 @media (max-width: 1280px) {
   :root { --sos-sidebar-width: 164px; }
   .top-actions button span:not(.avatar) { display: none; }
   .summary-strip { grid-template-columns: repeat(3, 1fr); }.summary-cell:nth-child(4)::before { display: none; }
   .workspace-grid { grid-template-columns: minmax(0,1fr) 246px; }
+  .user-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

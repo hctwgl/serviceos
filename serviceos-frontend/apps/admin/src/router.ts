@@ -17,6 +17,7 @@ export const router = createRouter({
         { path: 'workbench', name: 'workbench', meta: { title: '工作台' }, component: () => import('./pages/WorkbenchPage.vue') },
         { path: 'work-orders', name: 'work-orders', meta: { title: '工单中心' }, component: () => import('./pages/WorkOrderDirectoryPage.vue') },
         { path: 'work-orders/:id', name: 'work-order', meta: { title: '工单详情', hideInMenu: true }, component: () => import('./pages/WorkOrderWorkspacePage.vue') },
+        { path: 'system/users', name: 'users', meta: { title: '用户管理' }, component: () => import('./features/users/pages/UserDirectoryPage.vue') },
       ],
     },
   ],

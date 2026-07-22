@@ -23,6 +23,7 @@ export {
   SettingOutlined,
   TeamOutlined,
   ToolOutlined,
+  UserAddOutlined,
   WarningOutlined,
 } from '@ant-design/icons-vue'
 
