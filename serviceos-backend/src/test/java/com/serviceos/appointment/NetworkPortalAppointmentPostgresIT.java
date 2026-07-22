@@ -85,8 +85,8 @@ class NetworkPortalAppointmentPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, rel_outbox_event, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("135");
-        assertThat(flyway.info().applied()).hasSize(137);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("146");
+        assertThat(flyway.info().applied()).hasSize(148);
         assertThat(jdbc.sql("""
                         SELECT risk_level FROM auth_capability
                          WHERE capability_code='networkPortal.manageAppointment'
