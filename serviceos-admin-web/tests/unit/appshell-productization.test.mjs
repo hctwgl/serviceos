@@ -20,9 +20,10 @@ test('AppShell brand is productized without technical sidebar hint', () => {
   assert.match(scopeBar, /data-testid="scope-bar"/)
 })
 
-test('AppShell keeps server navigation test ids', () => {
+test('AppShell keeps server navigation test ids and excludes development tools from formal navigation', () => {
   assert.match(shell, /nav-users/)
-  assert.match(shell, /nav-portal-stubs/)
+  assert.doesNotMatch(shell, /nav-portal-stubs|nav-golden-path|nav-demo-data/)
+  assert.doesNotMatch(shell, /运维与开发者工具|工单全流程演练|演示数据管理/)
   assert.match(shell, /recent-resources/)
   assert.match(shell, /portal-context-select/)
 })

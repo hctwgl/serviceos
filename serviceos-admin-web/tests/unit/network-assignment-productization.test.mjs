@@ -27,3 +27,15 @@ test('责任网点候选使用 Task 派生的专用查询契约', () => {
   assert.match(api, /coverageSummary: string/)
   assert.match(api, /remainingCapacity: number/)
 })
+
+test('工单工作区不暴露联调命令、原始策略码或技术诊断页签', () => {
+  assert.doesNotMatch(page, /assign-candidates principals/)
+  assert.doesNotMatch(page, />技术诊断</)
+  assert.doesNotMatch(page, />SLA 与异常</)
+  assert.doesNotMatch(page, />工单 SLA 实例</)
+  assert.doesNotMatch(page, />PILOT_RESPONSE</)
+  assert.match(page, /title="工单详情"/)
+  assert.match(page, /data-testid="work-order-summary-strip"/)
+  assert.match(page, /title="风险与提醒"/)
+  assert.match(page, /title="当前责任链"/)
+})

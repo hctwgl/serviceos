@@ -38,7 +38,7 @@ test.describe('M188 Portal 上下文与导航', () => {
 
   test('M188-02/04：伪造上下文与隐藏 URL 失败关闭', async ({ page }) => {
     await loginWithLocalKeycloak(page)
-    await page.getByTestId('nav-portal-stubs').click()
+    await page.goto('/portal-stubs')
     await expect(page.getByTestId('portal-stubs-page')).toBeVisible()
     await page.getByTestId('forge-network-context').click()
     await expect(page.getByTestId('forge-network-result')).toContainText('伪造 NETWORK 上下文被拒绝')

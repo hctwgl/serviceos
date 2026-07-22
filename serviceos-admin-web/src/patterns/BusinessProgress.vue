@@ -22,9 +22,10 @@ defineProps<{
         class="sos-business-progress__step"
         :data-status="step.status"
       >
-        <span class="sos-business-progress__index">{{ index + 1 }}</span>
+        <span class="sos-business-progress__index">
+          {{ step.status === 'done' ? '✓' : index + 1 }}
+        </span>
         <span class="sos-business-progress__label">{{ step.label }}</span>
-        <span v-if="step.status === 'current'" class="sos-business-progress__badge">当前</span>
         <span v-if="step.hint" class="sos-business-progress__hint">{{ step.hint }}</span>
       </li>
     </ol>
@@ -42,53 +43,61 @@ defineProps<{
   margin: 0;
   padding: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 0;
+  overflow-x: auto;
 }
 .sos-business-progress__step {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--sos-color-border-default);
-  border-radius: 999px;
-  background: var(--sos-color-surface-subtle);
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 5px;
+  min-width: 112px;
+  padding: 0 10px;
   color: var(--sos-color-text-secondary);
   font-size: 13px;
 }
+.sos-business-progress__step:not(:last-child)::after {
+  position: absolute;
+  top: 13px;
+  left: calc(50% + 17px);
+  width: calc(100% - 34px);
+  height: 1px;
+  background: var(--sos-color-border-default);
+  content: '';
+}
 .sos-business-progress__step[data-status='done'] {
-  border-color: var(--sos-color-status-success-border);
-  background: var(--sos-color-status-success-bg);
-  color: var(--sos-color-status-success-fg);
+  color: var(--sos-primary-600);
+}
+.sos-business-progress__step[data-status='done']:not(:last-child)::after {
+  background: var(--sos-primary-500);
 }
 .sos-business-progress__step[data-status='current'] {
-  border-color: var(--sos-primary-500);
-  background: var(--sos-primary-100);
-  color: var(--sos-primary-800);
+  color: var(--sos-primary-700);
   font-weight: 600;
 }
 .sos-business-progress__step[data-status='blocked'] {
-  border-color: var(--sos-color-status-critical-border);
-  background: var(--sos-color-status-critical-bg);
   color: var(--sos-color-status-critical-fg);
 }
 .sos-business-progress__index {
-  width: 20px;
-  height: 20px;
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: var(--sos-color-surface-card);
   border: 1px solid currentColor;
-  font-size: 11px;
+  font-size: 12px;
 }
-.sos-business-progress__badge {
-  font-size: 11px;
-  padding: 0 6px;
-  border-radius: 999px;
+.sos-business-progress__step[data-status='current'] .sos-business-progress__index {
   background: var(--sos-primary-600);
   color: #fff;
+}
+.sos-business-progress__label {
+  white-space: nowrap;
 }
 .sos-business-progress__hint,
 .sos-business-progress__empty {
