@@ -155,11 +155,17 @@ SERVICEOS_PRODUCT_ACCESS_TOKEN="${access_token}" \
 restore_pkce_client
 trap - EXIT
 
+# 种子业务数据就绪后，补齐三端登录身份：平台超管、网点成员/授权、师傅登录绑定与授权。
+docker compose -f "${compose_file}" exec -T postgres \
+  psql -v ON_ERROR_STOP=1 -U serviceos_app -d serviceos \
+  < "${repository_root}/serviceos-deploy/keycloak/grant-local-product-portal.sql" >/dev/null
+
 echo
 echo "产品场景已重建。"
 echo "Admin：http://localhost:5173"
-echo "账号：developer"
-echo "密码：local-dev-change-me"
+echo "平台超级管理员：platform-admin / local-platform-admin-change-me（developer / local-dev-change-me 等价）"
 echo "其他角色：viewer / operator / dispatcher / reviewer / project-manager / project-assistant / network-manager / network-dispatcher"
 echo "对应密码：local-<账号>-change-me"
+echo "网点端：http://localhost:5174（network-manager / network-dispatcher）"
+echo "师傅端：http://localhost:5175（lijianguo / zhaohaifeng / zhouzhiqiang，密码 local-<账号>-change-me）"
 echo "后端日志：${backend_log}"

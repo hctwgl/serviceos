@@ -230,6 +230,29 @@ const profile = (await request(`/projects/${project.id}/fulfillment-profiles`, {
 const profileDraft = (await request(
   `/projects/${project.id}/fulfillment-profiles/${profile.profileId}/draft`,
 )).body
+// 让履约方案文档与运行期配置包保持一致：勘测阶段绑定表单与资料，安装阶段绑定完工资料。
+// 文档中的引用只影响方案可读性与运行说明书，运行期任务模板仍以配置包内 WORKFLOW/FORM/EVIDENCE 资产为准。
+const documentWithRefs = {
+  ...profileDraft.document,
+  stages: (profileDraft.document.stages ?? []).map((stage) => {
+    if (stage.stageCode === 'SURVEY') {
+      return {
+        ...stage,
+        slaRef: 'platform.home-charging.task-elapsed',
+        formRefs: ['product.byd-ocean.survey-form'],
+        evidenceRefs: ['product.byd-ocean.survey-evidence'],
+      }
+    }
+    if (stage.stageCode === 'INSTALLATION') {
+      return {
+        ...stage,
+        slaRef: 'platform.home-charging.task-elapsed',
+        evidenceRefs: ['product.byd-ocean.install-evidence'],
+      }
+    }
+    return stage
+  }),
+}
 await request(`/projects/${project.id}/fulfillment-profiles/${profile.profileId}/draft`, {
   method: 'PUT',
   idempotencyKey: key('fulfillment-bind-foundation'),
@@ -237,7 +260,7 @@ await request(`/projects/${project.id}/fulfillment-profiles/${profile.profileId}
   body: {
     profileName: profile.profileName,
     description: profile.description,
-    document: profileDraft.document,
+    document: documentWithRefs,
     workflowAssetVersionId: configurationFoundation.workflowAssetVersionId,
     sourceBundleId: configurationFoundation.sourceBundleId,
   },

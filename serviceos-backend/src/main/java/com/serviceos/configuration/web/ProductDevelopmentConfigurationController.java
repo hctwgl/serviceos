@@ -42,6 +42,9 @@ final class ProductDevelopmentConfigurationController {
     private static final String SLA_KEY = "platform.home-charging.task-elapsed";
     private static final String INTEGRATION_KEY = "platform.byd-cpim.create-work-order";
     private static final String DISPATCH_KEY = "product.byd-ocean.network-dispatch";
+    private static final String SURVEY_FORM_KEY = "product.byd-ocean.survey-form";
+    private static final String SURVEY_EVIDENCE_KEY = "product.byd-ocean.survey-evidence";
+    private static final String INSTALL_EVIDENCE_KEY = "product.byd-ocean.install-evidence";
 
     private final ConfigurationService configurations;
     private final AuthorizationService authorization;
@@ -82,13 +85,24 @@ final class ProductDevelopmentConfigurationController {
         ConfigurationAssetVersionReference dispatch = publishAsset(
                 principal.tenantId(), ConfigurationAssetType.DISPATCH, DISPATCH_KEY,
                 "1.0.0", "configuration-templates/product-development/byd-ocean/dispatch.json");
+        ConfigurationAssetVersionReference surveyForm = publishAsset(
+                principal.tenantId(), ConfigurationAssetType.FORM, SURVEY_FORM_KEY,
+                "1.0.0", "configuration-templates/product-development/byd-ocean/survey-form.json");
+        ConfigurationAssetVersionReference surveyEvidence = publishAsset(
+                principal.tenantId(), ConfigurationAssetType.EVIDENCE, SURVEY_EVIDENCE_KEY,
+                "1.0.0", "configuration-templates/product-development/byd-ocean/survey-evidence.json");
+        ConfigurationAssetVersionReference installEvidence = publishAsset(
+                principal.tenantId(), ConfigurationAssetType.EVIDENCE, INSTALL_EVIDENCE_KEY,
+                "1.0.0", "configuration-templates/product-development/byd-ocean/install-evidence.json");
         ConfigurationBundleReference bundle = configurations.publishBundle(
                 new PublishConfigurationBundleCommand(
                         principal.tenantId(), projectId,
                         "PRODUCT-HOME-CHARGING", "1.0.0", "BYD_OCEAN",
                         "HOME_CHARGING_SURVEY_INSTALL", "370000",
                         clock.instant().minusSeconds(60), null,
-                        List.of(sla.versionId(), workflow.versionId(), integration.versionId(), dispatch.versionId())));
+                        List.of(sla.versionId(), workflow.versionId(), integration.versionId(),
+                                dispatch.versionId(), surveyForm.versionId(), surveyEvidence.versionId(),
+                                installEvidence.versionId())));
         return ResponseEntity.ok(new FoundationResponse(workflow.versionId(), bundle.bundleId()));
     }
 

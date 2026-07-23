@@ -1,0 +1,53 @@
+{
+  "templateKey": "product.byd-ocean.survey-evidence",
+  "version": "1.0.0",
+  "title": "家充勘测资料",
+  "stage": "SURVEY",
+  "items": [
+    {
+      "evidenceKey": "survey.meterBoxPhoto",
+      "name": "电表箱照片",
+      "description": "清晰展示电表箱位置、表号与开关容量",
+      "mediaType": "PHOTO",
+      "required": true,
+      "capture": {
+        "allowCamera": true,
+        "allowGallery": true,
+        "minCount": 1,
+        "maxCount": 3,
+        "maxSizeBytes": 5242880
+      },
+      "reviewPolicy": { "reviewRequired": true }
+    },
+    {
+      "evidenceKey": "survey.parkingPhoto",
+      "name": "车位与安装点照片",
+      "description": "展示车位、拟安装墙面与走线路径",
+      "mediaType": "PHOTO",
+      "required": true,
+      "capture": {
+        "allowCamera": true,
+        "allowGallery": true,
+        "minCount": 1,
+        "maxCount": 3,
+        "maxSizeBytes": 5242880
+      },
+      "reviewPolicy": { "reviewRequired": true }
+    },
+    {
+      "evidenceKey": "survey.environmentPhoto",
+      "name": "现场环境照片",
+      "description": "配电间或车库整体环境（可选）",
+      "mediaType": "PHOTO",
+      "required": false,
+      "capture": {
+        "allowCamera": true,
+        "allowGallery": true,
+        "minCount": 0,
+        "maxCount": 3,
+        "maxSizeBytes": 5242880
+      },
+      "reviewPolicy": { "reviewRequired": false }
+    }
+  ]
+}

@@ -213,6 +213,62 @@
         { "type": "password", "value": "local-network-dispatcher-change-me", "temporary": false }
       ],
       "realmRoles": ["workOrder.read"]
+    },
+    {
+      "id": "aa100000-0000-4000-8000-000000000001",
+      "username": "platform-admin",
+      "email": "platform-admin@serviceos.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "平台",
+      "lastName": "超级管理员",
+      "attributes": { "tenant_id": ["tenant-local"] },
+      "credentials": [
+        { "type": "password", "value": "local-platform-admin-change-me", "temporary": false }
+      ],
+      "realmRoles": ["project.create", "workOrder.read", "file.upload", "file.download"]
+    },
+    {
+      "id": "aa100000-0000-4000-8000-000000000031",
+      "username": "lijianguo",
+      "email": "lijianguo@serviceos.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "建国",
+      "lastName": "李",
+      "attributes": { "tenant_id": ["tenant-local"] },
+      "credentials": [
+        { "type": "password", "value": "local-lijianguo-change-me", "temporary": false }
+      ],
+      "realmRoles": ["file.upload", "file.download"]
+    },
+    {
+      "id": "aa100000-0000-4000-8000-000000000027",
+      "username": "zhaohaifeng",
+      "email": "zhaohaifeng@serviceos.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "海峰",
+      "lastName": "赵",
+      "attributes": { "tenant_id": ["tenant-local"] },
+      "credentials": [
+        { "type": "password", "value": "local-zhaohaifeng-change-me", "temporary": false }
+      ],
+      "realmRoles": ["file.upload", "file.download"]
+    },
+    {
+      "id": "aa100000-0000-4000-8000-000000000044",
+      "username": "zhouzhiqiang",
+      "email": "zhouzhiqiang@serviceos.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "志强",
+      "lastName": "周",
+      "attributes": { "tenant_id": ["tenant-local"] },
+      "credentials": [
+        { "type": "password", "value": "local-zhouzhiqiang-change-me", "temporary": false }
+      ],
+      "realmRoles": ["file.upload", "file.download"]
     }
   ]
 }
