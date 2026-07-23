@@ -1,137 +1,78 @@
 # ServiceOS
 
-ServiceOS 是面向新能源充电设施现场服务的可配置履约平台。当前仓库同时保存架构事实源、参考后端工程和机器可读契约。
+ServiceOS 是面向新能源充电设施现场服务的可配置履约平台。仓库包含模块化后端、机器契约、Web Workspace、Technician iOS、部署入口和当前架构事实源。
 
-## 当前可运行基线
+## 当前边界
 
-当前实施状态已推进至 **M452 Admin 关注项目角标精确 COUNT**；完整范围和未实现边界以
-`serviceos-architecture/docs/implementation-status.md` 为准。
+- Java 21 + Spring Boot + Spring Modulith 模块化单体；
+- PostgreSQL + Flyway + MyBatis；
+- OpenAPI 3.1、事件 JSON Schema、TypeScript/Swift 客户端生成；
+- Inbox/Outbox、幂等、claim/lease/retry、审计与 W3C Trace；
+- OIDC/JWT、Capability、Tenant/Project/Region/Network Scope；
+- Admin、Network、Technician 三个独立 Web 应用位于同一 pnpm Workspace；
+- Technician 原生 iOS 工程保留独立发布与设备能力边界。
 
-- Java 21 + Spring Boot 4.1 + Spring Modulith 2.1 模块化单体；
-- Maven Wrapper 一条命令构建；
-- 21 个 Spring Modulith 模块，覆盖身份授权、配置、工单、工作流、任务、派单、SLA、预约、现场 Visit、
-  表单、资料、审核整改、文件、集成、可靠消息、审计、运营异常与跨模块只读投影；
-- PostgreSQL + Flyway 模块前缀物理表；
-- `CreateProject` 首条命令链路；
-- 聚合、审计、幂等结果和 Outbox 同一事务；
-- OIDC/JWT 主体、capability/tenant scope 后端授权和拒绝审计；
-- 稳定内部 Principal、不可变外部 IdentityLink、PersonProfile/多 Persona、受控 JIT、主体启停实时失权与安全目录 API；
-- Inbox 去重与 Outbox claim/lease/publish worker；
-- 自动 Task 调度、执行尝试、租约恢复、受控重试和最终失败人工接管；
-- 安全文件 Begin/受限直传/Finalize/隔离扫描/授权下载闭环；
-- OpenAPI 3.1 破坏性变更门禁、不可变事件 Schema 治理，以及同源可重复生成、严格编译并由独立消费者验证的 TypeScript 与 Swift 6 Client；
-- W3C API/Outbox/Worker Trace 串联、健康探针、Prometheus 看板与 ECS JSON 日志脱敏；
-- 单一非 root OCI 镜像、独立 Flyway 迁移、staging smoke、失败关闭与应用回滚演练；
-- 不可变配置资产/Bundle 最小发布解析，以及 tenant/project/bundle 工单版本锁定；
-- BYD CPIM V7.3.1 验签、防重放、统一映射到工单创建的事务切片；
-- BYD CPIM 创建工单的权威 InboundEnvelope/CanonicalMessage、私有原文留存、业务键幂等与崩溃恢复；
-- BYD 厂端审核回调的显式订单路由、逐项 Canonical、部分成功、外部决定与故障恢复；
-- BYD 提审不可变 OutboundDelivery/Attempt/Acknowledgement、Task 可靠执行、UNKNOWN 人工接管，
-  以及明确成功后自动创建 CLIENT ReviewCase 与回调路由；
-- UNKNOWN 外部交付的 USER/HIGH capability 人工重发、审批/版本门禁、不可变 ReplayRequest，
-  保留旧 UNKNOWN Attempt 并复用冻结 payload；
-- `WorkOrderReceived` Outbox、Inbox 去重、精确 Workflow 版本启动、首个 Stage/Task 创建与工单激活；
-- `TaskCompleted` 领域事件、NodeInstance 运行时，以及冻结流程定义下的同阶段唯一下一任务推进；
-- 唯一无条件跨阶段推进、END 完结，以及 Stage/Workflow/WorkOrder 履约完成事件；
-- 人工工作流 Task 的安全 claim/start/complete HTTP、冻结幂等响应和统一流程推进；
-- TaskAssignment USER 候选快照、唯一当前责任、候选领取门禁与 release/reclaim；
-- TaskExecutionGuard 改派保护窗、精确解除、幂等事实与人工命令失败关闭；
-- PREPARED TaskAssignment prepare/activate/abort 可靠责任切换握手；
-- Dispatch/Task 改派 Inbox saga、切换前可靠终止、阶段 deadline、超时对账、异常人工接管与成功后自动关单；
-- 动态表单不可变提交、表单/资料双输入 Task 完成门禁；
-- Evidence 固定/条件槽位、不可变 Item/Revision、机器校验、Snapshot、作废、Review/Correction、
-  整改 Task、强制通过/重开、外部审核回执与 WAIVED；
-- SERVICEOS_EXPR_V1 白名单布尔子集，包含输入/true-false 决策审计与复杂度失败关闭；
-- VALIDATED 表单事实驱动 EvidenceSlot 只追加重解析、槽位世代/lineage、条件变化人工处置与完成门禁；
-- 车企外部审核回执 `affectedTargets` 对 ReviewCase 冻结 SnapshotMember 的精确权威校验；
-- INTERNAL/CLIENT ReviewCase 来源分离、已通过总部审核的车企提交登记，以及回执批次/mapping 冻结门禁；
-- Workflow 显式 `slaRef` 与 SLA v1 发布门禁；Task ELAPSED 时钟、到期对账、MET/MET_LATE、
-  Inbox/Outbox 和不可变时钟历史；
-- `sla.read` + Project Scope 授权的 SLA 工作台、工单时间线和 segment/milestone 详情投影，
-  以及服务端 `asOf` 与稳定游标；
-- 实时 TENANT/PROJECT RoleGrant 授权项目集合，以及无需逐行鉴权的跨项目 SLA 队列；
-- Project 有效期 REGION 关系，以及 REGION RoleGrant 驱动的跨项目 SLA 队列；
-- Project 有效期 NETWORK 关系，以及 NETWORK RoleGrant 驱动的跨项目 SLA 队列；
-- Project REGION/NETWORK 当前关系整组修订、不可变修订收据与即时授权投影同步；
-- `project.read` + 实时 TENANT/PROJECT/REGION/NETWORK RoleGrant 的项目目录、详情与范围历史查询；
-- `workOrder.read` + 实时项目范围的工单目录与不含客户 PII 的详情查询；
-- 复用同一授权边界的 Workflow/Stage 当前投影与工单 Task 摘要稳定分页；
-- `task.read` + 实时授权范围的独立 Task 队列、`assignee=me` 事实筛选与冻结引用详情；
-- 复用 Task 读取边界并按 capability、责任、状态和 guard 实时投影现有人工命令 allowed-actions；
-- `task.read` 实时授权的自动 Task 执行 Attempt 历史、稳定分页与安全错误码投影；
-- 独立 `readmodel` 模块可靠消费 WorkOrder/Workflow/Stage/Task、Appointment/Visit/ContactAttempt
-  、SLA 与资料/审核事件形成授权工单执行时间线；
-- Spring Modulith 边界验证与 PostgreSQL Testcontainers 集成测试。
-- 新 Admin 黄金链路正在 `serviceos-frontend/` Workspace 中重建；工程门禁只运行 ESLint、TypeScript、
-  快速单元测试、产品边界静态扫描和构建。产品验收连接真实 Backend/PostgreSQL/Keycloak，
-  在 Chrome 中人工完成，不再维护 Playwright、永久截图或浏览器 E2E 基线。
+详细的已实现范围和生产化缺口见 [当前实施状态](serviceos-architecture/docs/implementation-status.md)。实现存在不代表产品已经验收。
 
-当前工程已实施 **M453 Admin 责任网点候选与分配产品化**：Admin 工单工作区只消费服务端按项目、
-ACTIVE 网点、覆盖、业务类型、现有容量和冻结策略计算的候选，命令提交前重新校验并禁止自动扩容；
-Core OpenAPI 为 **2.0.0**；Flyway 版本和迁移数量以 `bash scripts/migration-baseline.sh` 输出为准。
-M351～M355 平台终审工作台、M350 Technician 表达式上下文与 validationRules 及
-M321～M349 配置驱动履约主链路仍有效。Track A、独立 Network/Technician Web、iOS 与在线
-Visit/表单/Evidence/Snapshot/整改仍有效。本机没有 Apple 签名身份或物理设备；联系人/预约写、
-完整高级表单与草稿、真实 operationRef 签退、弱网/后台/离线闭环、签名真机、真实 IdP、
-VoiceOver 与 TestFlight 尚未验收；灰度定向发布与任务详情运行时拒单尚未交付。
+## 目录
 
-下一为硬门禁：吉利真实 Sandbox/凭据到位后优先联调；AMOUNT/加权仍待业务确认。
-Track F/G 仍为 `BLOCKED_EXTERNAL`。OCR/CV、计算字段/脚本、SLA 暂停/预警/升级、真实短信/邮件供应商
-Adapter、对账结算、正式 IdP/Broker/对象存储/扫描服务、Consumer Identity、离线工作包以及其余 Network
-写命令仍未实现。
-Admin 统一用户中心（M187）、Portal `/me` 上下文/导航（M188）、Admin 个人 SavedView（M189）、
-Admin UI Preferences（M190）、Admin 共享 SavedView（M191）、Admin 受控全局搜索（M192）、
-Admin 最近访问（M193）、Network Portal 只读查询（M194）、Technician Portal Feed（M195）、
-Network Portal 指派师傅（M196）、预约协作（M197）、预约改约/取消（M198）、爽约/联系尝试（M199）、
-改派师傅（M200）、资料代补 onBehalf（M201）、整改队列只读（M202）、运营异常队列只读（M203）、
-师傅关系/资质提交（M204）、本网点资质只读列表（M205）、师傅关系只读列表（M206）、工作台能力门控
-enrichment（M207）、产能页（M208）、整改详情只读 UI（M209）、运营异常详情只读 UI（M210）、资质详情只读 UI（M211）、师傅关系详情只读 UI（M212）、限定工单工作区（M213）、工作区协作队列深链（M214）、预约/联系 fan-in（M215）、当前师傅 fan-in（M216）、目录页师傅 fan-in（M217）、Technician Portal Feed 字段展示（M218）、TECHNICIAN.ME 页壳（M219）、Network Portal 队列字段展示（M220）、工作区薄 SLA 摘要（M221）、工作区 Visit/表单提交摘要（M222）、工作区 Evidence 槽位/资料项摘要（M223）、工作台薄 SLA 风险计数（M224）、工作区整改摘要（M225）、工作区运营异常摘要（M226）、工作区预约/联系服务端摘要（M227）、工作区当前师傅服务端摘要（M228）、工作区审核案例服务端摘要（M229）、目录页师傅服务端摘要（M230）、目录页预约服务端摘要（M231）、目录页联系尝试服务端摘要（M232）、目录页资料整改服务端摘要（M233）、目录页 SLA 风险服务端摘要（M234）、目录页资料 Evidence 服务端摘要（M235）、目录页工单头字段（M236）、工作台统计时间展示（M237）、预约/联系历史 Accepted 字段展示（M238）、工作区 Visit/表单/Evidence Accepted 字段展示（M239）、工作区协作摘要 Accepted 字段展示（M240）、预约/联系历史残余 Accepted 字段展示（M241）、整改详情残余 Accepted 字段展示（M242）、Technician 当前责任任务在线详情（M243）、联系历史安全摘要（M244）、Visit 历史安全摘要（M245）、表单提交安全摘要（M246），Track A 的 M247～M254 共享工程底座、M255～M256 Network Web、M257 Technician H5、M258 iOS 安全 Foundation、M259 SwiftUI/Xcode App 构建批次、M260 Simulator 运行验收、M261 签名与分发基础、M262 在线 Visit、M263 在线基础表单、M264 在线 Evidence 上传、M265 资料快照与任务完成，M266 在线资料整改批次、M267 通用 Connector SPI / BYD 入站边界归位，M268 配置治理 MVP，M269 EXCLUSIVE_GATEWAY 运行时，M270 WAIT_EVENT 运行时，M271 标准家充勘安模板，阶段一已闭合；**M275～M278** PARALLEL/TIMER/SUB_PROCESS/多实例 已交付。真实 OEM2/3 协议仍 BLOCKED_EXTERNAL。
+```text
+serviceos-backend/         Java 模块化单体
+serviceos-contracts/       OpenAPI、事件 Schema 和客户端生成
+serviceos-frontend/        Admin / Network / Technician Web Workspace
+serviceos-technician-ios/  原生 Technician iOS
+serviceos-ios-core/        iOS 共享基础
+serviceos-web-core/        仍在迁移中的 Web 共享基础
+serviceos-deploy/          本地、产品开发与 staging
+serviceos-architecture/    当前产品与架构事实源
+scripts/                   当前构建和验证入口
+```
+
+## 开发入口
+
+开始任务前：
+
+```bash
+git status --short --branch
+```
+
+随后按 [Agent 任务导航](serviceos-architecture/docs/agent-navigation.md) 读取最小事实集。后端模块地图见 [serviceos-backend/AGENTS.md](serviceos-backend/AGENTS.md)，产品设计入口见 [product-design/README.md](serviceos-architecture/product-design/README.md)。
 
 ## 快速验证
 
-先运行无需启动 JVM、PostgreSQL 或镜像构建的里程碑预检：
+后端编译与精准测试：
 
 ```bash
-bash scripts/verify-milestone-preflight.sh
+bash scripts/agent-verify.sh compile
+bash scripts/agent-verify.sh test RelevantTest
+bash scripts/agent-verify.sh it RelevantPostgresIT
+bash scripts/agent-verify.sh arch
 ```
 
-预检通过且已形成稳定的最终候选 HEAD 后，再执行完整门禁：
+契约、前端和文档：
 
 ```bash
-./mvnw clean verify
+bash scripts/agent-verify.sh contracts origin/master
+bash scripts/agent-verify.sh frontend
+bash scripts/agent-verify.sh docs
 ```
 
-Flyway 当前版本与迁移数量由迁移目录自动推导；需要查看时执行：
+仓库静态/迁移预检：
 
 ```bash
+bash scripts/verify-repository-preflight.sh
 bash scripts/migration-baseline.sh
 ```
 
-契约变更还必须相对目标 Git 基线执行兼容门禁，并验证客户端可重复生成：
+Apple Silicon + OrbStack/Docker 的完整 Maven 验证：
 
 ```bash
-OASDIFF_BIN="$(serviceos-contracts/scripts/install-oasdiff.sh serviceos-contracts/target/contract-tools)" \
-  serviceos-contracts/scripts/check-contract-compatibility.sh origin/master
-
-bash scripts/agent-verify.sh client-ts
+bash scripts/verify-local.sh
 ```
 
-本机存在 Docker/兼容容器运行时时，构建会运行 PostgreSQL 18 集成测试；没有容器运行时时，Testcontainers 会明确显示该组测试被跳过。CI 环境不得把这组 P0 数据库测试标为不适用。
+`verify-local.sh` 默认复用本机原生架构 PostgreSQL 镜像；不修改用户永久环境，也不跳过 PostgreSQL、Flyway、事务、安全或模块边界门禁。
 
-本地启动数据库：
-
-```bash
-docker compose -f serviceos-deploy/compose.yaml up -d postgres
-./mvnw -pl serviceos-backend spring-boot:run
-```
-
-完整容器化 staging 发布与回滚演练：
-
-```bash
-serviceos-deploy/staging/verify-rehearsal.sh
-```
-
-新 Admin 产品开发统一从前端 Workspace 启动：
+Web Workspace：
 
 ```bash
 cd serviceos-frontend
@@ -140,24 +81,13 @@ corepack pnpm check
 corepack pnpm product-data:reset
 ```
 
-Web 不再维护 Playwright、视觉截图或全量浏览器脚本。产品功能连接真实后端和统一场景数据，
-由产品负责人在 Chrome 中人工确认；后端事务、权限、派单、审核整改与集成规则继续由对应的
-精准单元测试、Controller 安全测试和 PostgreSQL 集成测试证明。
+本地数据库与后端：
 
-## 目录
-
-```text
-serviceos-architecture/  架构、产品、API、数据、测试和路线图事实源
-serviceos-backend/       Java 模块化单体参考实现
-serviceos-contracts/     OpenAPI 与事件 JSON Schema
-serviceos-deploy/        本地/环境部署入口
-serviceos-frontend/       新 Web Workspace（Vue 3 + Vben Admin 5 + Ant Design Vue）
+```bash
+docker compose -f serviceos-deploy/compose.yaml up -d postgres
+./mvnw -pl serviceos-backend spring-boot:run
 ```
 
-完整实施状态与每个里程碑的代码、迁移、契约和测试证据见
-[实施状态总览](serviceos-architecture/docs/implementation-status.md) 与
-[Architecture Book](serviceos-architecture/README.md)。Agent 探索入口见
-[任务导航](serviceos-architecture/docs/agent-navigation.md) 与
-[里程碑索引](serviceos-architecture/docs/milestone-index.md)。验证阶段划分、CI 去重和最终候选规则见
-[验证执行策略](serviceos-architecture/docs/verification-execution-policy.md)。最新切片从实施状态总览的
-`latestMilestone` 进入生成式里程碑索引定位，不在根 README 维护易过期的单里程碑指针。
+## 文档原则
+
+当前树只保存长期产品/架构事实和直接工程入口。开发过程、旧方案、PR 交接和逐切片记录从 Git 历史或 PR 查询，不在仓库新增 `archive`、`legacy`、里程碑总结或重复验收文档。

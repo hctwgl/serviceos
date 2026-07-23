@@ -1,6 +1,6 @@
 /**
  * Node 原生冒烟：SERVICEOS_EXPR_V1 运行时求值（不依赖 vitest）。
- * 运行：node serviceos-technician-web/src/expression/serviceosExprV1Evaluate.test.mjs
+ * 运行：node serviceos-frontend/apps/technician/src/expression/serviceosExprV1Evaluate.test.mjs
  */
 import assert from 'node:assert/strict'
 import { pathToFileURL } from 'node:url'

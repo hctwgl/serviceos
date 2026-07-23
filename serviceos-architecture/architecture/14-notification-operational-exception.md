@@ -6,7 +6,7 @@ status: Proposed
 
 # 通知与运营异常中心设计
 
-> M60 已实现“BYD 提审获权重发取得严格 ACK”这一单一来源的异常自动恢复：恢复事件通过 Inbox
+> 当前已实现“BYD 提审获权重发取得严格 ACK”这一单一来源的异常自动恢复：恢复事件通过 Inbox
 > 关闭对应异常、取消未完成处理 Task，并以不可变 marker 防止乱序失败事件重新开人工任务。
 > 其他异常目录、通知通道和运营中心前端仍为 Proposed。
 
@@ -166,7 +166,7 @@ OPEN -> ACKNOWLEDGED -> IN_PROGRESS -> RESOLVED -> CLOSED
 
 当依赖恢复或重试成功，领域事件可以自动将 Exception 标记 `RESOLVED`，再执行验证关闭。人工 Task 若不再需要，按任务取消规则关闭并记录自动恢复原因。
 
-M60 的实现要求恢复事实与源失败按同一 tenant/sourceTask 串行；恢复先到时先留不可变标记，迟到失败
+该实现要求恢复事实与源失败按同一 tenant/sourceTask 串行；恢复先到时先留不可变标记，迟到失败
 只形成 RESOLVED 历史，不能再创建 HUMAN Task。恢复 marker、Exception、Task、Inbox 和 Outbox 必须
 同事务提交。
 

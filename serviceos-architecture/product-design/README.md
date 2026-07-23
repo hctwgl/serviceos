@@ -14,7 +14,7 @@
 - 实施过程中何时必须请产品负责人确认。
 
 本目录不再保存逐页面、逐字段、逐异常分支的长篇推演稿，也不承担工程实施状态管理。当前代码、契约、迁移和测试是否已经实现，以
-[实施状态总览](../docs/implementation-status.md)及对应里程碑证据为准。
+[实施状态总览](../docs/implementation-status.md)及其指向的直接工程证据为准。
 
 ## 2. 文档结构
 
@@ -25,6 +25,7 @@
 | [核心产品旅程](03-core-product-journeys.md) | 描述用户如何跨页面完成完整业务目标 |
 | [实施就绪审计](04-implementation-readiness.md) | 区分已确认事实、工程事实、设计假设和实施缺口 |
 | [跨模块产品决策](decisions/) | 保存已经由产品负责人确认的稳定业务边界 |
+| [Admin A+ 视觉金标](../assets/product/admin/a-plus-gold/README.md) | 已批准视觉方向与工作区结构参考 |
 
 ## 3. 事实优先级
 
@@ -33,7 +34,7 @@
 1. 用户在当前任务中明确确认的最新业务决定；
 2. 已接受 ADR 和本目录 `decisions/` 中的产品决策；
 3. OpenAPI、事件 Schema、Flyway 与自动化测试证明的机器事实；
-4. Architecture Book 中 Accepted/Implemented 的设计与里程碑文档；
+4. Architecture Book 中 Accepted 的长期设计；
 5. 本目录的页面结构和交互建议；
 6. 当前代码和历史探索稿。
 

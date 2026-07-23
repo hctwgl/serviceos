@@ -27,4 +27,4 @@ ADR-085 已将 CREATE_WORK_ORDER 入站归位到通用管道，但 BYD 提审仍
 
 - BYD 提审任务变为薄入口 + `BydOutboundSubmissionConnector`。
 - 后续 OEM 出站以新连接器接入同一管道，不复制 Delivery 状态机。
-- 回调 SPI、创建面 connector 注册表与 INTEGRATION Mapping 运行时另开里程碑。
+- 回调 SPI、创建面 connector 注册表与 INTEGRATION Mapping 运行时按独立完整任务推进。

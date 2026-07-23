@@ -6,20 +6,10 @@ status: Accepted
 
 # 资料、审核与整改闭环设计
 
-> M44 已实现 ReviewCase/ReviewDecision 最小运行时（见 `architecture/57-review-case-decision-runtime.md`）。
-> M45 已实现 CorrectionCase 最小运行时（见 `architecture/58-correction-case-runtime.md`）。
-> M47 已实现整改 Task 自动创建（见 `architecture/60-correction-task-runtime.md`）。
-> M48 已实现强制通过与重开（见 `architecture/61-review-force-approve-reopen-runtime.md`）。
-> M49 已实现 ExternalReviewReceipt 最小运行时（见 `architecture/62-external-review-receipt-runtime.md`）。
-> M54 已实现外部回执 `affectedTargets` 对 ReviewCase 冻结 SnapshotMember 的精确权威校验。
-> M55 已实现 INTERNAL/CLIENT ReviewCase 来源分离、已通过总部审核后的 CLIENT Case 显式登记，
-> 以及回执批次和 mappingVersion 对 Case 冻结值的匹配门禁。
-> M56～M57 已为 BYD 创建工单与审核回调实现权威入站；M58 已实现 BYD 提审
-> OutboundDelivery，并在外部明确成功后自动创建 CLIENT ReviewCase 与回调路由。
-> M52 已实现工单/区域/任务白名单事实驱动的条件槽位初次解析；M53 已实现锁定表单事实驱动的
-> 只追加重解析、槽位世代/lineage 与条件变化人工处置。
-> 通用 Connector、UNKNOWN 人工处置命令与 Evidence target 自动映射仍未实现；
-> 本章其余内容仍为指导设计。
+> 当前代码已包含 ReviewCase/ReviewDecision、CorrectionCase、整改 Task、强制通过/重开、
+> ExternalReviewReceipt、条件槽位重解析、两级审核和可靠外部交付等基础能力。
+> OCR/CV、生产文件基础设施、自动 Evidence target 映射和部分高级处置仍未闭环。
+> 精确完成边界以 `docs/implementation-status.md`、源码、机器契约和直接测试为准。
 
 ## 1. 目标
 
@@ -60,7 +50,7 @@ status: Accepted
 
 ## 4. 条件解析
 
-任务进入资料采集阶段时，根据锁定配置和当时已确认字段生成 `EvidenceSlot`。M53 对表单条件变化采用：
+任务进入资料采集阶段时，根据锁定配置和当时已确认字段生成 `EvidenceSlot`。表单条件变化采用：
 
 - 最新 VALIDATED FormSubmission 是同一锁定 FormVersion 的权威条件事实；
 - false→true 创建新槽位世代，true→true 沿用活动槽位；
@@ -224,9 +214,9 @@ OPEN -> IN_PROGRESS -> RESUBMITTED -> VERIFIED -> CLOSED
 - 受影响字段、资料或报告版本。
 
 外部回执由适配器校验和映射后追加一条 ReviewDecision；它不是第二种审核案例模型。
-M54 起，已声明的资料目标必须以 slot/item/revision 三元组精确命中该 ReviewCase 冻结 Snapshot；
+已声明的资料目标必须以 slot/item/revision 三元组精确命中该 ReviewCase 冻结 Snapshot；
 跨 Snapshot、错配或重复引用失败关闭。字段、表单和报告 targetType 仍未开放。
-M55 起，CLIENT Case 必须引用已通过的 INTERNAL Case，并冻结外部提交引用、回执批次、映射版本
+CLIENT Case 必须引用已通过的 INTERNAL Case，并冻结外部提交引用、回执批次、映射版本
 和审核策略；内部 decide/force/reopen 不得裁决 CLIENT Case，外部回执的批次与映射版本必须匹配。
 
 车企驳回先创建客服协调任务，由客服确认整改对象并分派给网点/师傅。不得让外部回调直接把当前师傅任务改成任意状态。

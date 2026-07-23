@@ -20,18 +20,18 @@ related_adrs: []
    预警/升级/重算；
 2. **D2-R**：日历权威为版本化配置资产 `CALENDAR`，进入 Configuration Bundle；首切片使用显式
    样例日历（固定时区 + 周一～周五工作时段 + 可选节假日/调休日 JSON），**不接**外部节假日 API；
-3. **D4-R**：仍限 Task + `TASK_CREATED` / `TASK_COMPLETED`（与 M61 同构），仅扩展 `clockMode`；
+3. **D4-R**：仍限 Task + `TASK_CREATED` / `TASK_COMPLETED`，仅扩展 `clockMode`；
 4. 调休日样例语义：复用周一工作窗（实现文档固定，避免运行时猜测）。
 
 ## 2. 上下文
 
-- M61～M66 已交付 Task `ELAPSED` 自然时长时钟与授权查询；
+- Task `ELAPSED` 自然时长时钟与授权查询已经存在；
 - ARCH-12 §6～§8 描述 BUSINESS 日历与暂停/恢复，但整体仍为 Proposed，且时长/暂停原因需试点确认；
 - 本 ADR 仅固化**首切片可接受边界**，不把 ARCH-12 全体标为 Accepted。
 
 ## 3. 后果
 
-- M369 实现本 ADR：CALENDAR 资产 + SLA schema + V135 冻结列 + 纯函数截止/业务已用时长 +
+- 当前实现包含 CALENDAR 资产 + SLA schema + V135 冻结列 + 纯函数截止/业务已用时长 +
   `sla.started@v2` + IT；
 - 不接受：外部节假日 API、暂停/预警/升级、非 Task subject、结算落账、无期限双轨 clockMode。
 

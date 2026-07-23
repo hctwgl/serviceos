@@ -3,11 +3,11 @@
 - 状态：Proposed
 - 日期：2026-07-13
 
-> M58 范围内的 Task 唯一重试时钟、事务外网络调用、UNKNOWN 不盲目重发与最终人工接管
+> Task 唯一重试时钟、事务外网络调用、UNKNOWN 不盲目重发与最终人工接管
 > 已于 2026-07-15 获项目负责人明确批准并实现。ADR 其余通用范围仍保持 Proposed。
-> M59 的人工重发仍由新 Task 唯一调度，ReplayRequest/Task/Audit/Outbox 同事务登记，
+> 人工重发仍由新 Task 唯一调度，ReplayRequest/Task/Audit/Outbox 同事务登记，
 > 外部网络继续位于事务外；该子集已于 2026-07-15 获明确批准并实现。
-> M60 以恢复事件、Operations Inbox、不可变恢复标记和同事务 Task 取消处理重放/失败乱序，
+> 恢复事件、Operations Inbox、不可变恢复标记和同事务 Task 取消共同处理重放/失败乱序，
 > 该子集已于 2026-07-15 获明确批准并实现。
 
 ## 背景

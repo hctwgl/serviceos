@@ -6,11 +6,11 @@ status: Proposed
 
 # SLA 时钟、预警与升级设计
 
-> M61 已实现 Task `TASK_CREATED → TASK_COMPLETED` 的 ELAPSED 自然时长子集：Workflow 显式
+> 当前已实现 Task `TASK_CREATED → TASK_COMPLETED` 的 ELAPSED 自然时长子集：Workflow 显式
 > `slaRef`、SLA Version/摘要冻结、RUNNING/BREACHED/MET/MET_LATE、单一 TARGET_DUE milestone、
-> Inbox/Outbox 和 PostgreSQL 对账。M62 已实现 `sla.read` 查询，M63～M65 已实现 TENANT/PROJECT/
+> Inbox/Outbox 和 PostgreSQL 对账；`sla.read` 查询和 TENANT/PROJECT/
 > REGION/NETWORK RoleGrant 授权项目集合与跨项目工作台。本文其余 BUSINESS 日历、暂停、预警、升级、通知、重算和多 subject
-> 仍为 Proposed，不得从 M61 外推为完整 SLA 平台。
+> 仍为 Proposed，不得从现有子集外推为完整 SLA 平台。
 
 ## 1. 目标
 
@@ -41,7 +41,7 @@ region
 businessDate
 ```
 
-具体小时数和日历尚需按首个试点项目填写 M1-04，架构不预设数值。自动派单失败人工处理的 24 小时是当前唯一已确认的明确值。
+具体小时数和日历尚需由首个试点项目确认，架构不预设数值。自动派单失败人工处理的 24 小时是当前唯一已确认的明确值。
 
 ## 4. SlaInstance
 

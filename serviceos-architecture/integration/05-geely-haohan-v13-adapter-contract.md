@@ -8,16 +8,16 @@ lastUpdated: 2026-07-19
 
 权威协议输入：`serviceos-architecture/docs/吉利接口文档V1.3.pdf`（V1.3，2026-04-15）。
 
-## 已落地（M311 本地可测）
+## 已落地（本地可测）
 
 | 能力 | ServiceOS 入口 | 说明 |
 |---|---|---|
 | AES-128-CBC/PKCS5Padding | `GeelyAesCipher` | 密钥=AK 前 16 字节；IV=浩瀚分配；文档 4.5.2 示例密文可解密 |
 | 7.1 安装单创建通知 | `POST /api/v1/integrations/geely/haohan/v1.3/notify_create_order` | 解密 → Canonical → `InboundCreateWorkOrderPipeline` |
-| 7.18 用户信息更新 | `POST .../notify_update_order_info` | → `InboundUpdateWorkOrderPipeline`（M314） |
-| 7.17 安装单关闭 | `POST .../notify_close_order` | → `InboundCancelWorkOrderPipeline`（M314） |
-| 提审出站（本地 stub） | `integration.geely.submit-settlement` | AES 包装 + LOCAL_ACCEPT 技术 ACK（M316） |
-| 7.13 核销审核回调 | `POST .../notify_settlement_audit_result` | → `InboundReviewCallbackItemPipeline`（M316） |
+| 7.18 用户信息更新 | `POST .../notify_update_order_info` | → `InboundUpdateWorkOrderPipeline` |
+| 7.17 安装单关闭 | `POST .../notify_close_order` | → `InboundCancelWorkOrderPipeline` |
+| 提审出站（本地 stub） | `integration.geely.submit-settlement` | AES 包装 + LOCAL_ACCEPT 技术 ACK |
+| 7.13 核销审核回调 | `POST .../notify_settlement_audit_result` | → `InboundReviewCallbackItemPipeline` |
 | 映射版本 | `geely-haohan-v1.3-create-order-v1` | `installProcessNo` → externalOrderCode；省市区/联系人/地址/VIN |
 
 ## BLOCKED_EXTERNAL / TBD_EXTERNAL_CONTRACT

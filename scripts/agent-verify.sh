@@ -15,14 +15,13 @@ set -euo pipefail
 #   bash scripts/agent-verify.sh client-identities  Page/Feature/Action 注册、跨端生成与未知动作门禁
 #   bash scripts/agent-verify.sh client-metadata    Web/iOS Header、后端低基数观测与 OpenAPI 元数据门禁
 #   bash scripts/agent-verify.sh client-foundation  Track A 全部生成物、独立消费者与契约兼容总门禁
-#   bash scripts/agent-verify.sh network-web         独立 Network Web 构建、76 E2E、隔离与旧路由回流门禁
-#   bash scripts/agent-verify.sh technician-web      独立 Technician H5 构建、8 E2E、隔离与旧路由回流门禁
+#   bash scripts/agent-verify.sh frontend           当前 Web Workspace 静态检查、单测与构建
 #   bash scripts/agent-verify.sh technician-ios      Technician iOS Keychain/OIDC/Context/生成客户端基础门禁
 #   bash scripts/agent-verify.sh technician-ios-app  Technician iOS Xcode/Simulator App、XCTest 与 XCUITest 门禁
 #   bash scripts/agent-verify.sh technician-ios-distribution Technician iOS Production archive、隐私与签名失败关闭门禁
 #   bash scripts/agent-verify.sh web-core           Web auth/context/error/trace 基础构建与消费门禁
 #   bash scripts/agent-verify.sh ios-core           iOS auth/context/error/trace 基础构建与消费门禁
-#   bash scripts/agent-verify.sh docs               git diff --check + 脚本语法 + 里程碑索引新鲜度
+#   bash scripts/agent-verify.sh docs               git diff --check + 脚本语法
 #
 # 全量 L3 验证统一走 bash scripts/verify-local.sh，不在本脚本内提供。
 
@@ -63,7 +62,7 @@ case "${command_name}" in
     export OASDIFF_BIN="${oasdiff_bin}"
     base_ref="${1:-${CONTRACT_BASE_REF:-}}"
     if [[ -z "${base_ref}" ]] && git cat-file -e 'origin/master^{commit}' 2>/dev/null; then
-      # 使用分支起点而非 HEAD^，确保多提交里程碑中的早期破坏性变更不会被后续提交掩盖。
+      # 使用分支起点而非 HEAD^，确保多提交变更中的早期破坏性修改不会被后续提交掩盖。
       base_ref="$(git merge-base HEAD origin/master)"
     fi
     if [[ -z "${base_ref}" ]]; then
@@ -106,11 +105,8 @@ case "${command_name}" in
   client-foundation)
     scripts/verify-client-foundation.sh
     ;;
-  network-web)
-    scripts/verify-network-web.sh
-    ;;
-  technician-web)
-    scripts/verify-technician-web.sh
+  frontend)
+    corepack pnpm --dir serviceos-frontend check
     ;;
   technician-ios)
     scripts/verify-technician-ios-foundation.sh
@@ -130,23 +126,6 @@ case "${command_name}" in
   docs)
     git diff --check
     bash -n scripts/*.sh
-    bash scripts/test-generate-milestone-index.sh
-    bash scripts/test-find-milestone.sh
-    index_file="serviceos-architecture/docs/milestone-index.md"
-    if [[ -f "${index_file}" ]]; then
-      generated_index="$(mktemp)"
-      bash scripts/generate-milestone-index.sh --stdout > "${generated_index}"
-      if ! diff "${generated_index}" "${index_file}" >/dev/null; then
-        rm -f "${generated_index}"
-        echo "里程碑索引已过期，请运行 bash scripts/generate-milestone-index.sh 重新生成。" >&2
-        exit 1
-      fi
-      rm -f "${generated_index}"
-      echo "里程碑索引为最新。"
-    else
-      echo "里程碑索引缺失，请运行 bash scripts/generate-milestone-index.sh 生成。" >&2
-      exit 1
-    fi
     echo "docs 检查通过。"
     ;;
   *)

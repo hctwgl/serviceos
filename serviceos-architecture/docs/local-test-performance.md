@@ -76,7 +76,7 @@ bash scripts/verify-local.sh \
   compile
 ```
 
-### 3.3 里程碑全量验证
+### 3.3 全量验证
 
 ```bash
 bash scripts/verify-local.sh verify
@@ -84,7 +84,7 @@ bash scripts/verify-local.sh verify
 
 ### 3.4 从零干净验证
 
-仅在 AGENTS.md 规定的 L5 场景使用：
+仅在发布候选、从零可复现或怀疑缓存污染时使用：
 
 ```bash
 bash scripts/verify-local.sh clean verify
@@ -169,8 +169,8 @@ SERVICEOS_TEST_NATIVE_PLATFORM=linux/arm64 \
 - Flyway 仍从真实 PostgreSQL 验证；
 - Spring Modulith ArchitectureTest 仍为独立门禁；
 - 授权、事务、幂等、并发和契约测试不得跳过；
-- 里程碑完成前仍需执行 AGENTS.md 规定的 L4 全量 `verify`；
-- PR、主分支 CI 和发布候选仍按 L5 执行干净构建。
+- R3 或发布候选仍需执行 AGENTS.md 规定的完整 `verify`；
+- 主分支 CI 和发布候选按适用规则执行干净构建。
 
 ## 7. 后续可独立评估的优化
 

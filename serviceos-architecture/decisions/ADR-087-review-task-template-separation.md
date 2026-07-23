@@ -11,11 +11,6 @@ related_adrs:
   - decisions/ADR-017-workflow-runtime-selection.md
 related_docs:
   - architecture/10-evidence-review-correction.md
-  - architecture/60-correction-task-runtime.md
-  - architecture/279-m266-technician-correction-batch.md
-  - architecture/366-m353-review-target-decide.md
-  - architecture/377-m364-review-task-template-separation.md
-  - product/05-cross-portal-interaction-state-spec.md
 ---
 
 # ADR-087：独立审核 HUMAN Task（REVIEW_TASK）与提交 Task 分离
@@ -28,17 +23,14 @@ related_docs:
 Accept ADR-087 with: A1-R, A2-R, A3-R, A4-R, A5-R
 ```
 
-实现里程碑：M364（`architecture/377-m364-review-task-template-separation.md`）。
-
-背景：M353/M360～M363 已明确将「独立审核 HUMAN Task 与提交 Task 分离」列为未实现；
-历史实现将 `ReviewCase.taskId` 绑定 Snapshot 源提交 Task，`completeReviewTask` 对已 COMPLETED
+背景：历史实现将 `ReviewCase.taskId` 绑定 Snapshot 源提交 Task，`completeReviewTask` 对已 COMPLETED
 提交 Task 只能跳过，无法形成可领取的审核责任面。
 
 ## 2. 问题
 
 需要把「现场提交责任」与「客服审核责任」拆成两个 HUMAN Task，使：
 
-1. 师傅提交 Task 可保持 COMPLETED（与 M266 整改旁路同构）；
+1. 师傅提交 Task 可保持 COMPLETED；
 2. 审核员领取/启动/完成的是独立 `REVIEW_TASK`；
 3. 整改闭环后重新创建/激活审核任务，而不是篡改旧决定
    （`architecture/10` §12）。
@@ -61,11 +53,10 @@ Accept ADR-087 with: A1-R, A2-R, A3-R, A4-R, A5-R
 - 全量标准模板替换；
 - 把 `reviewTaskId` 改为工作流 HUMAN Task（A2-B）。
 
-## 4.1 A5-B 后续切片（已实施）
+## 4.1 A5-B 修订（已实施）
 
-负责人选型 **C** 后由 **M365** 实施：`REVIEW_TASK` 作为 WAITING 编排门闸，
-由 `evidence.review-decided`（APPROVED/FORCE_APPROVED）唤醒；不改变 A2-R/A5-R。
-见 `architecture/378-m365-review-task-workflow-gate.md`。
+负责人选型 **C**：`REVIEW_TASK` 作为 WAITING 编排门闸，由
+`evidence.review-decided`（APPROVED/FORCE_APPROVED）唤醒；不改变 A2-R/A5-R。
 
 ## 5. 后果
 

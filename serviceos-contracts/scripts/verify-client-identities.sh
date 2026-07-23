@@ -5,7 +5,7 @@ script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 module_directory="$(cd "${script_directory}/.." && pwd)"
 repository_root="$(cd "${module_directory}/.." && pwd)"
 manifest="${module_directory}/target/generated-client-identities/manifest.json"
-typescript_bin="${SERVICEOS_TYPESCRIPT_BIN:-${repository_root}/serviceos-admin-web/node_modules/.bin/tsc}"
+typescript_bin="${SERVICEOS_TYPESCRIPT_BIN:-${repository_root}/serviceos-frontend/node_modules/.bin/tsc}"
 
 if [[ ! -x "${typescript_bin}" ]]; then
   echo "未找到仓库锁定的 TypeScript 编译器：${typescript_bin}" >&2

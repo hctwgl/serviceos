@@ -12,7 +12,7 @@ status: Proposed
 
 MVP 默认交付可解释双向试算和结果导出。正式对账、发票、收付款与总账由二期或外部财务系统负责；但本章先固定边界，避免试算表未来无法演进。
 
-本章第 3～11 节定义二期 `FORMAL_SETTLEMENT` 能力的目标契约，不代表 M5 已启用。M5 默认仅启用 `CALCULATION_EXPORT`；正式批次、Statement、争议、Adjustment、锁定和 FinanceHandoff 均受独立 feature gate 保护，在业务与财务签署前不得创建真实对象或产生外部副作用。
+本章第 3～11 节定义后续 `FORMAL_SETTLEMENT` 能力的目标契约，不代表当前已启用。当前仅允许 `CALCULATION_EXPORT`；正式批次、Statement、争议、Adjustment、锁定和 FinanceHandoff 均受独立 feature gate 保护，在业务与财务签署前不得创建真实对象或产生外部副作用。
 
 ## 2. 核心对象
 
@@ -159,7 +159,7 @@ ServiceOS 输出业务应收/应付明细，不拥有总账、银行支付和法
 - 交接、接受、拒绝和错误回执；
 - 财务系统单号。
 
-交接使用 M4 OutboundDelivery 可靠模式。财务拒绝产生 OperationalException，不直接解锁业务结算。
+交接使用 OutboundDelivery 可靠模式。财务拒绝产生 OperationalException，不直接解锁业务结算。
 
 ## 12. 试算导出与正式结算
 
@@ -167,7 +167,7 @@ MVP 支持 `CALCULATION_EXPORT`：导出明确标记“试算/未结算”，带
 
 启用正式结算前必须额外满足：
 
-- M1-05 真实价格和流程完整；
+- 真实价格和流程完整；
 - 至少一个历史对账周期回放；
 - 对账/争议/调整审批确认；
 - 财务接口与会计口径确认；
@@ -209,7 +209,7 @@ MVP 支持 `CALCULATION_EXPORT`：导出明确标记“试算/未结算”，带
 
 ## 16. 正式结算启用验收（二期）
 
-以下项目不属于 M5 退出条件，但 `FORMAL_SETTLEMENT` 首次启用前必须全部验证：
+以下项目在 `FORMAL_SETTLEMENT` 首次启用前必须全部验证：
 
 1. 不合格 run 有明确不可入账原因；
 2. 同一 ChargeItem 不重复进入有效 Statement；

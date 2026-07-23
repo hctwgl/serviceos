@@ -8,7 +8,7 @@ status: Proposed
 
 ## 1. 目标
 
-本蓝图把 M0～M5 的领域边界转换为可创建代码仓库、模块、包、数据库迁移和测试的工程约束。它不重新定义业务规则，也不把逻辑模块误拆成首期微服务。
+本蓝图把长期领域边界转换为代码仓库、模块、包、数据库迁移和测试的工程约束。它不重新定义业务规则，也不把逻辑模块误拆成首期微服务。
 
 首期实现必须做到：
 
@@ -53,9 +53,9 @@ serviceos/
 │   ├── serviceos-adapters/
 │   └── serviceos-test-support/
 ├── serviceos-contracts/          # OpenAPI、AsyncAPI、JSON Schema 与生成物
-├── serviceos-admin-web/          # 总部运营/客服/审核/财务后台
-├── serviceos-network-web/        # 网点负责人 Portal
-├── serviceos-technician-app/     # 师傅移动端
+├── serviceos-frontend/           # Admin / Network / Technician Web Workspace
+├── serviceos-technician-ios/     # 师傅原生 iOS
+├── serviceos-ios-core/           # iOS 共享基础
 ├── serviceos-deploy/             # 容器、环境、迁移和运维清单
 └── .github/ 或 .gitlab/          # CI/CD
 ```

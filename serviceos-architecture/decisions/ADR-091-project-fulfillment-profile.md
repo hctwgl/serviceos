@@ -8,7 +8,7 @@ date: 2026-07-20
 
 ## 状态
 
-Accepted（M378 起实施）
+Accepted
 
 ## 背景
 

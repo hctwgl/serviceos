@@ -16,7 +16,7 @@ related_adrs:
 
 ## 1. 状态与已接受决策
 
-本 ADR 作为 M186 的 Modulith 依赖评审结论，正式接受：
+本 ADR 作为 RoleGrant 治理的 Modulith 依赖评审结论，正式接受：
 
 1. Role、稳定 Capability、RoleGrant、Delegation、授权解释与治理命令由现有模块
    `authorization` 拥有，表前缀保持 `auth_`；**不**新建独立 Modulith 模块；
@@ -29,7 +29,7 @@ related_adrs:
 
 ## 2. 上下文
 
-M183～M185 已提供 Principal、组织任职与网点/师傅目录。实时 RoleGrant 运行时（E1）已存在，
+Principal、组织任职与网点/师傅目录已经存在。实时 RoleGrant 运行时已经存在，
 但缺少申请/审批/撤销、Delegation、职责分离、授权解释与治理 HTTP API。交付计划要求复用现有
 Capability/RoleGrant 运行时，不另建平行 RBAC。
 
@@ -46,12 +46,12 @@ Capability/RoleGrant 运行时，不另建平行 RBAC。
 
 ### 3.2 不拥有
 
-- Admin 用户中心页面与真实 OIDC 治理 E2E（M187）；
-- Portal `/me` 上下文与导航（M188）；
+- Admin 用户中心页面与真实 OIDC 治理；
+- Portal `/me` 上下文与导航；
 - MFA step-up 执行器（本切片仅保留义务位与审计钩子边界，不伪造完成）。
 
 ## 4. 后果
 
 - ArchitectureTest 继续验证 `authorization` 模块边界，并允许 `reliability :: api`；
 - Organization 任职终止撤权继续经 `OrganizationRoleGrantPort`，并在撤销时推进 grant generation；
-- M187/M188 消费治理 API 与实时判定，不得复制 RoleGrant 规则。
+- 各 Portal 消费治理 API 与实时判定，不得复制 RoleGrant 规则。

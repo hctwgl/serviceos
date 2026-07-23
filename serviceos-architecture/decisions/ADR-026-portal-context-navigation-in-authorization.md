@@ -16,7 +16,7 @@ related_adrs:
 
 ## 1. 状态与已接受决策
 
-本 ADR 作为 M188 的 Modulith 边界结论，正式接受：
+本 ADR 作为 Portal 上下文与导航的 Modulith 边界结论，正式接受：
 
 1. `/me`、`/me/contexts`、`/me/capabilities`、`/me/navigation` 由现有模块 `authorization`
    拥有；**不**新建独立 `portal` Modulith 模块；
@@ -32,7 +32,7 @@ related_adrs:
 
 ## 2. 上下文
 
-M183～M187 已提供 Principal、组织任职、网点/师傅与 RoleGrant 治理。交付计划要求三 Portal
+Principal、组织任职、网点/师傅与 RoleGrant 治理已经存在。三 Portal
 独立消费服务端上下文，且前端切换不能扩权。新建 portal 模块会额外引入依赖方向评审，而
 authorization 已依赖 `identity::api` / `organization::api` / `network::api`，并拥有
 Capability 与 grant generation。

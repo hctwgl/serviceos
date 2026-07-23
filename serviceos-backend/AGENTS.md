@@ -2,7 +2,9 @@
 
 本文件是后端工程的导航补充，帮助 Agent 不探索目录树就能定位模块。工程硬约束（模块边界、事务、持久化、验证阶梯）以根 `AGENTS.md` 为准，本文件不重复也不放宽。
 
-任务路由先看 `serviceos-architecture/docs/agent-navigation.md`；里程碑文档索引用 `serviceos-architecture/docs/milestone-index.md`。
+任务路由先看 `serviceos-architecture/docs/agent-navigation.md`；当前能力和工程证据分别看
+`serviceos-architecture/docs/implementation-status.md` 与
+`serviceos-architecture/docs/implementation-traceability-matrix.md`。
 
 ## 包结构约定
 
@@ -66,6 +68,6 @@ bash scripts/agent-verify.sh compile          # 编译
 bash scripts/agent-verify.sh test <Class>     # 单元测试（精准）
 bash scripts/agent-verify.sh it <Class>       # PostgreSQL IT（精准，含架构修正）
 bash scripts/agent-verify.sh arch             # ArchitectureTest
-bash scripts/agent-verify.sh docs             # 文档/脚本/索引静态检查
-bash scripts/verify-local.sh                  # L3 全量 verify（里程碑门禁）
+bash scripts/agent-verify.sh docs             # 文档/脚本静态检查
+bash scripts/verify-local.sh                  # L3 全量 verify
 ```

@@ -15,17 +15,17 @@ related_adrs:
 
 ## 1. 状态与已接受决策
 
-本 ADR 作为 M184 的 Modulith 依赖评审结论，正式接受以下决策：
+本 ADR 作为 organization 模块的 Modulith 依赖评审结论，正式接受以下决策：
 
 1. 企业组织与任职使用独立 Spring Modulith 模块 `organization`，表前缀 `org_`；
 2. `organization` 允许依赖 `shared`、`identity::api`、`reliability::api`、`audit::api`；
 3. `authorization` 允许额外依赖 `organization::api`，以实现组织命令授权与任职终止撤权端口；
-4. 合作组织、ServiceNetwork、TechnicianProfile 不属于本模块，由 M185 独立边界承接。
+4. 合作组织、ServiceNetwork、TechnicianProfile 不属于本模块，由 `network` 独立边界承接。
 
 ## 2. 上下文
 
 交付计划要求“企业/合作组织、内部 OrgUnit、closure、人员任职与来源同步”落在独立组织目录边界，
-并在实施前完成模块名与依赖方向评审。工程蓝图已预留 `organization` 模块编码；M183 已提供稳定
+并在实施前完成模块名与依赖方向评审。工程蓝图已预留 `organization` 模块编码；稳定
 `Principal`，使任职可以引用主体而不创建第二套用户表。
 
 若把组织树放进 `identity` 或 `authorization`，会混淆登录主体、授权判定与主数据同步职责，并迫使
@@ -45,8 +45,8 @@ related_adrs:
 `organization` 不拥有：
 
 - 密码/OIDC 绑定（`identity`）；
-- Role/Capability/RoleGrant 治理申请审批（`authorization` / M186）；
-- Partner Organization、ServiceNetwork、TechnicianProfile（M185）。
+- Role/Capability/RoleGrant 治理申请审批（`authorization`）；
+- Partner Organization、ServiceNetwork、TechnicianProfile（`network`）。
 
 ### 3.2 跨模块协作
 
@@ -69,5 +69,5 @@ related_adrs:
 ## 4. 后果
 
 - ArchitectureTest 必须把 `organization` 纳入模块清单并验证依赖方向；
-- M185 不得把网点伪装成 `OrgUnit` 进入内部 closure；
-- M186 可在 RoleGrant 上引用 `organizationId`，但组织树权威仍属 `organization`。
+- `network` 不得把网点伪装成 `OrgUnit` 进入内部 closure；
+- RoleGrant 可引用 `organizationId`，但组织树权威仍属 `organization`。

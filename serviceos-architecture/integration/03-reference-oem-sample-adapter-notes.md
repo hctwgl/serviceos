@@ -12,7 +12,7 @@ lastUpdated: 2026-07-18
 - 验签、字段、错误码均为演示约定，正式协议见仓库 PDF 后另立 `TBD_EXTERNAL_CONTRACT` 退出任务；
 - 路径：`POST /api/v1/integrations/reference-oem/sample/v1/install-orders`。
 
-## M343 Update/Cancel
+## Update/Cancel
 
 - `POST .../update-orders` / `.../cancel-orders`：SAMPLE HMAC + RouteHint + 强制 Mapping
 - IT：`ReferenceOemInboundUpdateCancelPostgresIT`

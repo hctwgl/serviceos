@@ -21,7 +21,7 @@
 - 对上和对下分别门禁；
 - 权威切换按 cohort，不全局瞬时切换；
 - SHADOW、候选 override 或旧 authorityVersion run 永远不能进入正式 Statement；
-- 正式结算还需独立 `FORMAL_SETTLEMENT` feature gate，M5 默认只试算导出；
+- 正式结算还需独立 `FORMAL_SETTLEMENT` feature gate，当前默认只试算导出；
 - 切换后旧系统只读/影子，不能双主结算。
 
 ## 后果

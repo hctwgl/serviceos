@@ -1,56 +1,53 @@
 ---
 title: ServiceOS Agent 任务导航
+lastUpdated: 2026-07-23
 ---
 
 # ServiceOS Agent 任务导航
 
-本文件回答一个问题：**面对一个任务，最少读哪几个文件就可以开工。**
+本文件回答“完成当前任务最少需要读什么”。不要按历史编号探索，也不要把 Git 历史或已合并 PR 说明当作当前事实。
 
-所有路径相对仓库根 `/Users/louis/code/serviceos`。阅读顺序固定为：
+## 固定起点
 
-```text
-1. serviceos-architecture/docs/implementation-status.md（基线、能力总览、下一方向）
-2. 涉及产品、Portal、前端、身份授权、配置或完成状态时，读取 product/00-serviceos-product-delivery-decision-baseline.md
-3. 本文件中匹配任务类型的行（确定最小必读集）
-4. 用 bash scripts/find-milestone.sh <Mxx|关键词> 定位具体 Mxx 文档
-5. 只读最小必读集；Mxx 文档先读 frontmatter 与「已实现/明确未实现」两节再决定是否深读
-```
+1. `git status --short --branch`，保护用户已有修改；
+2. 阅读 `docs/implementation-status.md` 的相关能力和未完成边界；
+3. 从下表选择一行，只读直接事实源和相邻代码；
+4. 通过 `rg` 定位公共 API、契约、迁移和直接测试；
+5. 明确本次范围、非目标、风险等级和验证命令后实施。
 
-检索纪律：
+通常 3～6 个文档足够开工。需要批量通读目录时，先重新确认任务边界。
 
-- 通过 `scripts/find-milestone.sh` 查询里程碑号、模块名或关键词，不整份读取 `milestone-index.md`，也不批量通读 `architecture/`、`testing/` 目录；
-- 只读与任务直接相关的 Mxx 文档（通常是最近一次同模块切片）；历史摘要细节查 `implementation-status-archive.md`，不回读状态总览找；
-- 产品、Portal 和前端任务必须先读取决策基线，再读取对应 Portal 规格和已批准视觉基线；不得只根据当前页面代码反推产品；
-- Admin 页面和组件任务必须读取 `product/admin/12-classic-professional-visual-baseline.md`；服务覆盖相关任务还必须读取 `product/admin/13-service-coverage-amap-visual-baseline.md` 并打开其中四张批准视觉参考图；
-- Network 页面和组件任务必须读取 `product/network/README.md` 与 `product/network/01-classic-professional-collaboration-baseline.md`；
-- Technician H5/iOS 页面和组件任务必须读取 `product/technician/README.md` 与 `product/technician/01-classic-professional-mobile-baseline.md`；
-- 三个 Portal 均不得自行创造第二套视觉语言，也不得因效果图相似宣称产品完成；
-- 冲突优先级按根 `AGENTS.md` §2.2；代码与文档冲突时不默认代码正确；
-- 探索阶段的 token 预算是「3～6 个文件」，超过就说明路由选错了，回到本表重新定位。
+## 任务路由
 
-## 任务路由表
-
-| 任务类型 | 最小必读（按序） | 按需阅读 |
+| 任务 | 最小必读 | 直接工程入口 |
 |---|---|---|
-| 开工定位：下一个任务是什么 | `serviceos-architecture/docs/implementation-status.md` §2/§2.1/§3/§5 | 身份治理序列 M183～M188：`serviceos-architecture/roadmap/03-identity-organization-governance-delivery-plan.md`、`serviceos-architecture/roadmap/04-identity-organization-governance-agent-worklist.md`、`serviceos-architecture/testing/identity-organization-governance-program-acceptance.md` |
-| 产品、Portal 或前端产品化（通用） | `serviceos-architecture/product/00-serviceos-product-delivery-decision-baseline.md`、目标 Portal 产品规格、目标 Portal 已批准视觉基线、适用产品验收文档、相邻页面代码 | `serviceos-architecture/product/01-cross-portal-information-architecture.md`、`serviceos-architecture/product/05-cross-portal-interaction-state-spec.md`、`serviceos-architecture/product/06-design-system-accessibility-spec.md`、`serviceos-architecture/product/07-page-action-permission-matrix.md` |
-| 后端新里程碑（通用） | ① 若已有 Accepted 设计：对应 Mxx 实现文档 + 验收矩阵；② `serviceos-architecture/docs/implementation-traceability-matrix.md` §2 该模块行；③ `grep -i <模块或关键词> serviceos-architecture/docs/milestone-index.md` 找最近一次同模块里程碑的实现文档 + 验收矩阵；④ `serviceos-backend/AGENTS.md` 该模块行 | 领域总体设计（`serviceos-architecture/architecture/00`～`21` 编号文档）相关章节、相关 ADR（`serviceos-architecture/decisions/`） |
-| readmodel 时间线/工作区切片 | `serviceos-architecture/architecture/86-m73-work-order-core-execution-timeline.md`（投影基线）、`serviceos-architecture/architecture/97-m84-work-order-timeline-projection-checkpoint-rebuild.md`（checkpoint/重建）、index Grep `时间线\|工作区` 取最近一次同类切片、`serviceos-architecture/api/06-application-query-preference-http-api.md` 对应 Accepted 章节 | `serviceos-architecture/data/06-application-projection-preference-logical-model.md` |
-| 授权查询/队列切片 | `serviceos-architecture/architecture/80-m67-authorized-project-directory-query.md`、`serviceos-architecture/architecture/81-m68-authorized-work-order-query.md`、index Grep `队列` 取最近一次（如 M99/M158）、`serviceos-architecture/architecture/07-identity-authorization-audit.md` 授权章节 | `serviceos-architecture/data/02-authorization-audit-logical-model.md` |
-| Admin Web 切片 | `serviceos-architecture/product/00-serviceos-product-delivery-decision-baseline.md`、`serviceos-architecture/product/admin/README.md`、`serviceos-architecture/product/admin/12-classic-professional-visual-baseline.md`、index Grep `Admin` 取最近一次里程碑实现文档、`serviceos-architecture/docs/admin-pilot-readiness-baseline.md`、`serviceos-admin-web/src` 相邻页面代码 | `serviceos-architecture/product/02-admin-operations-portal-spec.md`、`serviceos-architecture/product/admin/05-page-patterns.md`、`serviceos-architecture/product/admin/06-master-pages.md`、`serviceos-architecture/product/07-page-action-permission-matrix.md` |
-| Admin 服务覆盖/高德行政区切片 | `serviceos-architecture/product/admin/13-service-coverage-amap-visual-baseline.md`、`serviceos-architecture/assets/product/admin/service-coverage/README.md`、四张批准视觉图、`serviceos-architecture/architecture/11-service-network-dispatch.md`、目标页面相邻代码 | `serviceos-architecture/data/04-automation-integration-logical-model.md`、`serviceos-architecture/api/04-automation-integration-http-api.md`、车企入站契约；PR 必须提交参考图与真实页面并排证据 |
-| Network Web 切片 | `serviceos-architecture/product/00-serviceos-product-delivery-decision-baseline.md`、`serviceos-architecture/product/03-network-portal-spec.md`、`serviceos-architecture/product/network/README.md`、`serviceos-architecture/product/network/01-classic-professional-collaboration-baseline.md`、`serviceos-architecture/product/network/02-master-pages-and-acceptance.md`、index Grep `Network` 取最近一次里程碑实现文档、`serviceos-network-web/src` 相邻页面代码 | `serviceos-architecture/product/01-cross-portal-information-architecture.md`、`serviceos-architecture/product/05-cross-portal-interaction-state-spec.md`、`serviceos-architecture/product/07-page-action-permission-matrix.md` |
-| Technician H5/iOS 切片 | `serviceos-architecture/product/00-serviceos-product-delivery-decision-baseline.md`、`serviceos-architecture/product/04-technician-mobile-app-spec.md`、`serviceos-architecture/product/technician/README.md`、`serviceos-architecture/product/technician/01-classic-professional-mobile-baseline.md`、`serviceos-architecture/product/technician/02-master-pages-and-acceptance.md`、index Grep `Technician` 取最近一次里程碑实现文档、目标客户端相邻代码 | `serviceos-architecture/product/01-cross-portal-information-architecture.md`、`serviceos-architecture/product/05-cross-portal-interaction-state-spec.md`、`serviceos-architecture/product/07-page-action-permission-matrix.md` |
-| BYD/集成切片 | `serviceos-architecture/architecture/69-m56-inbound-envelope-canonical-message-runtime.md`（入站基线）、`serviceos-architecture/architecture/71-m58-byd-review-submission-outbound-delivery.md`（外发基线）、`serviceos-architecture/architecture/13-integration-reliability.md`、`serviceos-contracts/src/main/resources/openapi/byd-cpim-v731.yaml` | ADR-010/014、index Grep `BYD\|OutboundDelivery` 取最近切片 |
-| Evidence/审核整改切片 | `serviceos-architecture/architecture/66-m53-form-condition-evidence-reresolution-proposal.md`、`serviceos-architecture/architecture/68-m55-client-review-case-origin-runtime.md`、`serviceos-architecture/architecture/10-evidence-review-correction.md` | ADR-008/018/022 |
-| SLA 切片 | `serviceos-architecture/architecture/74-m61-task-elapsed-sla-clock.md`、`serviceos-architecture/architecture/75-m62-sla-authorized-query-projection.md`、`serviceos-architecture/architecture/12-sla-clock-escalation.md` | index Grep `SLA` 取最近切片 |
-| 契约变更（OpenAPI/事件 Schema） | `serviceos-contracts/README.md`、目标 yaml/schema、根 `AGENTS.md` §7 | `serviceos-architecture/architecture/26-contract-ci-client-generation-implementation.md`（M12 门禁原理） |
-| Flyway/数据迁移 | `serviceos-architecture/architecture/36-persistence-engineering-guideline.md`、对应模块 `serviceos-backend/src/main/resources/db/migration/<module>/` 最新若干文件 | 相邻迁移的 PostgreSQL IT |
-| 纯文档/状态维护 | 当前文件及直接引用、`serviceos-architecture/docs/implementation-status.md` §7 维护规则、`serviceos-architecture/docs/milestone-playbook.md` §文档同步 | 根 `AGENTS.md` §11 |
+| 产品、页面、交互 | `product-design/README.md`、对应页面边界/旅程/DEC | `serviceos-frontend/apps/<portal>` 或 `serviceos-technician-ios` |
+| 前端共享能力 | 产品设计基线、共享边界决策 | `serviceos-frontend/packages`、当前消费者 |
+| 身份、组织、授权 | `architecture/07-identity-authorization-audit.md`、相关 Accepted ADR | `identity`/`organization`/`authorization` 模块及安全测试 |
+| 项目、工单、任务 | `architecture/03-domain-model.md`、`06-work-order-task-execution-kernel.md` | 对应模块、Core OpenAPI、直接测试 |
+| 配置、履约方案、工作流 | `architecture/05-*`、`06-*`、`AD-014-*`、相关产品 DEC | `configuration`/`workflow`、Schema、迁移和测试 |
+| 网点、师傅、派单 | `architecture/11-service-network-dispatch.md`、DEC-005/006 | `network`/`dispatch`/`task`、并发与授权测试 |
+| 预约、现场、表单、资料 | `architecture/08-*`、`09-*`、`10-*` | 对应模块、Core OpenAPI、PostgreSQL IT |
+| SLA、异常、通知 | `architecture/12-*`、`14-*` | `sla`/`operations`、事件 Schema 和恢复测试 |
+| OEM 集成 | `architecture/13-integration-reliability.md`、`integration/`、相关 ADR | `integration`、BYD/Core OpenAPI、幂等/验签/重放测试 |
+| Inbox/Outbox/Worker | `architecture/20-transaction-messaging-concurrency-blueprint.md`、ADR-014 | `reliability`、真实 PostgreSQL 并发测试 |
+| 数据库、MyBatis、Flyway | `architecture/36-persistence-engineering-guideline.md` | Repository 端口、Mapper/XML、迁移和 PostgreSQL IT |
+| API 或事件契约 | 相关领域架构和 ADR | `serviceos-contracts` 机器契约及契约测试 |
+| 部署、可观测性、安全 | `architecture/21-*`、`18-*`、`docs/local-test-performance.md` | `serviceos-deploy`、构建脚本和适用门禁 |
+| 当前状态/证据核对 | `docs/implementation-status.md`、`docs/implementation-traceability-matrix.md` | 代码、契约、Flyway、自动化测试 |
 
-## 明确不做
+## 判断规则
 
-- 任何任务都不得因为「找上下文」而 `cat` 或全量 Read 整个 `architecture/`、`testing/`、`docs/` 目录；
-- 身份治理序列已重编号为 M183～M188；不得再使用与 Admin Pilot 历史冲突的旧 M135～M140 编号（见 `implementation-status.md` §2.1）；
-- 「候选下一方向」清单（status §5）中的条目在明确批准前不得当作任务直接实现；
-- 不得以当前前端页面、路由存在、效果图相似或自动测试通过作为产品需求和产品完成的唯一依据。
+- 用户最新明确决定 > Accepted ADR/产品 DEC > Accepted 长期架构 > 机器契约/Flyway > 自动化测试 > 当前代码 > README/注释；
+- 状态文档只做导航，不覆盖更高优先级事实；
+- Draft/Proposed 只提供上下文，不构成实现承诺；
+- Git 历史只用于追责和恢复，不用于决定当前行为；
+- 实现存在不等于产品已验收，自动化通过也不等于真实环境完成。
+
+## 禁止重新引入
+
+- 逐 PR、逐切片、逐页面的永久 handoff 或总结文档；
+- 可从 Git、契约、迁移或测试直接得到的重复清单；
+- 递增编号驱动的事实源、索引生成器和完成状态；
+- `old`、`legacy`、`archive`、`temporary` 文档目录；
+- 已删除应用路径、演示入口或历史截图作为当前产品证据。

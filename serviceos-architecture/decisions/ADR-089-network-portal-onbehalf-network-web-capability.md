@@ -25,7 +25,7 @@ related_adrs:
    **失败关闭**，返回 `CLIENT_CAPABILITY_UNSUPPORTED`（HTTP 422）；
 3. 对源业务 Task 已解析 EVIDENCE 槽位调用 `ClientCapabilityRuntimeGate`，校验
    `NETWORK_WEB` 静态能力目录是否覆盖所需 mediaType / `requiredWhen` 等能力码；
-4. 资产级 `supportedClientKinds` **定向发布目标**仅约束师傅执行与派单过滤（M358/M366/M367）；
+4. 资产级 `supportedClientKinds` **定向发布目标**仅约束师傅执行与派单过滤；
    on-behalf **不要求** `NETWORK_WEB ∈ supportedClientKinds`。网点代补权威来自
    ACTIVE NetworkMembership + NETWORK scope `evidence.submitOnBehalf` + ACTIVE NETWORK 责任
    （ADR-039），不得用师傅定向目标旁路或阻断合法代补；
@@ -34,14 +34,14 @@ related_adrs:
 
 ## 2. 上下文
 
-M356～M363 已对师傅端建立 ClientCapability 门禁，但 RuntimeGate 故意不对
+师傅端已建立 ClientCapability 门禁，但 RuntimeGate 故意不对
 `NETWORK_WEB` 强制，导致 Network Portal on-behalf 可在配置能力不兼容时仍写入。
 ADR-088 将 on-behalf / `NETWORK_WEB` 代师傅语义列为另案。本 ADR 闭合该选型，不改变
 ADR-039 的授权、责任与 CaptureMetadata 语义。
 
 ## 3. 后果
 
-- M368 实现本 ADR：Controller 透传 ClientKind；Portal 适配器硬校验 `NETWORK_WEB` +
+- 当前实现：Controller 透传 ClientKind；Portal 适配器硬校验 `NETWORK_WEB` +
   槽位能力门禁；OpenAPI 登记 422；无新 Flyway；
 - 不接受：用师傅声明 clientKind 作代补门禁、要求配置资产声明 `NETWORK_WEB` 定向目标、
   表单代改、Visit、iOS 条件执行器变更。

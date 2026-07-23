@@ -15,7 +15,7 @@ related_adrs:
 
 ## 1. 状态与已接受决策
 
-本 ADR 作为 M185 的 Modulith 依赖评审结论，正式接受：
+本 ADR 作为网点与师傅目录的 Modulith 依赖评审结论，正式接受：
 
 1. 合作组织、ServiceNetwork、NetworkMembership、TechnicianProfile、
    NetworkTechnicianMembership 与 TechnicianQualification 由独立模块 `network` 拥有，表前缀 `net_`；
@@ -28,7 +28,7 @@ related_adrs:
 ## 2. 上下文
 
 交付计划要求网点人员与师傅身份落在服务网络边界，不得由 identity 或 authorization 直接拥有。
-工程蓝图已预留 `network` 模块；M183 已提供稳定 Principal；M184 已划清内部组织与合作组织边界。
+工程蓝图已预留 `network` 模块；稳定 Principal 已存在，内部组织与合作组织边界已经划清。
 
 ## 3. 决策细节
 
@@ -37,7 +37,7 @@ related_adrs:
 - 登录身份与 IdentityLink（identity）
 - 内部 OrgUnit/closure（organization）
 - 派单评分、ServiceAssignment 权威（dispatch）
-- 完整离线工作包运行时（Technician App / 后续里程碑）
+- 完整离线工作包运行时（Technician App 后续任务）
 
 ### 3.2 可接单判定
 
@@ -46,7 +46,7 @@ related_adrs:
 1. Principal 状态 ACTIVE；
 2. TechnicianProfile 状态 ACTIVE；
 3. 指定网点的 NetworkTechnicianMembership 有效且 ACTIVE；
-4. 所需资质均 APPROVED 且未过期（M185 默认要求至少一条有效资质；无资质策略显式失败关闭）。
+4. 所需资质均 APPROVED 且未过期（默认要求至少一条有效资质；无资质策略显式失败关闭）。
 
 ### 3.3 邀请与绑定
 
@@ -57,4 +57,4 @@ related_adrs:
 
 - ArchitectureTest 纳入 `network`；
 - dispatch 后续候选过滤应消费 `network.api` 的可接单查询，不得复制资质规则；
-- M186/M187 可引用 networkId，但网点目录权威仍属 `network`。
+- 授权治理与客户端可引用 networkId，但网点目录权威仍属 `network`。

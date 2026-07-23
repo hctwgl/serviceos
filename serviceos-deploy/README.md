@@ -11,9 +11,8 @@ docker compose -f serviceos-deploy/compose.yaml up -d
 本地 Portal 使用 `serviceos-local-cli` 客户端走 Authorization Code + PKCE（S256）。
 回调与 CORS 覆盖管理端 / 网点端 / 师傅端的 `localhost` 与 `127.0.0.1`（5173–5175）。
 开发用户为 `developer`，首次联调密码为 `local-dev-change-me`。
-三门户本地联调账号与网点夹具见 `serviceos-deploy/demo/README.md`。
 
-后端首次启动并完成 Flyway 后，为该本地用户建立 Admin 试点读取与 Project/File 命令所需的
+后端首次启动并完成 Flyway 后，为该本地用户建立产品开发读取与 Project/File 命令所需的
 ServiceOS RoleGrant：
 
 ```bash

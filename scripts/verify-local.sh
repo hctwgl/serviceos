@@ -35,10 +35,10 @@ case "${output_mode}" in
     ;;
 esac
 
-# 只有里程碑/全量 verify 才先执行机械预检；精准 test 保持快速反馈，不重复扩大验证范围。
+# 只有全量 verify 才先执行机械预检；精准 test 保持快速反馈，不重复扩大验证范围。
 if [[ " $* " == *" verify "* ]]; then
   bash scripts/test-verification-preflight.sh
-  bash scripts/verify-milestone-preflight.sh
+  bash scripts/verify-repository-preflight.sh
 fi
 
 postgres_image="${SERVICEOS_TEST_POSTGRES_IMAGE:-postgres:18-alpine}"

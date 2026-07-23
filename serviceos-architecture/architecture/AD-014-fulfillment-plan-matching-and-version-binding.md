@@ -213,4 +213,4 @@ WorkOrder
 
 ## 12. 现状与实现差距
 
-当前 `ProjectFulfillmentProfile` 按 `serviceProductCode` 键、`ProjectFulfillmentResolver` 按维度失败关闭解析、工单冻结 `fulfillment_profile_id`/`fulfillment_revision_id`/`fulfillment_version`。相对本设计尚缺：`matchPriority` 与结构化 `matchRuleSnapshot`、具体度排序、`HISTORICAL` 状态、待确认队列、AUTO/MANUAL/EXCEPTION/REMATCH 模式、`RematchFulfillmentPlan`/`AdjustFulfillmentPlan` 命令、方案级 code/name 与项目内多方案。以上为接受的目标，按独立里程碑实施；本文件不构成已实现声明。
+当前 `ProjectFulfillmentProfile` 按 `serviceProductCode` 键、`ProjectFulfillmentResolver` 按维度失败关闭解析、工单冻结 `fulfillment_profile_id`/`fulfillment_revision_id`/`fulfillment_version`。相对本设计尚缺：`matchPriority` 与结构化 `matchRuleSnapshot`、具体度排序、`HISTORICAL` 状态、待确认队列、AUTO/MANUAL/EXCEPTION/REMATCH 模式、`RematchFulfillmentPlan`/`AdjustFulfillmentPlan` 命令、方案级 code/name 与项目内多方案。以上为接受的目标，应按完整用例实施；本文件不构成已实现声明。

@@ -1,544 +1,61 @@
 ---
-title: 研发模块与架构证据追踪矩阵
-version: 0.1.0
-status: Proposed
+title: ServiceOS 当前工程追踪矩阵
+version: 1.0.0
+status: Accepted
+lastUpdated: 2026-07-23
 ---
 
-# 研发模块与架构证据追踪矩阵
+# ServiceOS 当前工程追踪矩阵
 
-## 1. 用途
+本矩阵用于快速定位当前实现证据，不复述历史切片。业务语义看长期架构与 Accepted ADR；对外行为看机器契约；数据库事实看 Flyway；实际行为看源码和直接测试。
 
-本矩阵帮助研发 Issue、代码模块、数据库迁移和测试定位权威设计来源。它是索引，不复制源文档语义；发生冲突时，以产品宪法、Accepted ADR 和对应领域文档为准。
+## 1. 后端
 
-## 2. 模块追踪
-
-| 实现模块 | 领域/架构输入 | API/事件输入 | 数据输入 | 验收输入 | 首次阶段 |
-|---|---|---|---|---|---|
-| identity | ARCH-07、ARCH-21 | API-01/02 通用身份上下文 | DATA-02 | M2 AUTH、M6 SEC | E1 |
-| organization | ARCH-01、ARCH-07、ARCH-11 | API-02/04 | DATA-02/04 | M2 AUTH、M4 DSP | E1/E4 |
-| project/workorder query | ARCH-01/03/05、M64～M68 | API-02/07、OpenAPI Core 0.39.0、project.created@v3、project.scope-relations-revised@v1 | DATA-01、V064～V068 | M2 CFG/WO、M7 ADM、M64～M68 | E0/E2 |
-| authorization | ARCH-07、ARCH-21、M63～M67、ADR-025/026、M186、M188、M196～M242 | API-01/02/07、Core OpenAPI 1.0.8、ProjectScopeAuthorizationService、治理 HTTP、`/me*` | DATA-02、V064～V067、V089～V090、V096～V100 | M2 AUTH、M6 SEC、M63～M67、M186、M188、M196～M242 | E1/E4 |
-| audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
-| authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
-| configuration | ARCH-05、AD-014、DEC-007（Accepted 目标）、ADR-091 | API-01/02/07 | DATA-01 | M2 CFG、M378〜M383、履约方案匹配验收（目标） | E2 |
-| files | ARCH-10、ARCH-21、ARCH-25 | API-03 资料引用、API-08 文件控制面 | DATA-03、V010 物理迁移 | M3 FILE、M6 SEC、M11 | E1/E3 |
-| reliability | ARCH-20、ADR-014 | API-01 通用命令/事件 | DATA-01 | M6 TX | E1 |
-| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032/033/040/041/043/044/045/046/047/048/049/050/051/052/053/054/055/056/057/058/059/060/061/062/063/064/065/066/067/068/069/070/071/072/073/074/075/076/077/078/079/080、M189～M195、M202～M203、M205～M242 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读/整改/异常/资质/师傅关系/工作台 enrichment/产能页/整改详情/异常详情/资质详情/关系详情/限定工作区/协作深链/预约联系 fan-in/师傅 fan-in/目录 fan-in/队列字段展示/工作区 SLA 摘要/Visit 与表单提交摘要/Evidence 槽位与资料项摘要/工作台 SLA 风险计数/工作区整改摘要/工作区运营异常摘要/工作区预约联系服务端摘要/工作区师傅服务端摘要/工作区审核案例服务端摘要/目录页师傅服务端摘要/目录页预约服务端摘要/目录页联系尝试服务端摘要/目录页资料整改服务端摘要/目录页 SLA 风险服务端摘要/目录页资料 Evidence 服务端摘要/目录页工单头字段/工作台统计时间展示/预约联系历史字段展示/工作区 Visit 表单 Evidence 字段展示/工作区协作摘要字段展示/预约联系历史残余字段展示/整改详情残余字段展示 + §11 Technician Feed/字段展示/ME 页壳）、Core OpenAPI 1.0.16 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M195、M202～M203、M205～M242 | U0/U1 |
-| automation | ARCH-06、ARCH-20 | API-01 事件 | DATA-01 | M2 TASK、M6 TX | E1 |
-| operations | ARCH-14、ARCH-20、M60、ADR-041、M203 | API-04 exception、API-06 §10 Network Portal operational-exceptions、outbound-delivery-recovered@v1、operational-exception-resolved@v2、Core OpenAPI 0.95.0 | DATA-04、V060、V084 | M4 OPS、M6 TX、M60、M203 | E1/E4 |
-| workorder | ARCH-03/06 | API-01/02 | DATA-01 | M2 WO | E2 |
-| task | ARCH-06、M61 | API-01/02、task.created/completed@v1/v2 | DATA-01、V061 | M2 TASK、M61 | E1/E2 |
-| workflow | ARCH-06/20、ADR-006 | API-01 领域事件 | DATA-01 process link | M2 WF、M6 TX-011 | E2 |
-| appointment | ARCH-08、ADR-035/036/037、M197～M199 | API-03、Core OpenAPI 0.92.0 Network Portal appointments + contact/no-show | DATA-03、V030、V097 | M3 APT、M197～M199 | E3 |
-| fieldwork | ARCH-08 | API-03 | DATA-03 | M3 VISIT/FIELD | E3 |
-| forms | ARCH-09、ADR-018/022 | API-03、form.submitted@v1 | DATA-03、V053 | M3 FORM、M53 FRM | E3 |
-| evidence | ARCH-10、ADR-008/018/022/039/040、M201～M202 | API-03、Core OpenAPI 0.94.0 Network Portal evidence on-behalf / correction queue、evidence.slots-reresolved@v1 | DATA-03、V053、V099 | M3 EVD/FILE、M53、M201、M202 | E3 |
-| review | ARCH-10 | API-03、OpenAPI 0.30.0、client-review-case-created@v1 | DATA-03、V049/V054/V056 | M3 REV/COR、M55/M57 | E3 |
-| network | ARCH-11、ADR-024/042/043/044、M185、M204～M206 | API-04、Core OpenAPI 1.0.0 Network Portal manage-technician + qualification/membership list | DATA-04、V088、V100 | M4 NET、M185、M204～M206 | E4 |
-| dispatch | ARCH-11、ADR-009、ADR-034/038、M144、M196、M200、M453 | API-04、Core OpenAPI 2.0.0 责任网点候选与两阶段责任链 | DATA-04、V024、V096、V098（M453 无迁移） | M4 DSP/ASN、M144、M196、M200、M453 | E4 |
-| sla | ARCH-12、M61～M66 | sla.started/breached/met@v1；API-04、OpenAPI Core 0.38.0 | DATA-04、V061～V066 | M4 SLA、M61～M66 | E4 |
-| integration | ARCH-13、ADR-010/014、M57～M60 | API-04、OpenAPI Core 0.32.0、BYD CPIM 0.3.0、outbound-delivery-created/acknowledged/replay-requested/recovered@v1、route/callback 事件 | DATA-04、V055～V060 | M4 INT/DLV、M56～M60 | E2/E4 |
-| notification | ARCH-14 | API-04 | DATA-04 | M4 NTF | E4 |
-| facts | ARCH-04/15 | API-05 | DATA-05 | M5 FACT | E5 |
-| pricing | ARCH-04/15、ADR-011 | API-05 | DATA-05 | M5 CALC | E5 |
-| settlement | ARCH-16、ADR-004/011 | API-05（feature-gated） | DATA-05 | FORMAL_SETTLEMENT | 二期 |
-| migration | ARCH-17、ADR-012 | API-05 | DATA-05 | M5 MIG | E5 |
-| rollout | ARCH-17/18、ADR-012 | API-05 | DATA-05 | M5 CUT、M6 OPS | E5/E6 |
-
-## 3. 不变量追踪
-
-| 不变量 | 运行时执行点 | 数据约束 | 自动化证据 |
+| 能力 | 实现入口 | 长期设计 | 直接证据 |
 |---|---|---|---|
-| 发布配置不可变 | Configuration publish/use case | version+digest、禁止 UPDATE published content | M2 CFG |
-| 工单锁定配置包 | CreateWorkOrder | configuration_bundle_id/version 非空 | M2 WO |
-| Task 是执行责任源 | Task command/assignment | active assignment 排他、aggregateVersion | M2 TASK、M4 ASN |
-| 流程不改业务表 | Workflow adapter | 仅 process link/correlation inbox | M2 WF、M6 TX-011 |
-| 资料版本不可覆盖 | Evidence finalize/submit | revision append-only、snapshot member 固定 | M3 EVD |
-| 审核决定不可覆盖 | Review command | decision version append-only | M3 REV/COR |
-| 改派责任原子切换 | Assignment saga | ACTIVE 排他、capacity reservation、task guard | M4 ASN |
-| 业务重试唯一调度 | Task executor | Task.nextRunAt 是调度事实，Attempt 记录本次选定值；Delivery 不拥有重试钟 | M4 DLV/NTF、M6 TX |
-| 对上/对下隔离 | Pricing context resolver | direction-specific run/items | M5 CALC |
-| 缺失不等于零 | Fact/Pricing validation | typed fact state | M5 FACT/CALC |
-| 事实更正不穿透结算 | CorrectFact/eligibility/collect | FactEligibilityGuard + run hold | M5 FACT-004A/B |
-| SHADOW 永不可结算 | Pricing/Settlement gate | mode + pricingAuthorityVersion + feature | M5 CALC-006/010、SET-009 |
-| 一张工单单一写权威 | 所有领域命令 | AuthorityAssignment ACTIVE/version | M5 CUT-002/004、M6 TX-010 |
-| 副作用最终门禁 | Delivery/Notification/Assignment/Settlement | fence decision + authorityVersion | M5 CUT-011/012 |
-| 同一费用不重复结算 | Settlement collect/line | lineBusinessKey 排他、source XOR | FORMAL_SETTLEMENT SET |
-| 数据迁移可追溯 | Migration batch/import API | SourceSnapshot/Lineage/IdMapping | M5 MIG |
-| 消息至少一次但结果一次 | Outbox/Inbox/consumer | eventId/digest unique | M6 TX-004/005/006 |
-| 跨租户不可见 | Query/Command authorization | tenant + ScopePredicate | M2 AUTH、M6 SEC |
+| 身份与组织 | `serviceos-backend/src/main/java/com/serviceos/identity`、`organization` | `architecture/07-identity-authorization-audit.md`、产品决策 | 同名测试目录、OpenAPI、Flyway |
+| 授权与审计 | `authorization`、`audit` | `architecture/07-*`、`21-security-*` | MVC 安全测试、拒绝审计测试、`ArchitectureTest` |
+| 项目与工单 | `project`、`workorder` | `architecture/01-*`、`03-*`、`06-*` | 同名测试目录、Core OpenAPI、`prj_`/`wo_` 迁移 |
+| 配置与工作流 | `configuration`、`workflow` | `architecture/05-*`、`06-*`、`AD-014-*` | 配置/工作流测试、Schema、`cfg_`/`wfl_` 迁移 |
+| 任务与派单 | `task`、`dispatch`、`network` | `architecture/06-*`、`11-*`、`20-*` | 并发/恢复 PostgreSQL IT、Core OpenAPI、相关迁移 |
+| 预约与现场 | `appointment`、`fieldwork` | `architecture/08-*` | 状态机测试、PostgreSQL IT、Core OpenAPI |
+| 表单与资料 | `forms`、`evidence`、`files` | `architecture/09-*`、`10-*` | 版本/完成门禁/文件授权测试、Schema、相关迁移 |
+| SLA 与异常 | `sla`、`operations` | `architecture/12-*`、`14-*` | 时钟/对账/异常恢复测试、Core OpenAPI |
+| 外部集成 | `integration` | `architecture/13-*`、`integration/`、Accepted ADR | BYD OpenAPI、事件 Schema、验签/幂等/重放测试 |
+| 可靠消息 | `reliability` | `architecture/20-*`、ADR-014 | Inbox/Outbox/claim/lease/retry PostgreSQL IT |
+| 只读投影 | `readmodel` | 模块公开 API 与相关领域架构 | 投影消费/授权查询/重建测试、`rdm_` 迁移 |
 
-## 4. Issue 模板中的必需引用
+公共模块地图和测试布局见 `serviceos-backend/AGENTS.md`。禁止通过本矩阵推断未列出的跨模块依赖。
 
-```markdown
-Architecture: ARCH-xx §n
-Decision: ADR-xxx
-API/Event: API-xx / Command / Event
-Data owner: module + entity
-Business sample: M1-xx / SAMPLE-xxx
-Acceptance: scenario IDs
-Security classification: INTERNAL/CONFIDENTIAL/RESTRICTED
-Feature gate/authority: if applicable
-```
+## 2. 契约与数据
 
-缺少引用时，Issue 只能作为 discovery/spike，不能直接成为生产业务实现任务。
+| 事实 | 权威位置 | 验证入口 |
+|---|---|---|
+| Core HTTP API | `serviceos-contracts/src/main/resources/openapi/serviceos-core-v1.yaml` | `bash scripts/agent-verify.sh contracts` |
+| BYD CPIM API | `serviceos-contracts/src/main/resources/openapi/byd-cpim-v731.yaml` | 契约测试与集成模块测试 |
+| 领域事件 | `serviceos-contracts/src/main/resources/events/` | Schema 不可变与兼容测试 |
+| 数据库结构 | `serviceos-backend/src/main/resources/db/migration/` | `bash scripts/migration-baseline.sh`、PostgreSQL IT |
+| TypeScript/Swift 客户端 | `serviceos-contracts` 生成脚本与消费者 | `client-ts`、`client-swift`、`client-foundation` |
 
-## 5. 发布 Coverage Report
+Markdown API/data 文档用于解释语义，不能覆盖机器契约或迁移。
 
-每次发布按以下维度输出“已验证/未验证/不适用”：
+## 3. 客户端与产品
 
-- 业务产品与流程版本；
-- 项目、品牌、区域和 cohort；
-- Admin/Network/Technician Portal；
-- 正常、异常、恢复和权限场景 ID；
-- 外部连接器和 sandbox/production 模式；
-- 配置包、数据迁移和价格模式；
-- SLO/备份/回退证据；
-- 已知风险与债务。
-
-存在通用代码或某个样例通过，不得推断所有服务类型、项目或异常已经闭环。
-
-## 6. 当前参考实现证据
-
-| 里程碑 | 代码/迁移 | 自动化测试 | 仍未证明 |
+| 范围 | 实现入口 | 产品事实 | 验证 |
 |---|---|---|---|
-| M8 | Project、Audit、Idempotency、Outbox 事务切片 | Modulith、Domain、Contract、PostgreSQL IT | 完整 E1/履约链路 |
-| M9 | OIDC principal、tenant/capability 授权、Inbox、Outbox worker/attempt | Identity/Auth/Web MVC/Worker Unit + PostgreSQL IT | RoleGrant/ScopePredicate/FieldPolicy、正式 IdP/Broker、Outbox DEAD 异常 Task |
-| M10 | 自动 Task、ExecutionAttempt、claim/lease、重试时钟、OperationalException、HUMAN handling Task | Task worker Unit + PostgreSQL IT + Event Schema | automation 模块提取、正式 Broker 路由、通用 Task 动作/负责人、authority fence、运行指标 |
-| M11 | UploadSession、私有短期传输、Finalize 校验、StoredFile 隔离、扫描 Task、授权下载 | File Unit/Web/Contract + PostgreSQL IT + Event Schema | 正式对象存储/反病毒、multipart/清理、EvidenceSlot 关系、OCR/质量/保留销毁、真实环境 SLO |
-| M12 | Git 基线 OpenAPI diff、事件版本不可变门禁、固定 TypeScript 客户端生成与来源清单 | Parser/Schema/Generator JUnit + Shell 正负向门禁 + 生成树重现性 + 根仓库 22 个 PostgreSQL IT | Portal 消费/编译、npm 发布签名/SBOM、多语言 SDK、远端 workflow 绿色结果 |
-| M13 | correlation 上下文、W3C Outbox Trace、探针、Prometheus 指标、ECS JSON 脱敏、本地可观测性栈 | Unit/Web + PostgreSQL IT + in-memory Span + Shell 泄露门禁 + Compose/组件 smoke | 生产 HA/告警/容量、集中日志、跨服务完整 Trace、远端 workflow 绿色结果 |
-| M14 | 单一非 root OCI 镜像、独立 Flyway 迁移、runtime 最小数据库权限、失败关闭发布、应用回滚/恢复 | Docker build/inspect + PostgreSQL 18 空库迁移 + HTTP/security smoke + rollback/negative rehearsal | 正式 registry/SBOM/签名、真实 orchestrator 滚动、PITR/对象恢复、容量、生产审批、远端 workflow 绿色结果 |
-| M15 | tenant/project/region/network RoleGrant 解析、scope 解释、FieldPolicy 缺省隐藏与显式拒绝优先 | Authorization Unit + PostgreSQL IT | organization/relation scope、读模型/导出/文件全入口接线、配置发布 UI |
-| M16 | Published Asset/Bundle 最小发布解析、tenant/project/bundle 工单锁定、BYD CPIM 入站创建工单 | Modulith + Configuration/WorkOrder/BYD HTTP PostgreSQL IT + V014 fail-closed migration | Stage/Task/Workflow、Audit/Outbox、完整配置审批、真实 CPIM sandbox 与全勘安链路 |
-| M17 | WorkOrderReceived Outbox、Inbox 幂等、精确 Workflow 启动、首 Stage/Task 与 WorkOrder 激活 | Modulith + Parser/Dispatcher Unit + Event Schema + WorkflowBootstrap PostgreSQL IT + V015～V017 | 后续节点推进、网关/并行/等待、负责人/SLA 绑定、正式 Broker、完整勘安链路 |
-| M18 | TaskCompleted 领域事件、冻结定义解析、NodeInstance 与同阶段唯一无条件下一任务推进 | Parser/Dispatcher Unit + Event Schema + WorkflowLinearProgression PostgreSQL IT + V018 | 跨阶段/END、网关/并行/等待、人工任务动作、负责人/SLA、正式 Broker、完整勘安链路 |
-| M19 | 唯一无条件跨阶段、END、Stage/Workflow 完结与 WorkOrder FULFILLED | Parser/Dispatcher Unit + Event Schema + WorkflowLinearProgression PostgreSQL IT + V019 | 网关/并行/等待、人工任务动作、负责人/SLA、取消/重开、正式 Broker、完整勘安链路 |
-| M20 | 人工工作流 Task claim/start/complete、HTTP、授权审计、幂等冻结响应 | MVC Security + Event/OpenAPI Contract + HumanTask/Workflow PostgreSQL IT + V020 | Assignment/候选人、release/block/cancel、SLA、离线同步、动态表单完成条件、完整勘安链路 |
-| M21 | USER 候选快照、唯一 ACTIVE RESPONSIBLE、claim 门禁与 release/reclaim | MVC Security + Event/OpenAPI Contract + TaskAssignment/HumanTask/Workflow PostgreSQL IT + V021 | 策略解析、ServiceAssignment/容量/改派 saga、Task guard、SLA、离线撤权、完整勘安链路 |
-| M22 | REASSIGNMENT TaskExecutionGuard、精确解除、人工命令与候选替换失败关闭 | Event Schema + TaskExecutionGuard/TaskAssignment/HumanTask PostgreSQL IT + V022 | PREPARED TaskAssignment、ServiceAssignment/容量/改派 saga、超时补偿、SLA、离线撤权、完整勘安链路 |
-| M23 | guard + PREPARED 责任原子准备、激活切换、切换前 abort | Event Schema + TaskReassignment/HumanTask PostgreSQL IT + V023 | Dispatch/ServiceAssignment/容量、跨模块 Inbox saga、切换后补偿、SLA、完整勘安链路 |
-| M24 | ServiceAssignment、容量预留、切换前 abort 与本地激活 saga | Event Schema + DispatchServiceAssignment PostgreSQL IT + V024 | 跨模块 Inbox saga、派单策略、切换后补偿、SLA、完整勘安链路 |
-| M25 | Dispatch/Task 四段 Inbox 改派握手、实时授权复核、失败后向前重试 | Event Schema + DispatchTaskReassignmentSaga PostgreSQL IT + V025 | 初派握手、Network 双级派单、策略、自动 abort/补偿、SLA、完整勘安链路 |
-| M26 | TASK_PREPARED 持久检查点、切换前 ABORTING/ABORTED 可靠终止、过期 checkpoint 抑制 | Event Schema + DispatchTaskReassignmentSaga PostgreSQL IT + V026 | 超时自动决策、初派握手、Network 双级派单、策略、切换后补偿、SLA、完整勘安链路 |
-| M27 | 激活逐阶段 deadline、并发安全超时 occurrence、可靠异常事件、去重 OperationalException 与 HUMAN handling Task | Event Schema + DispatchTaskReassignmentSaga/TaskExecution PostgreSQL IT + V027 | 超时后的策略化 abort/继续/补偿、异常自动恢复关单、初派握手、Network 双级派单、候选策略、SLA、完整勘安链路 |
-| M28 | 激活完成事件驱动异常自动解决、Task 精确取消/撤权、恢复证据约束与解决事件 | Handler Unit + Event Schema + TaskExecution PostgreSQL IT + V028 | 超时后的策略化 abort/继续/补偿、初派握手、Network 双级派单、候选策略、SLA、完整勘安链路 |
-| M29 | 租户隔离运营异常列表/详情、动态筛选、稳定游标、OPEN 确认与来源自动解决兼容 | MVC Security + OpenAPI/Event Contract + OperationalExceptionWorkbench PostgreSQL IT + V029 | 领域专属处置动作、通用处理任务编排、通知升级、完整运营工作台前端 |
-| M30 | 预约提议/确认/改约、不可变修订链、责任快照、实时 scope 授权与 ETag 并发控制 | MVC Security + OpenAPI/Event Contract + Appointment PostgreSQL IT + V030 | 取消/爽约、上门签到、现场执行、离线同步、完整勘安链路 |
-| M31 | 联系尝试追加历史、首次联系 SLA 事实、预约取消/爽约终态、终态修订与可靠通知 | MVC Security + OpenAPI/Event Contract + Appointment PostgreSQL IT + V031 | 上门签到、Visit 现场执行、离线同步、下游取消/爽约任务策略 |
-| M32 | Visit 签到/签退/中断、围栏 WARN/BLOCK、captured/received 双时间、重复上门序号、改派后离线撤权 | MVC Security + OpenAPI/Event Contract + Visit PostgreSQL IT + V032 | FieldOperation 结构化结果、表单/资料完整性、离线工作包有效期与人工合并 |
-| M33-FOUNDATION | FORM 发布门禁、多表单 Bundle、Task `formRef`/Bundle 冻结及授权只读解析 | OpenAPI 0.9.0 + Configuration/Workflow/Task PostgreSQL IT + V033～V035 | SERVICEOS_EXPR_V1、草稿、预填冲突和 M3 FORM-001～005 |
-| M34 | 精确 FormVersion 不可变提交、固定 required/基础类型验证、责任/guard 门禁、幂等审计事件闭环 | OpenAPI 0.10.0 + FormSubmission PostgreSQL/MVC/Event Contract + V036 | ADR-018 表达式/validator、草稿、预填冲突、更正审核和完整 FORM-001～005 |
-| M35 | 表单 Task 完成仅接受同 Task/Project/冻结 FormVersion 的 VALIDATED submission 与 contentDigest | OpenAPI 0.11.0 + FormSubmission/HumanTask PostgreSQL IT + Modulith | EvidenceSet/审核完成条件、整改 supersede、领域映射和完整 FORM-001～005 |
-| M36 | EVIDENCE Schema 发布门禁、身份/数量语义校验、多模板 Bundle 锁定与漂移保护 | Configuration PostgreSQL IT + Schema Drift Test | ADR-008/018、EvidenceSlot/Revision/Snapshot、审核整改和 EVD-001～009 |
-| M37 | Task 冻结 Stage、固定 EvidenceSlot 可靠解析、权威空结果与授权只读投影 | OpenAPI 0.12.0 + Evidence PostgreSQL/MVC/Event Contract + V037～V038 | ADR-018 条件重解析、EvidenceSetSnapshot、完成门禁、审核整改和完整 EVD-001～009 |
-| M38 | Evidence 编排安全文件 Begin/Finalize、EvidenceItem/不可变 Revision、扫描状态投影与授权查询 | OpenAPI 0.13.0 + Evidence PostgreSQL/MVC/Event Contract + V039 | OCR/图像业务校验实现、代办上传、invalidate、Snapshot、审核整改、完成门禁和完整 EVD-001～009 |
-| M39 | 扫描后确定性机器校验、EvidenceValidation 事实、VALIDATED/VALIDATION_FAILED | OpenAPI 0.14.0 + Evidence PostgreSQL/Event Contract + V040 | OCR/图像 CV 实现、GPS 权威距离、invalidate、Snapshot、审核整改、完成门禁 |
-| M40 | 不可变 EvidenceSetSnapshot、TASK_SUBMISSION 成员资格与 EVD-008/009 | OpenAPI 0.15.0 + Evidence PostgreSQL/MVC/Event Contract + V041 | REVIEW/REPORT purpose、自动选版、invalidate、Review/Correction、完成门禁 |
-| M41 | 无 formRef 资料 Task 完成仅接受精确 EvidenceSetSnapshot 引用与 digest | OpenAPI 0.16.0 + Evidence/HumanTask PostgreSQL IT + Modulith | Review/Correction |
-| M42 | 授权 VALIDATED→INVALIDATED、槽位投影刷新、历史 Snapshot 不可改写 | OpenAPI 0.17.0 + Evidence PostgreSQL/MVC/Event Contract + V042 | files 文件作废联动、Review/Correction、双引用完成 |
-| M43 | formRef 且非空 EvidenceSlot 的 HUMAN Task 仅接受精确 FormSubmission + TASK_SUBMISSION Snapshot 双引用，并在同一完成事务冻结 inputVersionRefs | OpenAPI 0.18.0 + HumanTask/Evidence/Form PostgreSQL IT + V043 | files 文件作废联动、Review/Correction、条件槽位重解析 |
-| M44 | ReviewCase 绑定 TASK_SUBMISSION Snapshot；只追加 APPROVED/REJECTED 决定 | OpenAPI 0.19.0 + Evidence PostgreSQL/MVC/Event Contract + V044 | CorrectionCase、强制通过、重开、车企回执 |
-| M45 | REJECTED 同事务创建 CorrectionCase；补传轮次只追加；RESUBMITTED→CLOSED | OpenAPI 0.20.0 + Evidence PostgreSQL/MVC/Event Contract + V045 | 整改 Task、IN_PROGRESS/WAIVED、强制通过、重开、车企回执 |
-| M46 | Evidence invalidate 同事务联动 StoredFile AVAILABLE→INVALIDATED；禁止下载授权 | OpenAPI 0.21.0 + Files/Evidence PostgreSQL IT + V046 | 物理删除、Retention、对象存储厂商切换 |
-| M47 | CorrectionCase 打开时自动创建 evidence.correction HUMAN Task；IN_PROGRESS 投影 | OpenAPI 0.22.0 + Evidence PostgreSQL IT + V047 | 自动指派、WAIVED、强制通过、重开、条件槽位 |
-| M48 | OPEN 强制通过 FORCE_APPROVED；APPROVED/FORCE_APPROVED 重开新 OPEN 案例 | OpenAPI 0.23.0 + Evidence PostgreSQL/MVC/Event Contract + V048 | 车企回执、二级审批/MFA、条件槽位 |
-| M49 | 适配层记录 ExternalReviewReceipt；追加 EXTERNAL 决定；驳回开客服协调 Task | OpenAPI 0.24.0 + Evidence PostgreSQL/MVC/Event Contract + V049 | Connector 入站表、CLIENT Case 自动创建、affectedTargets 强校验 |
-| M50 | 整改 Task 自动写入源 Evidence Task RESPONSIBLE 为 SYSTEM CANDIDATE | V050 + CorrectionCase PostgreSQL IT | 多候选人策略、自动 claim、条件槽位 |
-| M51 | CorrectionCase 高风险豁免进入 WAIVED；取消整改 Task | OpenAPI 0.25.0 + Evidence PostgreSQL/MVC/Event Contract + V051 | 条件槽位、OCR/CV、多候选人策略、自动 claim |
-| M52 | SERVICEOS_EXPR_V1 条件 EvidenceSlot；true/false 决策与输入摘要不可变审计；复杂度失败关闭 | ADR-018 + Expression/Modulith Unit + Evidence PostgreSQL IT + V052 | 表单条件求值、字段变化重解析、决策表/公式/脚本、OCR/CV |
-| M53 | VALIDATED 表单事实驱动只追加 Evidence resolution generation；槽位世代/lineage；REVIEW_REQUIRED 与显式 KEEP/INVALIDATE | ADR-022 + OpenAPI 0.26.0 + Expression/Form/Evidence/MVC/Contract/PostgreSQL IT + V053 | 计算字段、决策表/脚本、草稿离线合并、OCR/CV、GPS 权威距离 |
-| M54 | ExternalReviewReceipt 目标以 slot/item/revision 三元组精确命中 ReviewCase 冻结 SnapshotMember；跨 Snapshot、错配和重复失败关闭 | ARCH-10 + OpenAPI 0.27.0 + ReviewCase PostgreSQL IT + MVC Security + Contract/Client Generation + ArchitectureTest；无新迁移 | 完整 Connector 入站、CLIENT Case 自动创建、外部批次权威登记、其他 targetType 与自动整改映射 |
-| M55 | INTERNAL/CLIENT ReviewCase 来源分离；已通过总部审核后显式登记 CLIENT Case；回执批次与 mapping 匹配冻结值 | ARCH-10 + OpenAPI 0.28.0 + `client-review-case-created@v1` + V054 + ReviewCase PostgreSQL/MVC/Contract/Client/ArchitectureTest | Connector 验签与通用入站、OutboundDelivery、交付成功事件自动创建、integration 域批次权威登记、其他 targetType |
-| M56 | BYD 创建工单验签后登记不可变 Envelope/Canonical；私有原文；transport/业务键幂等；崩溃恢复；授权摘要查询 | ARCH-13 + OpenAPI 0.29.0 + `integration.canonical-message-processed@v1` + V055 + BYD/Replay PostgreSQL IT + Object Storage/Query/Security/Contract/Client/ArchitectureTest | 其他 CPIM messageType、外部审核回调标准化、OutboundDelivery、网络 Connector、自动重试/重放、生产对象存储和 Portal |
-| M57 | BYD 厂端审核回调按显式订单路由拆分 Canonical/item；M49 外部决定；部分成功、transport/业务幂等与故障恢复 | ARCH-10/13 + OpenAPI Core 0.30.0/BYD 0.2.0 + route/callback 事件 Schema + V056/V057 + ReviewCase/Signature/Mapper/Security/Contract/Client/ArchitectureTest | OutboundDelivery、自动创建 CLIENT Case、其他 CPIM 消息、自动 Evidence target 映射、生产 Connector/对象存储和 Portal |
-| M58 | 已通过 INTERNAL Case 派生不可变 BYD 提审 Delivery；Attempt/Acknowledgement 分离；Task 唯一重试时钟；UNKNOWN 不重发并进入人工异常；成功自动创建 CLIENT Case/Route | ARCH-13 + ADR-010/014 的 M58 已批准子集 + OpenAPI Core 0.31.0/BYD 0.3.0 + outbound delivery 事件/外部 Schema + V058 + ReviewCase/Gateway/Security/PostgreSQL/Contract/Client/ArchitectureTest | UNKNOWN 人工处置命令、其他 CPIM 消息、通用 Connector、生产凭据/对象存储/sandbox、自动 Evidence target 映射和 Portal |
-| M59 | UNKNOWN Delivery 经 USER/HIGH capability、原因、审批引用和预期版本授权人工重发；复用冻结 payload/external key；ReplayRequest/Task/Audit/Outbox 原子登记；旧 UNKNOWN Attempt 保留 | ARCH-13 + ADR-010/014 的 M59 已批准子集 + OpenAPI Core 0.32.0 + replay-requested@v1 + V059 + ReviewCase/MVC/PostgreSQL/Contract/Client/ArchitectureTest | M59 当时未实现异常自动闭环（后由 M60 补齐）；人工标记已送达/放弃、远端查询、批量审批、其他 CPIM、通用 Connector、生产基础设施和 Portal仍未实现 |
-| M60 | M59 重发取得严格 ACK 后发布恢复事实；Operations 幂等关闭同 Delivery 历次 UNKNOWN Task 异常；恢复先到时以不可变 marker 抑制迟到失败 HUMAN Task | M28/M58/M59 + ADR-010/014 的 M60 已批准子集 + recovered@v1/resolved@v2 + V060 + ReviewCase/TaskExecution/Handler/Contract/PostgreSQL/ArchitectureTest | 人工标记已送达/放弃、远端查询、完整通知、批量审批、其他 CPIM、通用 Connector、生产基础设施和 Portal |
-| M61 | Workflow 显式 `slaRef` 精确命中同 Bundle SLA v1；Task 创建/完成驱动 ELAPSED 时钟；到期对账形成 BREACHED，按时/逾期完成形成 MET/MET_LATE 并保留超时历史 | ARCH-12 的 M61 确定性子集 + SLA config schema v1 + started/breached/met@v1 + V061 + Configuration/SLA PostgreSQL IT + Contract/Event Governance/ArchitectureTest | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、SLA HTTP/Portal、考核结算 |
-| M62 | `sla.read` + 实时 Project Scope 暴露项目 SLA 工作台、工单时间线和实例/segment/milestone 详情；服务端 asOf 计算动态秒数；游标绑定查询范围 | ARCH-12 + API-04 + OpenAPI Core 0.33.0 + V062 + SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、跨项目范围投影、Portal 前端、考核结算 |
-| M63 | 实时 TENANT/PROJECT RoleGrant 解析为授权项目集合；省略 projectId 的 SLA 队列以单条范围化 SQL 查询；授权集合摘要绑定游标；REGION/NETWORK 无映射时拒绝审计 | ARCH-07/12 + API-04 + OpenAPI Core 0.34.0 + V063 + Authorization/SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | REGION/NETWORK/组织关系投影、授权缓存/导出、BUSINESS 日历、暂停/预警/通知、Portal、考核结算 |
-| M64 | Project 创建原子写入有效期 REGION 关系；REGION RoleGrant 经公开解析端口形成精确项目集合并复用跨项目 SLA 队列；关系变化使游标失败关闭；NETWORK 继续拒绝 | ARCH-07/12 + API-07/API-04 + OpenAPI Core 0.35.0 + project.created@v2 + V064 + Project/Authorization/SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | NETWORK/组织关系、Region 层级后代、关系修订命令、授权缓存/导出、BUSINESS 日历、暂停/预警/通知、Portal、考核结算 |
-| M65 | Project 创建原子写入有效期 NETWORK 关系；NETWORK RoleGrant 经公开解析端口形成精确项目集合并复用跨项目 SLA 队列；关系变化使游标失败关闭 | ARCH-07/11/12 + API-07/API-04 + OpenAPI Core 0.36.0 + project.created@v3 + V065 + Project/Authorization/SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | ServiceNetwork 生命周期/覆盖/能力/停派、组织层级、关系修订、授权缓存/导出、派单策略、BUSINESS SLA、Portal、结算 |
-| M66 | Project REGION/NETWORK 当前关系以显式完整集合即时修订；结束/追加历史、Project 版本、不可变收据、审计、Outbox 与幂等同事务；授权映射即时变化且旧 SLA 游标失败关闭 | ARCH-07/11/12 + API-07/API-04 + OpenAPI Core 0.37.0 + project.scope-relations-revised@v1 + V066 + Project/Authorization/SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | ServiceNetwork/Region/Organization 目录与生命周期、计划生效和审批、项目生命周期、授权缓存/导出、派单策略、BUSINESS SLA、Portal、结算 |
-| M67 | `project.read` 实时 TENANT/PROJECT/REGION/NETWORK 范围驱动项目目录、详情和 M66 不可变范围历史；SQL 范围收敛；cursor 绑定授权与筛选；撤权审计和跨租户 404 | ARCH-01/07 + API-07 + OpenAPI Core 0.38.0 + V067 + Project PostgreSQL/MVC/Contract/Client/ArchitectureTest | owners、品牌/服务产品/配置绑定、项目生命周期、ServiceNetwork/Region/Organization 目录、计划修订审批、导出分析、Portal、派单/BUSINESS SLA/结算 |
-| M68 | `workOrder.read` 实时项目范围驱动不含客户 PII 的工单目录和详情；SQL 范围收敛；cursor 绑定授权与筛选；拒绝审计与跨租户 404 | ARCH-01/07 + API-02 + OpenAPI Core 0.39.0 + V068 + WorkOrder PostgreSQL/MVC/Contract/Client/ArchitectureTest | 客户敏感详情及增强读取审计、阶段/任务/时间线/动作、派单/SLA 风险筛选、Portal、完整生命周期 |
-| M69 | 复用 M68 鉴权的 Workflow/Stage 当前投影与 Task 摘要稳定分页；未初始化显式空投影；模块内查询和敏感字段最小化 | ARCH-03/05 + API-02 + OpenAPI Core 0.40.0 + V069 + Workflow PostgreSQL/MVC/Contract/Client/ArchitectureTest | 完整时间线、Node/Attempt 历史、允许动作、Task 独立队列/详情、客户 PII、Portal |
-| M70 | `task.read` 实时 TENANT/PROJECT/REGION/NETWORK 范围驱动独立 Task 队列与详情；active assignment 精确筛选；cursor 绑定范围与筛选；详情冻结引用和责任事实最小披露 | ARCH-05/07 + API-02 + OpenAPI Core 0.41.0 + V070 + Task PostgreSQL/MVC/Contract/Client/ArchitectureTest | 动态允许动作、Node/Attempt 历史、SLA 聚合、客户 PII、Portal、默认候选人推断 |
-| M71 | Task 详情读取边界后按与写命令相同的 capability、状态、ACTIVE CANDIDATE/RESPONSIBLE 和 execution guard 实时投影 claim/start/complete/release；版本与输入 schema/obligation 显式返回 | ARCH-05/07 + API-02 + OpenAPI Core 0.42.0 + Task PostgreSQL/MVC/Contract/Client/ArchitectureTest；无新迁移，保持 V070/72 | block/retry/cancel/manual-complete、完成条件预演、Node/Attempt 历史、SLA 聚合、Portal |
-| M72 | 每页复用 M70 `task.read` 边界，按 attemptNo DESC 安全查询自动 Task 执行 Attempt；cursor 绑定 Task，HUMAN 明确空页，排除 worker/payload/错误正文 | ARCH-05/07 + API-02 + OpenAPI Core 0.43.0 + Task PostgreSQL/MVC/Contract/Client/ArchitectureTest；复用 V008 索引，无新迁移，保持 V070/72 | HUMAN 命令时间线、Workflow Node 历史、跨模块工单时间线、Attempt 写命令、SLA 聚合、Portal |
-| M73 | 独立 readmodel 通过 Inbox 可靠消费 WorkOrder/Workflow/Stage/Task 核心事件，按业务时间形成可重建工单时间线；查询复用 workOrder.read，游标绑定工单并显式 UNKNOWN freshness | ARCH-05/19 + API-02/API-06 + DATA-01/06 + OpenAPI Core 0.44.0 + V071 + Readmodel PostgreSQL/Inbox/MVC/Contract/Client/ArchitectureTest | Appointment/Visit/Evidence/Delivery/SLA/异常/试算/结算合并、correlation 展开、重建作业、Broker checkpoint、搜索/导出、Portal |
-| M74 | 同一 readmodel Inbox 合并已发布 ContactAttempt/Appointment/Visit 事件；不保存 partyRef/GPS/自由文本；V072 expand category；查询授权与 UNKNOWN freshness 不变 | ARCH-08/19 + API-02/03/06 + DATA-03/06 + OpenAPI Core 0.45.0 + V072 + Readmodel PostgreSQL/Inbox/MVC/Contract/Client/ArchitectureTest | Evidence/Review/Delivery/SLA/异常/试算合并、correlation 展开、重建作业、Broker checkpoint、搜索/导出、Portal |
-| M75 | 同一 readmodel Inbox 合并 sla.started/breached/met；breached/met 经 TaskTimelineContextQuery；V073 + OpenAPI 0.46.0 x-extensible-enum | ARCH-12/19 + API-02/04/06 + DATA-06 + OpenAPI Core 0.46.0 + V073 + Readmodel PostgreSQL/Inbox/MVC/Contract/Client/ArchitectureTest | Evidence/Review/Delivery/异常/试算合并、BUSINESS 日历与暂停/预警、checkpoint/重建、Portal |
-| M76 | 同一 readmodel Inbox 合并 form.submitted 与 evidence snapshot/review/correction 生命周期事件；经 TaskTimelineContextQuery；V074 + OpenAPI 0.47.0 | ARCH-09/10/19 + API-02/06 + DATA-06 + OpenAPI Core 0.47.0 + V074 + Readmodel PostgreSQL/Inbox/MVC/Contract/Client/ArchitectureTest | revision 技术噪声、Delivery/异常/试算、checkpoint/重建、Portal |
-| M77 | outbound-delivery-created 直接投影；exception.resolved@v2 经 Task 上下文；V075 + OpenAPI 0.48.0 | ARCH-13/14/19 + API-02/04/06 + DATA-06 + OpenAPI Core 0.48.0 + V075 + Readmodel PostgreSQL/Inbox/MVC/Contract/Client/ArchitectureTest | delivery ack/recovered、exception ack、试算、checkpoint/重建、Portal |
-| M78 | DeliveryTimelineContextQuery + acknowledged/recovered/replay-requested 时间线；readmodel 依赖 integration::api；OpenAPI 0.49.0 | ARCH-13/19 + API-02/04/06 + DATA-06 + OpenAPI Core 0.49.0 + Readmodel/Integration PostgreSQL/Inbox/MVC/Contract/Client/ArchitectureTest/L3 | checkpoint/重建、试算/结算、Portal |
-| M79 | ExceptionTimelineContextQuery + exception.acknowledged 时间线；readmodel 依赖 operations::api；OpenAPI 0.50.0 | ARCH-13/19 + API-02/04/06 + DATA-06 + OpenAPI Core 0.50.0 + Readmodel/Operations PostgreSQL/Inbox/MVC/Contract/Client/ArchitectureTest/L3 | checkpoint/重建、试算/结算、Portal |
-| M80 | ServiceAssignment 激活生命周期并入工单时间线；V076 ASSIGNMENT；OpenAPI 0.51.0；不投影 assignee/capacity/guard | ARCH-06/19 + API-02/06 + DATA-06 + OpenAPI Core 0.51.0 + V076 + Readmodel PostgreSQL/Inbox/MVC/Contract/Client/ArchitectureTest/L3 | ServiceNetwork 生命周期、试算/结算、checkpoint/重建、Portal |
-| M81 | Task assigned/assignment/guard/manual-intervention 时间线；OpenAPI 0.52.0；无新 Flyway | ARCH-05/19 + API-02/06 + DATA-06 + OpenAPI Core 0.52.0 + Readmodel PostgreSQL/Inbox/MVC/Contract/Client/ArchitectureTest/L3 | evidence revision 噪声、checkpoint/重建、试算/结算、Portal |
-| M82 | ReviewTimelineContextQuery + external-review-receipt-recorded 时间线；readmodel 依赖 evidence::api；OpenAPI 0.53.0 | ARCH-10/19 + API-02/06 + DATA-06 + OpenAPI Core 0.53.0 + Readmodel/Evidence PostgreSQL/Inbox/MVC/Contract/Client/ArchitectureTest/L3 | revision/slots 噪声、checkpoint/重建、试算/结算、Portal |
-| M83 | condition-disposition-recorded 时间线（KEEP/INVALIDATE）；OpenAPI 0.54.0；无新 Flyway | ARCH-10/19 + ADR-022 + API-02/06 + DATA-06 + OpenAPI Core 0.54.0 + Readmodel PostgreSQL/Inbox/MVC/Contract/Client/ArchitectureTest/L3 | revision/slots 噪声、checkpoint/重建、试算/结算、Portal |
-| M84 | 时间线 checkpoint/dead letter/generation 重建；freshness FRESH/LAGGING/UNKNOWN/REBUILDING；OpenAPI 0.55.0；V077 | ARCH-19 + API-02/06 + DATA-06 Accepted 窄切片 + OpenAPI Core 0.55.0 + V077 + Readmodel/Reliability PostgreSQL/Contract/Client/ArchitectureTest/L3 | 工作区/队列/SavedView/搜索、多投影平台、Broker offset、试算/结算、Portal |
-| M85 | 工单工作区顶层实时组合；缺权 SLA/异常降级；无 PII；OpenAPI 0.56.0；无新 Flyway | ARCH-19 + API-06 Accepted 窄切片 + OpenAPI Core 0.56.0 + Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | sections 按需加载、队列/SavedView/搜索、Portal、工作区持久化投影、试算/结算 |
-| M86 | 时间线 projection_definition、dead letter 幂等重放、旧/孤儿 generation 清理；V078；OpenAPI 保持 0.56.0 | ARCH-19 + DATA-06 Accepted 窄切片 + V078 + Readmodel/Reliability PostgreSQL/ArchitectureTest/L3 | Admin 重建/重放 HTTP、多投影平台、Broker offset、队列/SavedView/Portal |
-| M87 | 工作区 sections TASKS/TIMELINE_AUDIT 按需加载；OpenAPI 0.57.0；无新 Flyway | ARCH-19 + API-06 Accepted 窄切片 + OpenAPI Core 0.57.0 + Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 其余 section、队列/SavedView、Portal、区块持久化投影 |
-| M88 | 工作区 section APPOINTMENTS_VISITS；visit/appointment 缺权降级；无 GPS/地址/note；OpenAPI 0.58.0；无新 Flyway | ARCH-19 + API-06 Accepted 窄切片 + OpenAPI Core 0.58.0 + Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 其余 section、contact-attempts、队列/SavedView、Portal、区块持久化投影 |
-| M89 | 工作区 section FORMS_EVIDENCE；form/evidence 缺权降级；无 definition/资料 JSON；OpenAPI 0.59.0；无新 Flyway | ARCH-19 + API-06 Accepted 窄切片 + OpenAPI Core 0.59.0 + Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 其余 section、FormSubmission 列表、EvidenceItem 明细、队列/SavedView、Portal |
-| M90 | 工作区 section REVIEWS_CORRECTIONS；evidence.read + Project Scope；无审核/整改自由文本；OpenAPI 0.60.0；无新 Flyway | ARCH-10/19 + API-06 Accepted 窄切片 + OpenAPI Core 0.60.0 + Evidence/Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 其余 section、审核整改命令聚合、队列/SavedView、Portal |
-| M91 | 工作区 section INTEGRATION；入站 WorkOrder 结果与外发 Delivery；分离读权降级；无对象引用/operator/重放审批文本；OpenAPI 0.61.0；V079 | ARCH-13/19 + API-06 Accepted 窄切片 + OpenAPI Core 0.61.0 + V079 + Integration/Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | FACTS_CALCULATIONS、审核回调批次额外归属、专项队列/SavedView、Portal |
-| M92 | 工作区顶层 serviceAssignmentSummary；当前 Task ACTIVE 网点/师傅责任；dispatch.read + Project Scope；OpenAPI 0.62.0；V080 | ARCH-06/19 + API-06 Accepted 顶层扩展 + OpenAPI Core 0.62.0 + V080 + Dispatch/Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | FACTS_CALCULATIONS、历史责任、saga/容量详情、activity-summary、队列/SavedView、Portal |
-| M93 | activity-summary 复用时间线最近 N 条；无关键事件猜测、无 cursor；workOrder.read + freshness；OpenAPI 0.63.0；无新 Flyway | ARCH-19 + API-06 Accepted 窄切片 + OpenAPI Core 0.63.0 + Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 关键事件 taxonomy/过滤、correlation 展开、FACTS_CALCULATIONS、队列/SavedView、Portal |
-| M94 | APPOINTMENTS_VISITS 增加 ContactAttempt 安全摘要；appointment.read 降级；无联系对象/自由文本/录音/操作者；OpenAPI 0.64.0；无新 Flyway | ARCH-08/19 + API-06 Accepted 扩展 + OpenAPI Core 0.64.0 + Appointment/Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 工单级联系列表端口、敏感联系详情、FACTS_CALCULATIONS、队列/SavedView、Portal |
-| M95 | FORMS_EVIDENCE 增加 FormSubmission/EvidenceItem 安全元数据；独立 summary SQL；无 values/校验消息/Revision/file/captureMetadata；OpenAPI 0.65.0；无新 Flyway | ARCH-09/10/19 + API-06 Accepted 扩展 + OpenAPI Core 0.65.0 + Forms/Evidence/Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 表单值与资料版本详情、跨 Task cursor、FACTS_CALCULATIONS、队列/SavedView、Portal |
-| M96 | REVIEWS_CORRECTIONS 增加 INTERNAL→CLIENT 与重开血缘；复用现有 evidence API/auth；无决定/豁免文本和操作者；OpenAPI 0.66.0；无新 Flyway | ARCH-10/19 + API-06 Accepted 扩展 + OpenAPI Core 0.66.0 + Evidence/Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 回调批次多工单归属、审核队列/命令聚合、FACTS_CALCULATIONS、SavedView、Portal |
-| M97 | API-06 §6 review-cases 授权跨项目队列；OPEN 默认、origin/task/project 筛选、范围绑定 FIFO cursor；安全最新决定摘要；OpenAPI 0.67.0；V081 | ARCH-07/10 + API-06 Accepted 窄切片 + OpenAPI Core 0.67.0 + V081 + Evidence/Authorization PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 通用 work-queues/SavedView、SLA/assignee enrich、Correction/Outbound 队列、Portal |
-| M98 | API-06 §6 correction-cases 授权跨项目队列；OPEN 默认、task/sourceReview/project 筛选、范围绑定 FIFO cursor；安全原因码与补传次数；OpenAPI 0.68.0；V082 | ARCH-10/58 + API-06 Accepted 窄切片 + OpenAPI Core 0.68.0 + V082 + Evidence/Authorization PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 通用 work-queues/SavedView、SLA/assignee enrich、Outbound 队列、异常 Scope 硬化、Portal |
-| M99 | API-06 §6 outbound-deliveries 授权跨项目队列；UNKNOWN 默认、messageType/workOrder/review 筛选、范围绑定 FIFO cursor；安全摘要不含 digest/操作者/对象引用；OpenAPI 0.69.0；V083 | ARCH-13 + API-06 Accepted 窄切片 + OpenAPI Core 0.69.0 + V083 + Integration/Authorization PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 通用 work-queues/SavedView、异常 Scope 硬化、人工标记已送达/放弃、Portal |
-| M100 | 运营异常工作台 Project Scope 硬化；projectId 筛选/响应、scopeDigest 游标；无 project 孤儿仅 TENANT 可见；OpenAPI 0.70.0；V084 | ARCH-14/42 + API-06 Accepted 窄切片 + OpenAPI Core 0.70.0 + V084 + Operations/Authorization PostgreSQL/ArchitectureTest/L3 | 通用 work-queues/SavedView、人工标记已送达/放弃、Portal |
-| M101 | Admin Portal Vue+TS+Vite 只读队列外壳；审核/整改/外发/异常 Page ID 路由；本地 JWT；npm build | PRODUCT-01/02 + ARCH-19 + API-06 已实现队列消费 + Admin Web build | SavedView、工作区全页、命令 UI、OIDC SDK、Network/Technician、E2E |
-| M102 | Admin 工单工作区只读页；消费 workspace/activity-summary/sections；外发队列深链；npm build | PRODUCT-01/02 + ARCH-19 + API-06 Accepted workspace 窄切片 + Admin Web build | 命令 UI、SavedView、OIDC SDK、Network/Technician、E2E |
-| M103 | Admin 工作区展示当前任务 GET /tasks/{id}/allowed-actions 只读投影；不执行命令；npm build | PRODUCT-01/02 + ARCH-19 + API-02 AllowedActions + Admin Web build | 命令执行 UI、OIDC SDK、SavedView、E2E |
-| M104 | Admin 授权工单目录消费 GET /work-orders；status/clientCode 筛选与工作区深链；npm build | PRODUCT-01/02 + ARCH-19 + API-02 Authorized WorkOrder Query + Admin Web build | SavedView、命令 UI、OIDC SDK、E2E |
-| M105 | Admin 工作区按 allowed-actions 执行 claim/start/complete/release；Idempotency-Key+If-Match；npm build | PRODUCT-01/02/05 + ARCH-19 + API-02 Human Task Commands + Admin Web build | 表单/资料提交流程编排、OIDC SDK、SavedView、E2E |
-| M106 | Admin 授权任务目录消费 GET /tasks；筛选与工作区深链；npm build | PRODUCT-01/02 + ARCH-19 + API-02 Task Directory + Admin Web build | 任务详情独立页、SavedView、OIDC、E2E |
-| M107 | Admin SLA 工作台消费 GET /sla-instances；status 筛选与工作区深链；npm build | PRODUCT-01/02 + ARCH-19 + API-04/SLA Query + Admin Web build | SLA 详情操作、BUSINESS 日历、预警通知、E2E |
-| M108 | Admin 授权项目目录消费 GET /projects；status/clientId 筛选；npm build | PRODUCT-01/02 + ARCH-19 + API-07 Project Directory + Admin Web build | 项目创建/范围修订 UI、配置治理、OIDC、E2E |
-| M109 | Admin 任务详情消费 GET /tasks/{id} 与 execution-attempts；复用命令面板 | PRODUCT-01/02 + ARCH-19 + API-02 Task Detail/Attempts + Admin Web build | 表单/资料提交流程编排、OIDC、E2E |
-| M110 | Admin 项目详情与 scope-revisions 历史 | PRODUCT-01/02 + ARCH-19 + API-07 Project Query + Admin Web build | 项目创建/范围修订命令 UI、OIDC、E2E |
-| M111 | Admin 异常队列按 allowedActions 执行 ACKNOWLEDGE | PRODUCT-01/02 + ARCH-19 + API-04 Exception Acknowledge + Admin Web build | 通用 RESOLVED UI、OIDC、E2E |
-| M112 | Admin 审核案例详情与 decide/force/reopen | PRODUCT-01/02 + ARCH-10/19 + Evidence Review APIs + Admin Web build | 表单/资料编排、OIDC、E2E |
-| M113 | Admin 整改案例详情与 resubmit/close/waive | PRODUCT-01/02 + ARCH-10/19 + Correction APIs + Admin Web build | 资料提交流程编排、OIDC、E2E |
-| M114 | Admin 外发交付详情与 UNKNOWN retry | PRODUCT-01/02 + ARCH-13/19 + Outbound APIs + Admin Web build | 人工标记已送达/放弃、OIDC、E2E |
-| M115 | Admin SLA 实例详情 | PRODUCT-01/02 + ARCH-12/19 + SLA Detail API + Admin Web build | BUSINESS 日历、预警 UI、E2E |
-| M116 | Admin 任务详情表单列表与 submitTaskForm；VALIDATED 回填 complete 引用 | PRODUCT-01/02 + ARCH-09/19 + Forms APIs + Admin Web build | 动态表单设计器、OIDC、E2E |
-| M117 | Admin 任务详情资料槽位/项与 createEvidenceSetSnapshot；回填 complete 引用 | PRODUCT-01/02 + ARCH-10/19 + Evidence APIs + Admin Web build | Begin/Finalize 上传编排、OIDC、E2E |
-| M118 | Admin 审核详情创建 BYD review submission OutboundDelivery | PRODUCT-01/02 + ARCH-13/19 + Integration submit API + Admin Web build | 其他 CPIM 提审、OIDC、E2E |
-| M119 | Admin 资料 Begin→PUT→Finalize 上传编排；SHA-256 | PRODUCT-01/02 + ARCH-10/11/19 + Evidence Upload APIs + Admin Web build | 专业扫描 UI、OIDC、E2E |
-| M120 | Admin REVIEW_REQUIRED 条件 KEEP/INVALIDATE 处置 | PRODUCT-01/02 + ARCH-10/19 + Condition Disposition API + Admin Web build | 自动处置策略、OIDC、E2E |
-| M121 | Admin 快照后 createReviewCase 并深链 | PRODUCT-01/02 + ARCH-10/19 + Create ReviewCase API + Admin Web build | 审核队列自动刷新、OIDC、E2E |
-| M122 | Admin 任务联系历史列表与追加联系事实 | PRODUCT-01/02 + ARCH-10/19 + ContactAttempt APIs + Admin Web build | 通话录音回放、OIDC、E2E |
-| M123 | Admin 预约提议/确认/取消命令面板 | PRODUCT-01/02 + ARCH-10/19 + Appointment APIs + Admin Web build | 改约/爽约完整 UX、OIDC、E2E |
-| M124 | Admin 预约签到与 Visit 签退模拟 | PRODUCT-01/02 + ARCH-10/19 + Visit APIs + Admin Web build | 真实设备 GPS、OIDC、E2E |
-| M125 | Admin 预约改约与爽约命令 | PRODUCT-01/02 + ARCH-10/19 + Appointment reschedule/no-show APIs + Admin Web build | 日历 UX、OIDC、E2E |
-| M126 | Admin Visit interrupt 命令 | PRODUCT-01/02 + ARCH-10/19 + Visit interrupt API + Admin Web build | 异常联动、OIDC、E2E |
-| M127 | Admin 资料短期下载授权与 Revision 作废 | PRODUCT-01/02 + ARCH-10/11/19 + File/Evidence invalidate APIs + Admin Web build | 在线预览器、OIDC、E2E |
-| M128 | Admin 项目目录 createProject | PRODUCT-01/02 + ARCH-10/19 + Create Project API + Admin Web build | 项目状态机完整 UX、OIDC、E2E |
-| M129 | Admin 项目范围关系整组修订 | PRODUCT-01/02 + ARCH-10/19 + Revise Scope API + Admin Web build | 组织目录联动、OIDC、E2E |
-| M130 | Admin 任务候选 MANUAL 分配 | PRODUCT-01/02 + ARCH-10/19 + Assign Candidates API + Admin Web build | 策略解析 UI、OIDC、E2E |
-| M131 | Admin 运营异常详情与确认 | PRODUCT-01/02 + ARCH-10/19 + getOperationalException API + Admin Web build | 异常自动解决、OIDC、E2E |
-| M132 | Admin 工单 SLA 实例列表与深链 | PRODUCT-01/02 + ARCH-10/19 + listWorkOrderSlaInstances API + Admin Web build | SLA 策略编辑、OIDC、E2E |
-| M133 | Admin 表单/资料详情读取与 StoredFile 作废 | PRODUCT-01/02 + ARCH-10/11/19 + Detail/Invalidate APIs + Admin Web build | 在线预览器、OIDC、E2E |
-| M134 | Admin 工单权威详情/Stage/Task/核心时间线；真实 OIDC/Backend/PostgreSQL/Chrome PR 门禁覆盖 assign/claim/release、表单/资料/APPROVED/双引用 complete 至 FULFILLED、REJECTED→自动整改→WAIVED/CANCELLED，以及 FORCE_APPROVED→原 Case REOPENED/后继 Case OPEN；修复重开审计长文本溢出 | PRODUCT-01/02 + ARCH-10/11/19 + Task/Form/Evidence/Review/Correction APIs + Workflow END Progression + Admin Web build/E2E + ReviewCase PostgreSQL IT + `admin-pilot-readiness-acceptance.md` | 外部提审、正式企业 OIDC/BFF、生产对象存储/专业扫描、从外部接单开始的完整履约写链路 E2E |
-| M135 | Admin 正常整改补传/关闭/复审写链路 E2E：同 Item 追加补传 Revision、resubmit→close、新 INTERNAL ReviewCase APPROVED、双引用 complete→FULFILLED；第四套动态夹具 + PR 阻断冒烟 SQL 断言 | PRODUCT-01/02 + ARCH-10/11/19 + Correction/Review/Task APIs + Admin Web build/E2E + `148-m135-*` + `132-m135-*` + `admin-pilot-readiness-acceptance.md` | 外部提审回执、ServiceAssignment Admin 写表面、入站接单完整链、正式企业 OIDC/BFF |
-| M136 | Admin 预约/上门写链路 E2E：RoleGrant 写能力、ACTIVE ServiceAssignment 夹具、propose→confirm→check-in→check-out；Appointment/Visit COMPLETED 与审计/Inbox | PRODUCT-01/02 + ARCH-08/09/19 + Appointment/Visit APIs + Admin Web build/E2E + `149-m136-*` + `133-m136-*` + `admin-pilot-readiness-acceptance.md` | 用户确认渠道、GPS BLOCK、派单 Admin HTTP、完整 ADMIN-PILOT-09 |
-| M137 | Admin BYD 提审外发 ACK E2E：USER 可提交、Canonical 系谱夹具、本地 stub errno=0→ACKNOWLEDGED+CLIENT Case；OpenAPI 0.71.0 | PRODUCT-01/02 + ARCH-13/19 + OutboundDelivery APIs + Admin Web build/E2E + `150-m137-*` + `134-m137-*` | 真实 sandbox、其他 CPIM、人工标记已送达/放弃 |
-| M138 | Admin BYD 厂端审核回调联调 E2E：同租户 CPIM 签名回调 result=1 → EXTERNAL APPROVED；Admin 可见 CLIENT Case | PRODUCT-01/02 + ARCH-13/19 + BYD Review Callback + Admin Web build/E2E + `151-m138-*` + `135-m138-*` | 真实 sandbox、REJECTED 回调浏览器路径、入站接单完整链 |
-| M139 | Admin BYD 入站 CREATE_WORK_ORDER 接单 E2E：CPIM 签名 install-orders → RECEIVED 工单；Admin 目录/工作区/INTEGRATION 可见；SQL 断言 Envelope/Canonical/审计/Outbox | PRODUCT-01/02 + ARCH-13/19 + BYD Inbound Order + Admin Web build/E2E + `152-m139-*` + `136-m139-*` + `admin-pilot-readiness-acceptance.md` | 激活/派单、同单完整履约贯通、专用入站队列页、真实 sandbox、完整 ADMIN-PILOT-09 |
-| M140 | Admin 入站激活与同单预约上门 E2E：可解析 WORKFLOW → Outbox ACTIVE + HUMAN Task；Admin assign/claim/start + propose→confirm→check-in→check-out；SA 本地夹具 | PRODUCT-01/02 + ARCH-08/09/13/19 + BYD Inbound + Workflow Bootstrap + Appointment/Visit APIs + Admin Web build/E2E + `153-m140-*` + `137-m140-*` | Admin 派单 HTTP、同单审核外发贯通、真实 sandbox、完整 ADMIN-PILOT-09 |
-| M141 | Admin 入站同单表单/资料/审核/外发 E2E：`BYD:INSTALL:` 系谱、formRef+PILOT_SURVEY Evidence、visit→form→snapshot→INTERNAL APPROVED→BYD ACK→厂端回调→dual complete→FULFILLED；SA 仍为本地夹具 | PRODUCT-01/02 + ARCH-08/09/10/11/13/19 + BYD Inbound/Outbound + Form/Evidence/Review + Admin Web build/E2E + `154-m141-*` + `138-m141-*` | Admin 派单 HTTP、同单整改分支、真实 sandbox、完整 ADMIN-PILOT-09 |
-| M142 | Admin 入站同单整改补传复审外发 E2E：visit→form→REJECTED→CorrectionCase→同 Item 补传→resubmit/close→复审 APPROVED→BYD ACK→厂端回调→FULFILLED；SA 仍为本地夹具 | PRODUCT-01/02 + ARCH-08/09/10/11/13/19 + BYD Inbound/Outbound + Form/Evidence/Review/Correction + Admin Web build/E2E + `155-m142-*` + `139-m142-*` | Admin 派单 HTTP、真实 sandbox、完整 ADMIN-PILOT-09 |
-| M143 | Admin 试点 SPI ServiceAssignment 种子：field-ops/入站工单经 Capacity+Assignment SPI 注入 ACTIVE NETWORK/TECHNICIAN、CONFIRMED reservation 与 COMPLETED saga；删除 SQL 直插 | PRODUCT-01/02 + ARCH-11/19 + Dispatch SPI + Admin pilot smoke + `156-m143-*` + `140-m143-*` | Admin 派单 HTTP、真实 sandbox、完整 ADMIN-PILOT-09 |
-| M144 | 历史 Admin 双责任 HTTP 试点；M453 已删除外部路径与 Admin UI，内部原子编排仅供 Network Portal 指派师傅复用 | PRODUCT-01/02 + ARCH-11/19 + Dispatch ManualAssign 内部编排 + `157-m144-*` + `141-m144-*` | 当前产品入口以 M453 两阶段责任链为准 |
-| M145 | Admin 入站 Envelope/Canonical 详情深链：工作区 INTEGRATION → `/integration/inbound/{id}`；复用已 Implemented GET；Playwright 断言 Envelope/Canonical/`BYD:INSTALL:` | PRODUCT-01/02 + ARCH-13/19 + Inbound GET APIs + Admin Web E2E + `158-m145-*` + `142-m145-*` | 专用入站队列列表 API、原文下载、真实 sandbox |
-| M146 | Admin 外发交付队列筛选：OutboundQueuePage 绑定 Accepted OpenAPI 单值筛选（默认 UNKNOWN）；Playwright ACK 后 `status=ACKNOWLEDGED` 可见交付 | PRODUCT-01/02 + ARCH-13/19 + API-06 §6 outbound-deliveries + Admin Web E2E + `159-m146-*` + `143-m146-*` | 多 status OR、SavedView、专用入站队列列表 API、真实 sandbox |
-| M147 | Admin 工作区外发交付详情深链：INTEGRATION `outboundDeliveries[]` → `/integration/outbound/{id}`；复用已 Implemented GET/详情页；Playwright 断言 | PRODUCT-01/02 + ARCH-13/19 + API-06 workspace INTEGRATION + Outbound GET + Admin Web E2E + `160-m147-*` + `144-m147-*` | 专用入站队列列表 API、SavedView、真实 sandbox |
-| M148 | Admin 审核/整改队列筛选：Review/Correction QueuePage 绑定 Accepted OpenAPI 单值筛选；Playwright OPEN+taskId 与 IN_PROGRESS+sourceReviewCaseId | PRODUCT-01/02 + ARCH-10/19 + API-06 §6 review/correction-cases + Admin Web E2E + `161-m148-*` + `145-m148-*` | 多 status OR、SavedView、SLA/assignee 富化、专用入站队列列表 API、真实 sandbox |
-| M149 | Admin 工作区审核/整改详情深链：REVIEWS_CORRECTIONS → `/reviews/{id}` 与 `/corrections/{id}`；复用已 Implemented 详情 GET；Playwright 断言 | PRODUCT-01/02 + ARCH-10/19 + API-06 workspace REVIEWS_CORRECTIONS + Review/Correction GET + Admin Web E2E + `162-m149-*` + `146-m149-*` | 专用入站队列列表 API、SavedView、真实 sandbox |
-| M150 | Admin 运营异常队列筛选：ExceptionQueuePage 绑定 Accepted OpenAPI 单值筛选（默认 OPEN）；Playwright ACKNOWLEDGED+P1 查询 200 | PRODUCT-01/02 + ARCH-14/19 + API-06 §6 operational-exceptions + Admin Web E2E + `163-m150-*` + `147-m150-*` | 多 status OR、SavedView、专用入站队列列表 API、真实 sandbox |
-| M151 | Admin 目录与 SLA 筛选补齐：WO/Task/SLA `projectId`、Task `SUCCEEDED`、Project `activeOn`；Playwright 四类筛选 GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI directory/SLA lists + Admin Web E2E + `164-m151-*` + `148-m151-*` | 专用入站队列列表 API、SavedView、工作区 TASKS 深链、真实 sandbox |
-| M152 | Admin 工作区 TASKS → `/tasks/{taskId}`；Playwright GET 详情 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI Task GET + Admin Web E2E + `165-m152-*` + `149-m152-*` | TIMELINE/预约/表单证据独立详情深链、专用入站队列列表 API、SavedView、真实 sandbox |
-| M153 | Admin 工作区 TIMELINE_AUDIT → 白名单资源详情深链；Playwright Task GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI timeline + Admin Web E2E + `166-m153-*` + `150-m153-*` | Appointment/Visit/Form/Evidence 独立详情页、专用入站队列列表 API、SavedView、真实 sandbox |
-| M154 | Admin 工作区 AV/FE → Task 旁路深链；Playwright 预约确认与完结后 GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI workspace sections + Admin Web E2E + `167-m154-*` + `151-m154-*` | Visit/EvidenceItem 独立详情页、专用入站队列列表 API、SavedView、真实 sandbox |
-| M155 | Admin 预约/表单提交详情页 + 工作区深链；Playwright Appointment/FormSubmission GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI Appointment/FormSubmission GET + Admin Web E2E + `168-m155-*` + `152-m155-*` | Visit/EvidenceItem 独立详情页、详情页写命令、专用入站队列列表 API、SavedView、真实 sandbox |
-| M156 | Admin 资料项/资料快照详情页 + 工作区/Task 面板深链；Playwright Item/Snapshot GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI EvidenceItem/Snapshot GET + Admin Web E2E + `169-m156-*` + `153-m156-*` | Visit 独立详情页、详情页写命令、专用入站队列列表 API、SavedView、真实 sandbox |
-| M157 | Admin 工作区项目与 SLA 任务深链；Playwright Project/Task GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI Project/Task/SLA GET + Admin Web E2E + `170-m157-*` + `154-m157-*` | Visit 详情、SavedView、企业 OIDC、真实 sandbox |
-| M158 | 授权入站 Envelope 队列：API-06 §6.1 + OpenAPI 0.73.0 + V085 + Admin 队列页；Playwright COMPLETED 筛选与详情深链 | PRODUCT-01/02 + ARCH-19 + API-06 §6.1 + Core OpenAPI 0.73.0 + Flyway V085 + Admin Web E2E + `171-m158-*` + `155-m158-*` | null-project 可见性、原文下载、SavedView、真实 sandbox |
-| M159 | Admin 上门 Visit 详情：`GET /visits/{id}` OpenAPI 0.74.0 + visit.read；工作区 AV 深链；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Visit runtime + Core OpenAPI 0.74.0 + Admin Web E2E + `172-m159-*` + `156-m159-*` | ContactAttempt/FieldOperation 详情、SavedView、ServiceNetwork、真实 sandbox |
-| M160 | Admin 联系尝试详情：`GET /contact-attempts/{id}` OpenAPI 0.75.0 + appointment.read；工作区 AV 深链；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + ContactAttempt runtime + Core OpenAPI 0.75.0 + Admin Web E2E + `173-m160-*` + `157-m160-*` | FieldOperation 详情、SavedView、ServiceNetwork、真实 sandbox |
-| M161 | Admin 核心时间线资源深链：FormSubmission/EvidenceSetSnapshot 等已有详情页；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI timeline + Admin Web E2E + `174-m161-*` + `158-m161-*` | FieldOperation 详情、SavedView、ServiceNetwork、真实 sandbox |
-| M162 | Admin 最近活动资源深链：复用 activity-summary + 同构白名单；Playwright Task GET 200 | PRODUCT-01/02 + ARCH-19 + API-06 §5 M93 + Admin Web E2E + `175-m162-*` + `159-m162-*` | 关键事件 taxonomy、FieldOperation 详情、SavedView、真实 sandbox |
-| M163 | Admin 外部审核回执详情：复用 GET /internal/external-review-receipts/{id} + evidence.read；时间线白名单；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + ExternalReviewReceipt runtime + Admin Web E2E + `176-m163-*` + `160-m163-*` | FieldOperation 详情、SavedView、ServiceNetwork、真实 sandbox |
-| M164 | Admin 审核/整改详情交叉深链：Review↔Snapshot、后继→源 Review、Correction→源 Snapshot；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Admin Web E2E + `177-m164-*` + `161-m164-*` | FieldOperation 详情、SavedView、异常队列 query 水合、真实 sandbox |
-| M165 | Admin 工作区异常摘要 → 异常队列 query 水合：exceptionSummary 深链 + ExceptionQueuePage route.query 水合；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + API-06 §6 + Admin Web E2E + `178-m165-*` + `162-m165-*` | FieldOperation 详情、SavedView、多 status OR、真实 sandbox |
-| M166 | Admin 工作区审核/整改关联资源深链：REVIEWS_CORRECTIONS → Snapshot / 源审核 / 最近补传快照；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI workspace section + Admin Web E2E + `179-m166-*` + `163-m166-*` | FieldOperation 详情、SavedView、真实 sandbox |
-| M167 | Admin Task 面板资源详情深链：FieldOps/FormsEvidence → 已有详情页；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Admin Web E2E + `180-m167-*` + `164-m167-*` | FieldOperation 详情、SavedView、真实 sandbox |
-| M168 | Admin Canonical Message 独立详情页：复用 GET /canonical-messages/{id}；Envelope/INTEGRATION/回执深链；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Integration OpenAPI + Admin Web E2E + `181-m168-*` + `165-m168-*` | FieldOperation 详情、SavedView、原文下载、真实 sandbox |
-| M169 | Admin 专项队列 route.query 水合：Review/Correction/Inbound/Outbound 对齐 Exception；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + API-06 queues + Admin Web E2E + `182-m169-*` + `166-m169-*` | FieldOperation 详情、SavedView、多 status OR、真实 sandbox |
-| M170 | Admin 目录页 route.query 水合：WorkOrder/Task/SLA/Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI directories + Admin Web E2E + `183-m170-*` + `167-m170-*` | FieldOperation 详情、SavedView、真实 sandbox |
-| M171 | Admin 外发关联资源与回执入站交叉深链：sourceTask/Snapshot + Envelope；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Outbound/Receipt OpenAPI + Admin Web E2E + `184-m171-*` + `168-m171-*` | ReviewRoute 详情、FieldOperation、SavedView、真实 sandbox |
-| M172 | Admin 详情页明文 projectId 深链：Review/Exception/Canonical/Outbound → Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Project OpenAPI + Admin Web E2E + `185-m172-*` + `169-m172-*` | FieldOperation、ReviewRoute、SavedView、真实 sandbox |
-| M173 | Admin 详情页源资源明文字段深链：Outbound/Receipt/Exception/Review/Correction 事实格 UUID；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `186-m173-*` + `170-m173-*` | ReviewRoute、FieldOperation、SavedView、真实 sandbox |
-| M174 | Admin 现场/表单/SLA 事实格 scope 深链：Appointment/Visit/Contact/Form/Evidence/SLA/Task/Inbound；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `187-m174-*` + `171-m174-*` | ServiceNetwork/Technician 目录、FieldOperation、SavedView |
-| M175 | Admin 运营异常 handlingTaskId 深链：Exception → HUMAN Task；Playwright GET 200 | PRODUCT-01/02 + ARCH-14 + Exception/Task OpenAPI + Admin Web E2E + `188-m175-*` + `172-m175-*` | 多态 sourceId、FieldOperation、SavedView |
-| M176 | Admin 专项队列关联资源深链：Correction/Review 队列 → Review/Task/Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `189-m176-*` + `173-m176-*` | QueueTable 行内链接、SavedView、FieldOperation |
-| M177 | Admin 外发/异常/入站队列源资源深链：Outbound/Exception/Inbound 关联资源；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `190-m177-*` + `174-m177-*` | QueueTable 行内链接、多态 sourceId、SavedView |
-| M178 | Admin 目录/SLA 项目关联深链：WorkOrder/Task 目录与 SLA → Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Project OpenAPI + Admin Web E2E + `191-m178-*` + `175-m178-*` | QueueTable 行内链接、SavedView、FieldOperation |
-| M179 | Admin 剩余详情页 projectId 深链：Correction/Form/Evidence/Appointment/Visit/SLA/Task/Inbound/Receipt → Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Project OpenAPI + Admin Web E2E + `192-m179-*` + `176-m179-*` | QueueTable 行内链接、FieldOperation、SavedView |
-| M180 | Admin 专项队列剩余关联资源深链：Correction/Review 队列 Accepted 字段补齐；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `193-m180-*` + `177-m180-*` | QueueTable 行内链接、SavedView、FieldOperation |
-| M181 | Admin QueueTable 行内单元格深链：可选 linkColumns；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Admin Web E2E + `194-m181-*` + `178-m181-*` | 移除关联资源条、SavedView、FieldOperation |
-| M182 | Admin 外发执行任务与快照成员深链：executionTaskId + Snapshot members；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Outbound/Evidence OpenAPI + Admin Web E2E + `195-m182-*` + `179-m182-*` | FieldOperation、SavedView |
-| M183 | 统一 Principal/IdentityLink/PersonProfile/Persona；JIT 并发去重；启停实时失权；安全目录 API | 身份治理计划 + Core OpenAPI 0.76.0 + Flyway V086 + PostgreSQL/MVC/ArchitectureTest + `196-m183-*` + `180-m183-*` | M184～M188、解绑、密码、跨服务身份缓存/事件 |
-| M184 | Organization/OrgUnit/closure/OrgMembership；LOCAL/EXTERNAL_AUTHORITATIVE；同步收据；离职停用/撤权/待重分配 | ADR-023 + Core OpenAPI 0.77.0 + Flyway V087 + PostgreSQL/MVC/ArchitectureTest + `197-m184-*` + `181-m184-*` | M185～M188、正式 HR Connector、ORGANIZATION DataScope、Admin 用户中心 |
-| M185 | PartnerOrganization/ServiceNetwork/NetworkMembership；TechnicianProfile/多网点关系；资质审核；可接单与清退影响 | ADR-024 + Core OpenAPI 0.78.0 + Flyway V088 + PostgreSQL/MVC/ArchitectureTest + `198-m185-*` + `182-m185-*` | M186～M188、Coverage/Capability 硬过滤、离线工作包回收、自动改派、Portal UI |
-| M186 | Role/Capability 目录；RoleGrant 申请/审批/撤销；Delegation；SoD/可授予范围；DENY 优先；grant generation；授权解释 | ADR-025 + Core OpenAPI 0.79.0 + Flyway V089 + PostgreSQL/MVC/ArchitectureTest + `199-m186-*` + `183-m186-*` | M187～M188、Admin 授权 UI、MFA obligation 执行器、Portal `/me` 消费 |
-| M187 | Admin 统一用户中心：用户/组织/网点/师傅/角色/授权页；目录选择器；影响面板；If-Match 写流；Capability 探测导航；真实 Keycloak PKCE E2E | PRODUCT-01 + Core OpenAPI 0.79.0（无 bump）+ Admin Web + deploy seed + `200-m187-*` + `184-m187-*` + `admin-user-center.spec.ts` | M188 `/me` 导航、Network/Technician Portal、正式 IdP/HR Connector |
-| M188 | Portal `/me` contexts/capabilities/navigation；代码 Page Registry + V090 覆盖；contextVersion 失权；Admin 消费与 Network/Technician stub；CONSUMER 不暴露入口 | ADR-026 + Core OpenAPI 0.80.0 + Flyway V090 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `201-m188-*` + `185-m188-*` | Consumer Identity Epic、完整 Network/Technician UI、MFA obligation 执行器 |
-| M189 | Admin 个人 SavedView CRUD；受控 filter AST；`rdm_saved_view`；Admin Task/WorkOrder/Correction UI；不授予页面 capability | ADR-027 + Core OpenAPI 0.81.0 + Flyway V091 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `202-m189-*` + `186-m189-*` | 共享 SavedView、UI Preference、Network/Technician 偏好 |
-| M190 | Admin UI Preference CRUD；键白名单；`rdm_ui_preference`；Admin 偏好面板与 CSS 应用；可选默认 SavedView 绑定 | ADR-028 + Core OpenAPI 0.82.0 + Flyway V092 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `203-m190-*` + `187-m190-*` | 共享偏好、Network/Technician Portal、设计系统大改 |
-| M191 | Admin 共享 SavedView：ROLE/TENANT 可见性；`preference.shareSavedView`；列表合并；Share≠数据授权；Admin Share/Unshare UI | ADR-029 + Core OpenAPI 0.83.0 + Flyway V093 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `204-m191-*` + `188-m191-*` | ORGANIZATION 组织树共享、Network/Technician SavedView、共享 UI Preference |
-| M192 | Admin 受控全局搜索：`search.read` + type 读能力降级；WO/EXTERNAL/NETWORK/TECHNICIAN fan-in；无索引平台；Admin Search 页 | ADR-030 + Core OpenAPI 0.84.0 + Flyway V094 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `205-m192-*` + `189-m192-*` | `search_document` 索引、VEHICLE/CHARGER、Network/Technician Portal 搜索 |
-| M193 | Admin 最近访问：`GET/PUT /me/recent-resources`；读时重鉴权省略失权项；`rdm_recent_resource`；AppShell Recent | ADR-031 + Core OpenAPI 0.85.0 + Flyway V095 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `206-m193-*` + `190-m193-*` | notifications、application-context、Network/Technician Portal 最近访问 |
-| M194 | Network Portal 只读：`/network-portal/work-orders|tasks|technicians|workbench|capacity`；`X-Network-Context`；ACTIVE assignment fan-in；Admin Web shell | ADR-032 + Core OpenAPI 0.86.0 + Flyway 095/97 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `207-m194-*` + `191-m194-*` | Technician Feed、Network 写命令、完整 product/03、评分/容量策略引擎 |
-| M195 | Technician Portal Feed：`/technician/me/task-feed|schedule|sync-summary`；`X-Technician-Context`；本人 ACTIVE assignment + tombstone；Admin Web shell | ADR-033 + Core OpenAPI 0.87.0 + Flyway 095/97 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `208-m195-*` + `192-m195-*` | 离线工作包、mobile sync commands、完整 Technician App、Network 写命令 |
-| M196 | Network Portal 指派师傅：`POST /network-portal/tasks/{taskId}:assign-technician`；强制 networkAssigneeId；委托 ManualAssign；Admin Web 表单 | ADR-034 + Core OpenAPI 0.88.0 + Flyway V096/98 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `209-m196-*` + `193-m196-*` | 改派、评分/硬过滤、预约/资料 Network 写、离线工作包 |
-| M197 | Network Portal 预约协作：propose/confirm/list；`networkPortal.manageAppointment`；拒绝 TECHNICIAN 确认伪装；Admin Web 表单 | ADR-035 + Core OpenAPI 0.89.0 + Flyway V097/99 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `210-m197-*` + `194-m197-*` | 爽约/联系尝试 Network 写、资料补传、离线工作包（改约/取消见 M198） |
-| M198 | Network Portal 预约生命周期：reschedule/cancel；复用 `networkPortal.manageAppointment`；If-Match；委托 AppointmentService；Admin Web 动作 | ADR-036 + Core OpenAPI 0.90.0 + Flyway 097/99（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `211-m198-*` + `195-m198-*` | 改派、资料补传、离线工作包（爽约/联系见 M199） |
-| M199 | Network Portal 爽约与联系尝试：mark-no-show + contact-attempts list/record；复用 `networkPortal.manageAppointment`；委托 AppointmentService；Admin Web 动作 | ADR-037 + Core OpenAPI 0.91.0 + Flyway 097/99（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `212-m199-*` + `196-m199-*` | 资料补传、Visit、离线工作包（改派见 M200） |
-| M200 | Network Portal 改派师傅：reassign-technician；`networkPortal.reassignTechnician`；委托 ManualReassign supersedes；Admin Web 动作 | ADR-038 + Core OpenAPI 0.92.0 + Flyway V098/100 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `213-m200-*` + `197-m200-*` | 跨网点改派、资料补传、评分/硬过滤、离线工作包 |
-| M201 | Network Portal 资料代补：begin/finalize on-behalf + correction resubmit；`evidence.submitOnBehalf`；CaptureMetadata 服务端写入；Admin Web 控件 | ADR-039 + Core OpenAPI 0.93.0 + Flyway V099/101 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `214-m201-*` + `198-m201-*` | 槽位 allowOnBehalf 配置、表单代改、Visit、离线工作包 |
-| M202 | Network Portal 整改队列只读：`GET /network-portal/correction-cases` list/get；复用 `evidence.read` NETWORK；Page Registry `NETWORK.CORRECTION.QUEUE`；Admin Web `/network-portal/corrections` | ADR-040 + Core OpenAPI 0.94.0 + Flyway 099/101（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `215-m202-*` + `199-m202-*` | Admin cursor 队列语义、资质/产能写、异常队列、离线工作包 |
-| M203 | Network Portal 运营异常队列只读：`GET /network-portal/operational-exceptions` list/get；复用 `operations.exception.read` NETWORK；`listForTask` + NETWORK get auth；Page Registry `NETWORK.EXCEPTION.QUEUE`；Admin Web `/network-portal/exceptions`；allowedActions 恒为空 | ADR-041 + Core OpenAPI 0.95.0 + Flyway 099/101（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `216-m203-*` + `200-m203-*` | Portal ACK/resolve、Admin cursor 队列语义、资质/产能写、离线工作包 |
-| M204 | Network Portal 师傅关系与资质提交：create/terminate membership + submit qualification；`networkPortal.manageTechnician`；NETWORK 收窄 `network.manageTechnician`；Page Registry `NETWORK.QUALIFICATION`；Admin Web 控件 | ADR-042 + Core OpenAPI 0.96.0 + Flyway V100/102 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `217-m204-*` + `201-m204-*` | Portal decide、FileObject、createTechnicianProfile、产能申请、离线工作包 |
-| M205 | Network Portal 本网点资质只读：`GET /network-portal/technician-qualifications` list/get；复用 `technician.readOwnNetwork` NETWORK；ACTIVE 师傅 fan-in；Page Registry `page-registry-v12`；Admin Web `/network-portal/qualifications` | ADR-043 + Core OpenAPI 0.97.0 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `218-m205-*` + `202-m205-*` | Portal decide、FileObject、产能申请、离线工作包 |
-| M206 | Network Portal 师傅关系只读：`GET /network-portal/technician-memberships` list/get；复用 `technician.readOwnNetwork` NETWORK；默认 ACTIVE；含真实 version；Page Registry `page-registry-v13`；Admin Web 终止表单填充真实 version | ADR-044 + Core OpenAPI 0.98.0 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `219-m206-*` + `203-m206-*` | 操作员 NetworkMembership、Portal decide、产能申请、离线工作包 |
-| M207 | Network Portal 工作台能力门控 enrichment：扩展 `GET /network-portal/workbench`；`unassignedTechnicianTaskCount` + correction/exception/qualification 可选计数；缺能力省略；Page Registry `page-registry-v14`；Admin Web capacity/深链 | ADR-045 + Core OpenAPI 1.0.0 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `220-m207-*` + `204-m207-*` | SLA 风险计数、产能申请、Portal ACK/decide、离线工作包 |
-| M208 | Network Portal 产能页：复用 `GET /network-portal/capacity`；Page Registry `NETWORK.CAPACITY` + `page-registry-v15`；Admin Web `/network-portal/capacity`（含 `version`）；工作台深链 | ADR-046 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `221-m208-*` + `205-m208-*` | 产能申请/写、`CapacityAdjustmentRequest`、未 Accepted 字段、离线工作包 |
-| M209 | Network Portal 整改详情只读 UI：复用 `GET /network-portal/correction-cases/{id}`（`CorrectionCase`）；Admin Web `/network-portal/corrections/:id`；列表深链；catalog 仍 v15 | ADR-047 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `222-m209-*` + `206-m209-*` | Portal close/waive/ACK、新 pageId/capability、离线工作包 |
-| M210 | Network Portal 运营异常详情只读 UI：复用 `GET /network-portal/operational-exceptions/{id}`；Admin Web `/network-portal/exceptions/:id`；列表深链；catalog 仍 v15 | ADR-048 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `223-m210-*` + `207-m210-*` | Portal ACK/resolve、新 pageId/capability、离线工作包 |
-| M211 | Network Portal 资质详情只读 UI：复用 `GET /network-portal/technician-qualifications/{id}`；Admin Web `/network-portal/qualifications/:id`；列表深链；catalog 仍 v15 | ADR-049 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `224-m211-*` + `208-m211-*` | Portal decide、FileObject、新 pageId/capability |
-| M212 | Network Portal 师傅关系详情只读 UI：复用 `GET /network-portal/technician-memberships/{id}`；Admin Web `/network-portal/technicians/memberships/:id`；列表深链；catalog 仍 v15 | ADR-050 + Core OpenAPI 0.99.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `225-m212-*` + `209-m212-*` | 操作员 NetworkMembership、Portal decide、新 pageId/capability |
-| M213 | Network Portal 限定工单工作区：`GET /network-portal/work-orders/{id}/workspace`；ACTIVE NETWORK 门禁；薄 DTO；Page Registry `NETWORK.WORKORDER.WORKSPACE` + `page-registry-v16`；Admin Web `/network-portal/work-orders/:id` | ADR-051 + Core OpenAPI 1.0.0 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `226-m213-*` + `210-m213-*` | Admin workspace 复用、完整 §6.1、PII/INTEGRATION、Portal ACK、notifications |
-| M214 | Network Portal 工作区协作队列深链：UI-only taskId 深链/水合 + related OPEN 整改/异常 fan-in；catalog 仍 v16 | ADR-052 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `227-m214-*` + `211-m214-*` | SLA/Visit/表单 DTO、PII、Portal ACK、notifications |
-| M215 | Network Portal 工作区预约/联系 fan-in：按 taskIds 客户端拉取 M197/M199 appointments/contact-attempts；缺能力省略；catalog 仍 v16 | ADR-053 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `228-m215-*` + `212-m215-*` | SLA/Visit/表单 DTO、PII、写控件、notifications |
-| M216 | Network Portal 工作区当前师傅 fan-in：客户端 fan-in M194 technicians 解析 displayName/membershipId + 预约 window 只读 enrichment；catalog 仍 v16 | ADR-054 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `229-m216-*` + `213-m216-*` | SLA/Visit/表单 DTO、Admin workspace 复用、addressRef/PII、notifications |
-| M217 | Network Portal 目录页师傅 fan-in：工单/任务目录 displayName + 工作台基数深链 + 详情残余深链；catalog 仍 v16 | ADR-055 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `230-m217-*` + `214-m217-*` | 列表预约 N+1、SLA/Visit/表单 DTO、PII、notifications |
-| M218 | Technician Portal Feed/日程 Accepted 字段展示：UI-only 展示 M195 既有非 PII 字段 + 门户内深链/水合；catalog 仍 v16 | ADR-056 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `231-m218-*` + `215-m218-*` | 离线工作包、TASK.DETAIL、MESSAGE、PII、GPS/上传 |
-| M219 | Technician Portal TECHNICIAN.ME /me 页壳：UI-only 消费 M188 /me*；修正 ME→sync-summary 别名；catalog 仍 v16 | ADR-057 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `232-m219-*` + `216-m219-*` | PROFILE/TASK.DETAIL/MESSAGE、离线工作包、PII |
-| M220 | Network Portal 队列/列表 Accepted 字段展示：整改/异常/资质/师傅列表 + 任务目录 + handlingTaskId 深链；catalog 仍 v16 | ADR-058 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `233-m220-*` + `217-m220-*` | ACK/decide、Admin Review 深链、SLA/Visit/表单、notifications |
-| M221 | Network Portal 工作区薄 SLA 摘要：扩展 workspace 可选 `slaSummary`；NETWORK `sla.read` soft-gate；按 ACTIVE taskIds 计数；OpenAPI 1.0.1；catalog 仍 v16 | ADR-059 + Core OpenAPI 1.0.1 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `234-m221-*` + `218-m221-*` | Visit/表单摘要、工作台 SLA 风险计数、Admin workspace 复用、PII、SLA 详情/deeplink |
-| M222 | Network Portal 工作区 Visit/表单提交摘要：扩展 workspace 可选 `visits`/`formSubmissions`；NETWORK `visit.read`/`form.read` soft-gate；复用 Admin 摘要字段集；OpenAPI 1.0.2；catalog 仍 v16 | ADR-060 + Core OpenAPI 1.0.2 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `235-m222-*` + `219-m222-*` | definition/values、Evidence 摘要、Admin workspace 复用、独立 NP Visit/表单列表、工作台 SLA 风险、notifications |
-| M223 | Network Portal 工作区 Evidence 槽位/资料项摘要：扩展 workspace 可选 `evidenceSlots`/`evidenceItems`；NETWORK `evidence.read` soft-gate；复用 Admin 摘要字段集；OpenAPI 1.0.3；catalog 仍 v16 | ADR-061 + Core OpenAPI 1.0.5 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `236-m223-*` + `220-m223-*` | Admin workspace 复用、独立 NP Evidence 列表、缩略图/下载、Revision 图、definition JSON、工作台 SLA 风险、notifications |
-| M224 | Network Portal 工作台薄 SLA 风险计数：扩展 workbench 可选 `slaSummary`；NETWORK `sla.read` soft-gate；跨 ACTIVE taskIds 聚合；OpenAPI 1.0.4；catalog 仍 v16 | ADR-062 + Core OpenAPI 1.0.5 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `237-m224-*` + `221-m224-*` | 即将超时时间窗、SLA 详情/deeplink、notifications、Portal ACK |
-| M225 | Network Portal 工作区整改摘要：扩展 workspace 可选 `corrections`；NETWORK `evidence.read` soft-gate；复用 Admin 摘要字段集；OpenAPI 1.0.5；catalog 仍 v16 | ADR-063 + Core OpenAPI 1.0.5 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `238-m225-*` + `222-m225-*` | reviews[]、Portal ACK、Admin workspace 复用、notifications |
-| M226 | Network Portal 工作区运营异常摘要：扩展 workspace 可选 `exceptions`；NETWORK `operations.exception.read` soft-gate；复用 `NetworkPortalExceptionItem`；OpenAPI 1.0.6；catalog 仍 v16 | ADR-064 + Core OpenAPI 1.0.6 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `239-m226-*` + `223-m226-*` | Portal ACK/resolve、Admin exception-item 发明、notifications、预约/联系服务端摘要 |
-| M227 | Network Portal 工作区预约/联系服务端摘要：扩展 workspace 可选 `appointments`/`contactAttempts`；NETWORK `networkPortal.manageAppointment` soft-gate；复用 Admin 摘要字段集；OpenAPI 1.0.7；catalog 仍 v16 | ADR-065 + Core OpenAPI 1.0.7 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `240-m227-*` + `224-m227-*` | 完整 Appointment DTO、写控件、PII、师傅服务端摘要、notifications |
-| M228 | Network Portal 工作区当前师傅服务端摘要：扩展 workspace 可选 `technicians`；NETWORK `technician.readOwnNetwork` soft-gate；复用 `NetworkPortalTechnicianItem`；OpenAPI 1.0.8；catalog 仍 v16 | ADR-066 + Core OpenAPI 1.0.8 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `241-m228-*` + `225-m228-*` | PII、写控件、Admin workspace 复用、notifications |
-| M229 | Network Portal 工作区审核案例服务端摘要：扩展 workspace 可选 `reviews`；NETWORK `evidence.read` soft-gate；复用 Admin Review 摘要；OpenAPI 1.0.9；catalog 仍 v16；ReviewCase NETWORK read 对齐 | ADR-067 + Core OpenAPI 1.0.9 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `242-m229-*` + `226-m229-*` | 独立 NP Review API/pageId、Portal ACK/decide、Admin Review 深链、note/approvalRef/decidedBy、notifications |
-| M230 | Network Portal 目录页师傅服务端摘要：扩展 work-orders/tasks 可选 `technicians`；NETWORK `technician.readOwnNetwork` soft-gate；复用 `NetworkPortalTechnicianItem`；OpenAPI 1.0.10；catalog 仍 v16 | ADR-068 + Core OpenAPI 1.0.10 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `243-m230-*` + `227-m230-*` | PII、写控件字段发明、列表预约 N+1、notifications、Portal ACK |
-| M231 | Network Portal 目录页预约服务端摘要：扩展 work-orders/tasks 可选 `appointments`；NETWORK `networkPortal.manageAppointment` soft-gate；复用 Admin/NP 预约摘要；OpenAPI 1.0.11；catalog 仍 v16 | ADR-069 + Core OpenAPI 1.0.11 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `244-m231-*` + `228-m231-*` | 完整 Appointment DTO、写控件、PII、目录 contactAttempts、notifications、Portal ACK |
-| M232 | Network Portal 目录页联系尝试服务端摘要：扩展 work-orders/tasks 可选 `contactAttempts`；NETWORK `networkPortal.manageAppointment` soft-gate；复用 Admin/NP 联系摘要；OpenAPI 1.0.12；catalog 仍 v16 | ADR-070 + Core OpenAPI 1.0.12 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `245-m232-*` + `229-m232-*` | PII/party/note/recording/actor、写控件、notifications、Portal ACK |
-| M233 | Network Portal 目录页资料整改服务端摘要：扩展 work-orders/tasks 可选 `corrections`；NETWORK `evidence.read` soft-gate；复用 Admin/NP 整改摘要；OpenAPI 1.0.13；catalog 仍 v16 | ADR-071 + Core OpenAPI 1.0.13 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `246-m233-*` + `230-m233-*` | 目录 SLA 风险、目录 evidence、独立 NP Correction CRUD、notifications、Portal ACK |
-| M234 | Network Portal 目录页 SLA 风险服务端摘要：扩展 work-orders/tasks 可选 `slaRiskSummaries`；NETWORK `sla.read` soft-gate；keyed 薄计数；OpenAPI 1.0.14；catalog 仍 v16 | ADR-072 + Core OpenAPI 1.0.14 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `247-m234-*` + `231-m234-*` | 即将超时窗口、完整 SlaInstance、目录 evidence、notifications、Portal ACK |
-| M235 | Network Portal 目录页资料 Evidence 服务端摘要：扩展 work-orders/tasks 可选 `evidenceSlots`/`evidenceItems`；NETWORK `evidence.read` soft-gate；复用 Admin/NP 工作区摘要；OpenAPI 1.0.15；catalog 仍 v16 | ADR-073 + Core OpenAPI 1.0.15 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `248-m235-*` + `232-m235-*` | 缩略图/下载、Revision 图、definition JSON、独立 NP Evidence API、notifications、Portal ACK、用户脱敏 |
-| M236 | Network Portal 目录页工单头字段：扩展 items 非 PII 服务产品/区域/receivedAt；WorkOrderDirectoryHeaderQuery；OpenAPI 1.0.16；catalog 仍 v16 | ADR-074 + Core OpenAPI 1.0.16 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC + Admin E2E + `249-m236-*` + `233-m236-*` | 用户脱敏 PII、独立 updatedAt、目录 reviews、notifications、Portal ACK |
-| M237 | Network Portal 工作台统计时间展示：UI-only 页级 asOf「统计时间」+ capacity.updatedAt；OpenAPI 仍 1.0.16；catalog 仍 v16 | ADR-075 + Core OpenAPI 1.0.16（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `250-m237-*` + `234-m237-*` | 今日/明日预约计数、签约比例/评分、PII、notifications、Portal ACK、产能申请 |
-| M238 | Network Portal 预约/联系历史 Accepted 字段展示：UI-only 操作者/渠道/窗口；OpenAPI 仍 1.0.16；catalog 仍 v16 | ADR-076 + Core OpenAPI 1.0.16（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `251-m238-*` + `235-m238-*` | 工作区/目录摘要扩 actor、今日/明日预约计数、notifications、Portal ACK、PII |
-| M239 | Network Portal 工作区 Visit/表单/Evidence Accepted 字段展示：UI-only 补齐 M222/M223 非 PII 摘要字段；OpenAPI 仍 1.0.16；catalog 仍 v16 | ADR-077 + Core OpenAPI 1.0.16（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `252-m239-*` + `236-m239-*` | GPS/note/values/definition/file、Admin workspace 复用、notifications、Portal ACK、PII |
-| M240 | Network Portal 工作区协作摘要 Accepted 字段展示：UI-only 预约/联系/整改/审核/异常/师傅非 PII 字段；OpenAPI 仍 1.0.16；catalog 仍 v16 | ADR-078 + Core OpenAPI 1.0.16（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `253-m240-*` + `237-m240-*` | 摘要扩 actor、PII、Portal ACK、notifications、Admin workspace 复用 |
-| M241 | Network Portal 预约/联系历史残余 Accepted 字段展示：UI-only project/workOrder/technician/network/createdAt/allowedActions；OpenAPI 仍 1.0.16；catalog 仍 v16 | ADR-079 + Core OpenAPI 1.0.16（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `254-m241-*` + `238-m241-*` | addressRef/note/party/recording、PII、Portal ACK、notifications、今日/明日预约计数 |
-| M242 | Network Portal 整改详情残余 Accepted 字段展示：UI-only closedBy/waivedBy/waiveApprovalRef/waiveNote/submittedBy；OpenAPI 仍 1.0.16；catalog 仍 v16 | ADR-080 + Core OpenAPI 1.0.16（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `255-m242-*` + `239-m242-*` | Portal close/waive 写控件、摘要扩 waiveNote、PII、notifications |
-| M243 | Technician Portal 当前责任任务在线详情：`GET /technician/me/tasks/{taskId}`；ACTIVE 当前师傅责任门禁；非 PII Task 头/guard/version/预约摘要；Feed 深链 | ADR-081 + Core OpenAPI 1.0.17 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `256-m243-*` + `240-m243-*` | 联系/预约、Visit、表单、Evidence、整改写命令；离线工作包、GPS/上传、MESSAGE/PROFILE、PII |
-| M244 | Technician Portal 联系历史安全摘要：M243 详情 `contactAttempts[]`；Appointment SQL 白名单投影；无对象引用/自由文本/录音/actorId | ADR-082 + Core OpenAPI 1.0.18 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `257-m244-*` + `241-m244-*` | 联系对象权威引用与写命令；预约写、Visit、表单、Evidence、整改、离线与通知 |
-| M245 | Technician Portal Visit 历史安全摘要：M243 详情 `visits[]`；Fieldwork SQL 白名单投影；无 GPS/距离/设备/离线命令/note/引用 | ADR-083 + Core OpenAPI 1.0.19 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `258-m245-*` + `242-m245-*` | Visit 写、离线、表单、Evidence、整改与通知 |
-| M246 | Technician Portal 表单提交安全摘要：可选 `formSubmissions`；project `form.read` 软门禁；无 values/message/digest/submittedBy | ADR-084 + Core OpenAPI 1.0.20 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `259-m246-*` + `243-m246-*` | 表单写/schema/values；Evidence、整改、离线与通知 |
-| M247 | TypeScript OpenAPI Client 消费基础：固定生成模板；两次干净生成；CommonJS/ESM 编译；npm tarball 独立安装、类型导入与运行时实例化 | Core OpenAPI 1.0.20（不变）+ OpenAPI Generator 7.22.0 + `agent-verify.sh client-ts` + contracts test/gate + `260-m247-*` + `244-m247-*` | Swift Client、制品发布/签名/SBOM、Web auth/context/error/trace、设计 Token、兼容元数据 |
-| M248 | Swift OpenAPI Client 消费基础：同源 swift6/URLSession/AsyncAwait 生成；oneOf/Package 受控模板；两次干净生成；完整 Swift 6 模块编译与独立 executable 消费 | Core OpenAPI 1.0.20（不变）+ OpenAPI Generator 7.22.0 + Apple Swift 6.4 + `agent-verify.sh client-swift` + 37 contracts tests + `261-m248-*` + `245-m248-*` | iOS App/Xcode/真机、认证/错误/Trace、设计 Token、制品发布/签名/SBOM |
-| M249 | 多端共享 Design Token：版本化单一 JSON 源；Web CSS variables 与 Swift 6 常量确定性生成；无 Portal/角色假设 | `agent-verify.sh design-tokens` + Swift 6 compile + CSS probes + 38 contracts tests + Core OpenAPI 1.0.20/Flyway 100/102（不变）+ `262-m249-*` + `246-m249-*` | 独立客户端导入、Admin 全量迁移、暗色/可访问性、视觉回归、图标文案与制品发布 |
-| M250 | Web auth/context/error/trace 共享基础：内存 Token；opaque context/version 边界；Bearer/correlation/trace；Problem Details 安全文案；无角色假设 | TypeScript 6 strict + 4 Node tests + npm pack/install/import + Admin production build + Core OpenAPI 1.0.20/Flyway 100/102（不变）+ `263-m250-*` + `247-m250-*` | 生产 OIDC/BFF、独立 App 接入、iOS 对齐、clientKind/clientVersion、浏览器 E2E 与制品发布 |
-| M251 | iOS auth/context/error/trace 共享基础：Token Vault 协议与测试内存 Actor；opaque Context 边界；HTTPS/Bearer/correlation 请求；Problem Details 安全文案与诊断 | Apple Swift 6.4 strict module + independent async executable + source role gate + Core OpenAPI 1.0.20/Flyway 100/102（不变）+ `264-m251-*` + `248-m251-*` | Xcode App、Keychain、OIDC、真实 URLSession、clientKind/clientVersion、真机/模拟器与离线运行时 |
-| M252 | 多端身份机器注册表：33 Page ID、Accepted Feature ID、11 已发布 Action Code 单源；TypeScript/Swift 确定性生成；未知动作默认过滤 | `agent-verify.sh client-identities` + backend Page Registry alignment + Core OpenAPI action enum contract + TS/Swift negative probes + Core OpenAPI 1.0.20/Flyway 100/102（不变）+ `265-m252-*` + `249-m252-*` | clientKind/clientVersion、支持能力协商、独立 App 实际导入、制品发布、运行时 Feature API、未知 schema |
-| M253 | 多端客户端元数据：Web/iOS 自动发送有界 kind/version；服务端规范化到请求属性、MDC 与 OTel Span；非法/缺失值不回显并降为哨兵；不参与授权 | Core OpenAPI 1.0.21 + `agent-verify.sh client-metadata` + Filter positive/negative tests + Web/iOS strict smoke + oasdiff + TS/Swift generation/consumer + Flyway 100/102（不变）+ `266-m253-*` + `250-m253-*` | 支持能力与最低版本协商、强制升级、灰度 cohort、独立 App 实际接入、版本指标面板与制品发布 |
-| M254 | Track A 仓库内总门禁：TS/Swift Client、Token、Identity、Web/iOS Core、元数据与契约兼容按独立消费者顺序阻断；分项日志和 manifest | `agent-verify.sh client-foundation` 9/9 PASS + Core OpenAPI 1.0.21/Flyway 100/102（不变）+ `267-m254-*` + `251-m254-*` | 远端 CI/制品、签名/SBOM、独立 App 实际导入、生产身份/Keychain/真机、运行时兼容策略 |
-| M255 | 独立 Network Web AppShell：自有 package/lock、Vite 端口、生产构建、响应式 Shell、固定 NETWORK_WEB 身份与环境/API/version 失败关闭 | `agent-verify.sh network-web` + npm ci + vue-tsc/Vite build + environment positive/negative probes + Core OpenAPI 1.0.21/Flyway 100/102（不变）+ `268-m255-*` + `252-m255-*` | OIDC、`/me`、Network Context/Capability/导航、业务页迁移、E2E/部署、Admin 旧路由删除 |
-| M256 | Track B 独立 Network Web 完整交付：OIDC PKCE 内存会话、`/me` Context/Capability/导航、M194～M242 页面与 75 条旧回归迁移、A/B 隔离负向、独立镜像、Admin 正式路由退役 | `agent-verify.sh network-web`（76 Playwright）+ Admin build + PortalContext/NetworkPortalRead PostgreSQL IT + MVC security + Docker build/healthz/SPA smoke + Core OpenAPI 1.0.21/Flyway 100/102（不变）+ `269-m256-*` + `253-m256-*` | 正式生产 IdP/集群发布、NETWORK.NOTIFICATION、Portal ACK/resolve/decide、价格结算、离线工作包；下一批次 Track C |
-| M257 | Track C 独立 Technician H5 迁移：OIDC PKCE 内存会话、`/me` TECHNICIAN Context/Capability/导航、Feed/Schedule/Sync/Me/Task Detail、8 条移动端 E2E、Admin 正式路由退役、独立镜像 | `agent-verify.sh technician-web`（8 Playwright）+ Admin build + TechnicianPortalFeed PostgreSQL IT + MVC security + Docker build/healthz/SPA smoke + Core OpenAPI 1.0.21/Flyway 100/102（不变）+ `270-m257-*` + `254-m257-*` | Track D iOS 工程；Track E 联系/Visit/表单/Evidence/提交整改写闭环；Track F 离线；生产 IdP/集群 |
-| M258 | Track D 仓库内 iOS 安全基础：五环境、OIDC PKCE、ThisDeviceOnly Keychain、exchange/refresh/logout、URLSession/Problem Details、TECHNICIAN Context、生成 Client/Token 实际链接、日志脱敏 | `agent-verify.sh technician-ios` Swift 6 four-module compile + real Keychain/OIDC/Context smoke + `agent-verify.sh ios-core` + Core OpenAPI 1.0.21/Flyway 100/102（不变）+ `271-m258-*` + `255-m258-*` | 缺完整 Xcode：SwiftUI App/Xcode project/Simulator/真机/签名/TestFlight 未验收；Track E/F 未开始 |
-| M259 | Track D 原生 App 构建批次：SwiftUI/Observation AppShell、系统 OIDC、Keychain 恢复、TECHNICIAN Context/Capability/导航、五环境 Xcode project/workspace/scheme、XCTest/XCUITest 产物 | Xcode shared scheme Test generic Simulator build + generic iPhoneOS arm64 build + Build For Testing；`technician-ios-app` source/后续运行门禁 + Core OpenAPI 1.0.21/Flyway 100/102（不变）+ `272-m259-*` + `256-m259-*` | Simulator 运行态、Production 优化构建、签名/真机/真实 IdP、VoiceOver、崩溃采集与 TestFlight 未验收；Track E/F 未开始 |
-| M260 | Track D Simulator 运行批次：本地签名宿主 Keychain、Token 恢复、Page/Capability 导航失败关闭、Accessibility XXXL 未登录壳、App 安装启动 | `agent-verify.sh technician-ios-app`：3 App XCTest + 1 XCUITest；Test/Production Simulator + generic iPhoneOS arm64 + Build For Testing；`simctl install/launch` + Core OpenAPI 1.0.21/Flyway 100/102（不变）+ `273-m260-*` + `257-m260-*` | 真实 IdP/API、开发团队签名/真机、VoiceOver 人工听读、崩溃采集、TestFlight 未验收；Track E/F 未开始 |
-| M261 | Track D 分发就绪基础：AppIcon、PrivacyInfo、Production arm64 archive/dSYM、真实 Team/证书/生产地址失败关闭、可选 App Store Connect IPA 导出 | `agent-verify.sh technician-ios-distribution` 无签名 archive/store validation + release negative probe + Core OpenAPI 1.0.21/Flyway 100/102（不变）+ `274-m261-*` + `258-m261-*` | 本机 0 签名身份/无物理设备；真实签名、真机/IdP、IPA/TestFlight、VoiceOver、崩溃采集未验收；Track E/F 未开始 |
-| M262 | Track E 首个在线 Visit 批次：Technician Context/当前责任双重校验；H5/iOS 一次性定位签到与无法施工中断；check-out 契约准备但 UI 不伪造 operationRefs | Core OpenAPI 1.0.22 + PostgreSQL/MVC/ArchitectureTest + H5 Playwright + iOS Foundation/App/Distribution + `275-m262-*` + `259-m262-*` | ADR-082 联系引用未接受；动态表单/Evidence/真实签退/整改、真机定位与 Track F 离线未实现 |
-| M263 | Track E 在线基础表单批次：当前责任双重校验；冻结 FormVersion 基础字段 H5/iOS 渲染；不可变提交；不支持规则失败关闭；不伪造草稿/prefill | Core OpenAPI 1.0.23 + Forms/Portal PostgreSQL/MVC/ArchitectureTest + H5 Playwright + iOS Foundation/App + contract/client gates + `276-m263-*` + `260-m263-*` | 完整 MCP-ONLINE-05 条件/选项/高级控件/预填草稿冲突；Evidence/真实签退/整改、真机与 Track F 离线未实现 |
-| M264 | Track E 在线资料上传批次：当前责任双重校验；安全 Slot/Item；H5 与 iOS SHA-256/Begin/无凭证 PUT/Finalize；可信采集字段服务端生成；状态不冒充扫描完成 | Core OpenAPI 1.0.24 + Evidence PostgreSQL/MVC/ArchitectureTest + H5 12 Playwright + iOS Foundation/App/Distribution + contract/client gates + `277-m264-*` + `261-m264-*` | 真机采集、弱网/断点/后台/离线、生产对象存储/扫描；EvidenceSetSnapshot、真实签退/整改未实现 |
-| M265 | Track E 资料提交批次：Technician 只提交权威 Revision/Snapshot/FormSubmission ID；服务端冻结 TASK_SUBMISSION Snapshot 并重建规范引用、摘要和双输入版本后完成 Task | Core OpenAPI 1.0.25 + Snapshot/DualInput PostgreSQL IT + MVC/ArchitectureTest + H5 13 Playwright + iOS Foundation/App + contract/client gates + `278-m265-*` + `262-m265-*` | 真实 FieldOperation operationRefs/check-out、在线整改、完整表单草稿、弱网/后台/离线与真机未实现 |
-| M266 | Track E 在线整改批次：源 Task 保持 COMPLETED；独立 correction Task 承载多轮上传/Snapshot/resubmit；历史责任精确回派；reviewer close 才权威完成整改 Task | Core OpenAPI 1.0.26 + `task.handling-completed@v1` + Correction PostgreSQL IT + MVC/ArchitectureTest + H5/iOS + contract/client gates + `279-m266-*` + `263-m266-*` | 审核人移动端、自动目标、多候选/转派、通知、完整表单草稿、真实签退、弱网/后台/离线与真机未实现 |
-| M267 | 多车企内核起点：程序验收标准 + ADR-085 通用 Connector SPI + `InboundCreateWorkOrderPipeline`；BYD CREATE_WORK_ORDER 入站委托管道；核心域禁止依赖 OEM 适配包 | ADR-085 + `integration.spi` + BYD 入站 PostgreSQL IT + ArchitectureTest 防污染 + 无 OpenAPI/Flyway 变更 + `280-m267-*` + `264-m267-*` | 回调/出站全面 SPI、条件网关运行时、REFERENCE_OEM、双车企 E2E、第三家手册 |
-| M268 | 配置治理 MVP：Workflow condition 对齐 SERVICEOS_EXPR_V1 对象；EXCLUSIVE_GATEWAY 出边静态校验；schema 漂移门禁；线性运行时仍拒绝条件边 | workflow.schema + embedded workflow-v1 + ConfigurationAssetSchemaValidator + Parser + Publication/Workflow IT + `281-m268-*` + `265-m268-*` | 完整 Workflow JSON Schema 强制、审批 UI、回放/灰度 |
-| M269 | EXCLUSIVE_GATEWAY 运行时：冻结定义条件求值；唯一命中推进；零/多命中失败关闭；工单冻结表达式上下文 | Parser + TaskCompletedHandler + Gateway/Linear IT + `282-m269-*` + `266-m269-*` | PARALLEL、默认边、网关审计轨迹增强 |
-| M270 | WAIT_EVENT 运行时：挂起订阅、关联键模板、信号幂等唤醒并继续推进；Flyway V101 | schema + V101 + WaitSignalService + WaitEvent/Linear/Gateway IT + `283-m270-*` + `267-m270-*` | 定时器超时唤醒、全量外部事件自动 fan-in、PARALLEL |
-| M271 | 标准家充勘安平台模板：中立 WORKFLOW+SLA；EXCLUSIVE_GATEWAY+WAIT_EVENT；classpath 漂移门禁与发布冒烟 | template JSON + DriftTest + HomeChargingSurveyInstallTemplatePostgresIT + `284-m271-*` + `268-m271-*` | FORM/EVIDENCE 完整模板包、Admin 模板 UI、真实 OEM 回传 |
-| M272 | REFERENCE_OEM SAMPLE Connector：独立适配器经通用 SPI 建单；SAMPLE HMAC；明确 TBD_EXTERNAL_CONTRACT | referenceoem + Security permitAll + ReferenceOemInboundOrderPostgresIT + ArchitectureTest + `285-m272-*` + `269-m272-*` | 真实第二家协议/Sandbox、出站/回调 |
-| M273 | 双车企入站回归：BYD + REFERENCE_OEM 独立 Connector/Bundle；冲突失败关闭 | DualOemInboundRegressionPostgresIT + `286-m273-*` + `270-m273-*` | 双车企提审/回调全矩阵、真实 OEM2 |
-| M274 | 第三家车企接入手册：Connector+Mapping+Bundle 标准路径 | `integration/04-third-oem-onboarding-handbook.md` + `287-m274-*` + `271-m274-*` | 真实 OEM3 接入 |
-| M275 | PARALLEL_GATEWAY fork/join：多分支激活、汇聚计数、重复 token 失败关闭；Flyway V102 | Parser + Handler + ParallelGateway/Linear IT + Validator + `288-m275-*` + `272-m275-*` | 子流程、多实例、包容网关 |
-| M276 | TIMER 到期捕获：durationSeconds 挂起、worker claim/lease 点火推进；Flyway V103 | schema + V103 + TimerWorker + Timer IT + `289-m276-*` + `273-m276-*` | 边界定时器、业务日历、超时转人工 UI |
-| M277 | SUB_PROCESS：Bundle 内 subProcessRef 启动子实例；子 END 恢复父节点；仅根 fulfill；Flyway V104 | schema + V104 + Handler + SubProcess/Linear IT + `290-m277-*` + `274-m277-*` | 嵌套取消传播 |
-| M278 | 多实例任务：multiInstance.cardinality 并行创建 N 实例；slot 到齐后推进；Flyway V105 | schema + V105 + Handler + MultiInstance IT + `291-m278-*` + `275-m278-*` | 集合驱动 cardinality、顺序多实例、多实例子流程 |
-| M279 | 工单取消级联、授权重开新建 ROOT、人工跳转到任务节点；Flyway V106～V108；事件 cancelled/reopened@v1 | Command + Cancel/Reopen Handlers + JumpService + CancelReopenJump IT + `292-m279-*` + `276-m279-*` | HTTP 命令面、FULFILLED 纠错重开、跳转网关/等待、异常补偿 |
-| M280 | 取消时配置化补偿：节点 `compensation.taskType`；COMPLETED 节点生成补偿请求与任务；Flyway V109 | schema + Validator + CancelledHandler + Compensation IT + `293-m280-*` + `277-m280-*` | 补偿完成回写、失败重试、边界事件、补偿编排图 |
-| M281 | 标准维修/移机/巡检配置模板（平台中立）+ 架构/运行时同步 + 发布冒烟 | templates + Drift + StandardChargerServiceTemplates IT + `294-m281-*` + `278-m281-*` | 表单/资料完整包、设计器、真实 OEM Bundle 绑定 |
-| M282 | Workflow 配置设计器草稿→校验→发布 API；Flyway V110～V111；OpenAPI 1.0.28 | DraftService + Controller + Designer IT + ArchitectureTest + `295-m282-*` + `279-m282-*` | 可视化画布、FORM/EVIDENCE/SLA 设计器、Diff/审批/灰度 |
-| M283 | FORM/EVIDENCE/SLA 纳入同一设计器 API；OpenAPI 1.0.29 | DraftService 类型扩展 + FormEvidenceSlaDesigner IT + `296-m283-*` + `280-m283-*` | Admin 画布、Diff/审批/灰度、其余资产类型 |
-| M284 | Admin 配置设计器壳：Page Registry v17、JSON 编辑、WORKFLOW 结构预览 | Admin Vue + PortalContext IT + build + Playwright + `297-m284-*` + `281-m284-*` | 拖拽画布、Diff/审批/灰度 |
-| M285 | 草稿 Diff + APPROVED 审批门禁；发布仅 APPROVED；OpenAPI 1.0.30；Flyway V112～V113 | DraftService + Controller + DiffApproval IT + Admin UI + `298-m285-*` + `282-m285-*` | 拖拽画布、灰度/回滚、多级审批 |
-| M286 | Bundle STABLE/CANARY 通道激活、晋级与回滚；resolve preferCanary；OpenAPI 1.0.31；Flyway V114～V115 | ActivationService + Controller + CanaryRollback IT + `299-m286-*` + `283-m286-*` | 百分比流量灰度、拖拽画布 |
-| M287 | Admin Workflow 可视化拖拽画布；布局 metadata.layout | WorkflowCanvas + Designer + Playwright + build + `300-m287-*` + `284-m287-*` | 画布建边、条件编辑、百分比灰度 |
-| M288 | CANARY trafficPercent 哈希分流；preferCanary 强制；OpenAPI 1.0.32；Flyway V116 | resolve + Activation + PercentageCanary IT + `301-m288-*` + `285-m288-*` | 多 CANARY、动态调比例 UI、自动晋级 |
-| M289 | Workflow 画布建边/删边与 EXCLUSIVE_GATEWAY 条件编辑 | WorkflowCanvas + Playwright + build + `302-m289-*` + `286-m289-*` | 条件积木、并行网关向导、自动晋级 |
-| M290 | 多槽位 CANARY、流量预算、adjust-traffic 满量自动晋级；OpenAPI 1.0.33；Flyway V117 | ActivationService + MultiSlot IT + `303-m290-*` + `287-m290-*` | 指标驱动晋级、区域槽位 UI |
-| M291 | WORKFLOW 依赖分析（draft/analyze API + Admin 报告）；OpenAPI 1.0.34 | DependencyAnalysisService + PostgresIT + `304-m291-*` + `288-m291-*` | 跨资产图 UI |
-| M292 | WORKFLOW 干跑模拟（线性/EXCLUSIVE/WAIT 暂停）；OpenAPI 1.0.35 | WorkflowSimulationService + PostgresIT + `305-m292-*` + `289-m292-*` | 历史回放、并行展开 |
-| M293 | Bundle 通道停用 + 通道托管项目 resolve 失败关闭；OpenAPI 1.0.36 | ActivationService.deactivate + Deactivate IT + `306-m293-*` + `290-m293-*` | Admin 发布控制台 |
-| M294 | RULE/DISPATCH Schema 设计器；OpenAPI 1.0.37 | rule/dispatch schemas + RuleDispatchDesignerPostgresIT + `307-m294-*` + `291-m294-*` | — |
-| M295 | NOTIFICATION/ASSIGNEE/INTEGRATION/PRICING 设计器；OpenAPI 1.0.38 | RemainingAssetDesignersPostgresIT + 4 schemas + `308-m295-*` + `292-m295-*` | 运行时引擎 |
-| M296 | 冻结 Bundle WORKFLOW 历史回放；OpenAPI 1.0.39 | HistoricalReplayService + PostgresIT + `309-m296-*` + `293-m296-*` | 事件时间轴回放 |
-| M297 | 出站提审 Connector SPI + BYD 归位：`OutboundSubmissionPipeline`；技术 ACK 分离；无 OpenAPI/Flyway 变更 | ADR-086 + Outbound SPI + BydOutboundSubmissionConnector + ArchitectureTest + unit/IT + `310-m297-*` + `294-m297-*` | 回调 SPI、创建面注册表、REFERENCE 出站样本、远端查询 |
-| M298 | 入站审核回调逐单管道 SPI：`ReviewCallbackMappedItem` + `InboundReviewCallbackItemPipeline`；BYD 委托；无 OpenAPI/Flyway 变更 | SPI + Pipeline + BydCpimReviewCallbackService + ArchitectureTest + unit/IT + `311-m298-*` + `295-m298-*` | Update/Cancel、远端查询、REFERENCE 回调样本 |
-| M299 | 出站提审 Profile 注册表：按入站 lineage/connectorVersion 唯一解析；零/多命中失败关闭；无 OpenAPI/Flyway | Profile SPI + Registry + BYD Profile + unit/IT + `312-m299-*` + `296-m299-*` | Update/Cancel、Route 注册表化、远端查询 |
-| M300 | 入站取消工单 SPI：`CancelWorkOrderMappedInbound` + 管道 + BYD cancel-orders；WorkOrderExternalLookup；无 Core OpenAPI/Flyway 变更 | SPI + Pipeline + BYD HTTP IT + ArchitectureTest + `313-m300-*` + `297-m300-*` | Update/远端查询、REFERENCE 取消样本 |
-| M301 | ExternalReviewRoute connectorVersion 经 Profile 注册表解析；单 OEM mapping 回退；无 OpenAPI/Flyway | Profiles.requireForRouteRegistration + ReviewCase IT + `314-m301-*` + `298-m301-*` | Update/远端查询、INTEGRATION 运行时 |
-| M302 | 入站更新工单 SPI：UpdateExternalWorkOrder + V118 digest + BYD update-orders；事件 external-details-updated@v1；OpenAPI 1.0.40 | SPI + Pipeline + BYD HTTP IT + ContractValidation + `315-m302-*` + `299-m302-*` | 远端查询、INTEGRATION Mapping 运行时 |
-| M303 | INTEGRATION Mapping 运行时：冻结 Bundle 加载 + 白名单 Transform + 解释；无 Flyway；OpenAPI 仍 1.0.40 | IntegrationMappingRuntime + unit/IT + `316-m303-*` + `300-m303-*` | 出站 Mapping、接入建单主路径、其他资产运行时 |
-| M304 | 建单主路径冻结 INTEGRATION Mapping 闸门；零 Mapping 兼容；审计 APPLIED | Create pipeline + BYD IT + `317-m304-*` + `301-m304-*` | 替代 OEM Mapper、出站 Mapping、ASSIGNEE 运行时 |
-| M305 | ASSIGNEE_POLICY 运行时：冻结 Bundle + when 求值 + 候选/Fallback 解释；不写 TaskAssignment | AssigneePolicyRuntime + unit/IT + `318-m305-*` + `302-m305-*` | 组织/网点实时成员解析、DISPATCH 评分；自动写入见 M323 |
-| M306 | DISPATCH 运行时：硬过滤/评分/并列/无候选 Fallback；确定性解释；不写 ServiceAssignment | DispatchRuntime + unit/IT + `319-m306-*` + `303-m306-*` | 比例分配闭环、NOTIFICATION 运行时；自动 ServiceAssignment 见 M324 |
-| M307 | NOTIFICATION 运行时：冻结触发器/when/收件人角色/通道 SPI/幂等/UNKNOWN 人工接管；LocalReference Adapter | NotificationRuntime + LocalReference + unit/IT + `320-m307-*` + `304-m307-*` | 真实短信/邮件 Adapter、模板引擎、Outbox 投递、RULE/PRICING 运行时 |
-| M308 | RULE 运行时：冻结规则 when 求值 + 严重级别聚合（BLOCK>REQUIRE_APPROVAL>WARN>default）；无领域副作用 | RuleRuntime + unit/IT + `321-m308-*` + `305-m308-*` | ReviewCase.decide 门禁见 M325、PRICING 运行时 |
-| M309 | PRICING 运行时：冻结价目 when 匹配 + amountMinor 合计；试算不落账 | PricingRuntime + unit/IT + `322-m309-*` + `306-m309-*` | 结算落账、对账、动态公式、P3 低代码增强 |
-| M310 | SERVICEOS_EXPR_V1 条件积木：字段/运算符/值/AND-OR → 白名单表达式；设计器与网关边接入 | ConditionBuilder + blocks TS + Admin build + Playwright + `323-m310-*` + `307-m310-*` | 嵌套括号 round-trip、全资产属性面板（FORM formValues 积木见 M340） |
-| M311 | 吉利浩瀚本地入站：AES 解密 + 7.1 建单映射 + 通用管道；Sandbox/签名 BLOCKED_EXTERNAL | Geely adapter + AES/IT + `324-m311-*` + `308-m311-*` + `05-geely-*` | OpenAPI 签名、Sandbox 联调、7.2～7.22 |
-| M312 | Workflow 画布：节点面板/属性（formRef/slaRef/WAIT/TIMER/SUB_PROCESS）/校验高亮/小地图/撤销重做 | WorkflowCanvas + model TS + Admin build + Playwright + `325-m312-*` + `309-m312-*` | FORM/EVIDENCE/SLA 可视配置器、多实例 UI |
-| M313 | FORM/EVIDENCE/SLA 可视结构编辑器：分组/字段/资料项/SLA 时长双向同步 JSON | StructuredAssetEditor + Admin build + Playwright + `326-m313-*` + `310-m313-*` | visibility 积木内嵌、qualityChecks UI、RULE/DISPATCH 全属性面板 |
-| M314 | 吉利本地取消/更新：AES notify_close_order / notify_update_order_info → 通用管道 | Geely cancel/update + IT + `327-m314-*` + `311-m314-*` | OpenAPI 签名、Sandbox、其余 7.x |
-| M315 | RULE/DISPATCH/ASSIGNEE/NOTIFICATION/INTEGRATION/PRICING 结构化设计器 + 条目条件积木 | PolicyAssetEditor + Admin build + Playwright + `328-m315-*` + `312-m315-*` | DISPATCH scope 地图、BUSINESS 日历 |
-| M316 | 吉利提审出站 Profile/Connector 本地 stub + 7.13 审核回调；多 OEM mapping 精确解析 | Geely outbound/callback + ProfilesTest + ReviewCase IT + `329-m316-*` + `313-m316-*` | Sandbox/OpenAPI 真实联调 |
-| M317 | 远端状态查询 SPI：UNKNOWN Delivery 探询；BYD NotSupported / Geely StillUnknown；OpenAPI 1.0.41 | RemoteStatusQueryConnector + HTTP + unit/security/Arch/contracts + `330-m317-*` + `314-m317-*` | 查询结果自动收敛、人工已送达/放弃 |
-| M318 | UNKNOWN Delivery 人工确认/放弃：disposition 不可变；状态保持 UNKNOWN；OpenAPI 1.0.42；Flyway V119 | record-manual-ack + ManualDispositionPostgresIT + contracts + `331-m318-*` + `315-m318-*` | 批量 ReplayRequest、查询自动改状态 |
-| M319 | 批量 ReplayRequest：PREVIEW/SUBMIT/approve；逐条调度单笔 retry；OpenAPI 1.0.43；Flyway V120 | BatchReplayService + PostgresIT + contracts + `332-m319-*` + `316-m319-*` | 1000 条压测、二级审批/MFA |
-| M320 | 多 OEM 并行建单冒烟：BYD + REFERENCE_OEM + GEELY 同运行时 | MultiOemParallelCreateSmokePostgresIT + `333-m320-*` + `317-m320-*` | Sandbox 真实联调 |
-| M321 | 入站 INTEGRATION Mapping 物化为建单 Canonical/领域命令；mappingVersionId=assetVersionId；Canonical 嵌 contentDigest | CreateWorkOrderMappingMaterializer + pipeline + unit/BYD HTTP IT + `334-m321-*` + `318-m321-*` | 出站 Mapping、无适配器 fallback 见 M333、默认值/枚举/条件 DSL |
-| M322 | 出站 INTEGRATION Mapping 生成提审 OEM Payload；零 Mapping 兼容 Profile；mappingVersionId=assetVersionId | IntegrationMappingRuntime OUTBOUND + DefaultOutboundDeliveryService + unit/IT + `335-m322-*` + `319-m322-*` | Profile 硬编码拆除见 M331；defaults/enum/condition DSL |
-| M323 | ASSIGNEE_POLICY 自动接入 TaskAssignment：冻结 assigneePolicyRef + task.created Inbox + RoleGrant 主体目录 → CANDIDATE；空池 MANUAL | RolePrincipalDirectoryQuery + TaskAssigneePolicy* + V121 + AssigneePolicyTaskAssignmentPostgresIT + 336-m323-* + 320-m323-* | ORGANIZATION/NETWORK 实时成员、auto-claim、DISPATCH |
-| M324 | DISPATCH 自动接入 ServiceAssignment：冻结 dispatchPolicyRef + task.created Inbox + 项目/网点目录 → ACTIVE NETWORK；空池/无容量 MANUAL | ProjectNetworkDirectoryQuery + ServiceNetworkDirectoryQuery + TaskDispatchPolicy* + V122 + DispatchPolicyServiceAssignmentPostgresIT + 337-m324-* + 321-m324-* | TECHNICIAN 见 M332；地图见 M337；比例分配/Admin 派单工作台 |
-| M325 | RULE 接入 INTERNAL ReviewCase.decide：冻结 ruleRef + decide 前门禁；BLOCK/REQUIRE_APPROVAL 拒绝 APPROVED；REJECTED/forceApprove 不受阻 | ReviewRuleGate + ReviewRuleDenyAuditor + V123 + ReviewRuleGatePostgresIT + 338-m325-* + 322-m325-* | FORM_REVIEW subjectType（CLIENT 见 M329；Snapshot/complete 见 M330） |
-| M326 | NOTIFICATION 可靠投递：task.created/completed → Inbox + Runtime → Intent/Delivery/Attempt；LocalReference SENT 本地 ACK | NotificationEventDispatchService + TaskNotificationEventHandler + V124 + NotificationReliableDeliveryPostgresIT + 339-m326-* + 323-m326-* | 真实供应商、Admin 投递工作台、PRICING、网络 I/O 移出事务 |
-| M327 | PRICING 履约事实 + SHADOW CalculationSnapshot：workorder.fulfilled → Inbox + PricingRuntime → cfg_fulfillment_fact / cfg_calculation_snapshot | PricingCalculationSnapshotService + WorkOrderFulfilledPricingHandler + V125 + PricingCalculationSnapshotPostgresIT + 340-m327-* + 324-m327-* | 落账/对账、完整 FactDefinition、Admin 计价工作台 |
-| M328 | UNKNOWN/Replay Admin 工作台：详情人工确认/放弃 + 队列批量 PREVIEW/SUBMIT/审批；Capability 软门禁 | Admin OutboundQueue/Detail + batchReplay API 客户端 + 341-m328-* + 325-m328-* | MFA/二级审批、allowedActions、新导航注册、吉利联调 |
-| M329 | RULE → CLIENT 外部回执门禁：复用 Task ruleRef + ReviewRuleGate；APPROVED 前门禁；REJECTED 不受阻 | DefaultExternalReviewReceiptService + ReviewRuleGate + ClientReviewRuleGatePostgresIT + 342-m329-* + 326-m329-* + PR #156 | clientRuleRef、吉利联调 |
-| M330 | RULE → Task complete / Evidence Snapshot 门禁：FrozenTaskRuleEvaluator + TaskFulfillmentRuleGate；BLOCK/REQUIRE_APPROVAL 失败关闭 | FrozenTaskRuleEvaluator + RuleTaskCompletionValidator + DefaultEvidenceSetSnapshotService + TaskFulfillmentRuleGatePostgresIT + 343-m330-* + 327-m330-* + PR #157 | Mapping DSL、DISPATCH TECHNICIAN（出站 Profile 拆除见 M331） |
-| M331 | 出站提审仅 Mapping：删除 Profile buildSubmitPayload；零 Mapping VALIDATION_FAILED；mappingVersionId=assetVersionId | DefaultOutboundDeliveryService + OutboundReviewSubmissionProfile SPI 瘦身 + ReviewCasePostgresIT + 344-m331-* + 328-m331-* + PR #158 | 入站仅 Mapping 见 M333、defaults/enum/condition DSL、吉利联调 |
-| M332 | DISPATCH 自动激活 TECHNICIAN：NETWORK 后网点师傅候选 + DispatchRuntime → ACTIVE TECHNICIAN；空池 MANUAL 保留 NETWORK | ActivateTechnicianFromFrozenDispatchCommand + DefaultTaskDispatchPolicyEventConsumer + DispatchPolicyServiceAssignmentPostgresIT + 345-m332-* + 329-m332-* + PR #159 | 比例分配、地图 scope 见 M337、targetType schema、自动改派 |
-| M333 | 入站 Mapping 物化无适配器 fallback：命中 INBOUND 后建单字段仅 Mapping；零 Mapping 兼容；brand/product 临时播种 | CreateWorkOrderMappingMaterializer + InboundCreateWorkOrderPipeline + CreateWorkOrderMappingMaterializerTest + BydCpimInboundOrderHttpPostgresIT + MultiOemParallelCreateSmokePostgresIT + 346-m333-* + 330-m333-* + PR #160 | defaults/enum/condition DSL 见 M334、强制 INBOUND Mapping、删除 OEM Mapper、吉利联调 |
-| M334 | 入站 Mapping DSL：constantValue/defaultValue/enumMap/condition；移除 brand/product 管道播种 | DefaultIntegrationMappingRuntime + integration-v1.schema + ConfigurationAssetSchemaValidator + BYD/MultiOem IT + 347-m334-* + 331-m334-* + PR #161 | 强制 INBOUND Mapping 见 M335、OEM Mapper 拆除、嵌套表达式、Admin DSL UI、吉利联调 |
-| M335 | CREATE_WORK_ORDER 强制 INBOUND Mapping：零 Mapping 失败关闭；三 OEM 建单夹具补齐 | InboundCreateWorkOrderPipeline.requireFrozenIntegrationMapping + Reference/Geely/Multi/Dual/BYD IT + 348-m335-* + 332-m335-* + PR #162 | RouteHint/OEM Mapper 瘦身见 M336、Update/Cancel Mapping 强制、吉利联调 |
-| M336 | CREATE_WORK_ORDER RouteHint：适配器仅路由提示；删除 BydCpimMappedOrder；Geely/REF 建单瘦身 | CreateWorkOrderRouteHint + Materializer/Pipeline + OEM create adapters + 349-m336-* + 333-m336-* + PR #163 | Update/Cancel Mapping、DISPATCH 地图/比例、吉利联调 |
-| M337 | DISPATCH 地图 scope：ServiceCoverage 过滤 NETWORK 候选；policy.scope + REGION_SCOPE 省市区命中 | V126 + ServiceNetworkCoverageQuery + DefaultTaskDispatchPolicyEventConsumer + DefaultDispatchRuntime + DispatchPolicyServiceAssignmentPostgresIT + 350-m337-* + 334-m337-* + PR #164 | 比例分配见 M338、师傅 Coverage、Admin Coverage UI |
-| M338 | DISPATCH 签约比例缺口：ORDER_COUNT/MONTH gap → ALLOCATION_RATIO_GAP 评分 | V127 + NetworkAllocation*Query + Consumer gap + Runtime allocationRatio gate + IT + 351-m338-* + 335-m338-* + PR #165 | AMOUNT/加权、qualityMayOverride、Admin 比例 UI |
-| M339 | UPDATE/CANCEL 强制 INBOUND Mapping：messageType 共存选择；拆除 BYD Update/Cancel Mapper；GEELY RouteHint | IntegrationMappingRuntime messageType + ExternalWorkOrderPointer bundle + Update/Cancel Materializer/Pipeline + BYD/GEELY IT + 352-m339-* + 336-m339-* + PR #166 | REFERENCE_OEM Update/Cancel、Admin Mapping UI、吉利联调 |
-| M340 | FORM ConditionBuilder：formValues["…"] 积木 + section visibility / field visibleWhen/requiredWhen | serviceosExprV1Blocks + ConditionBuilder formFieldKeys + StructuredAssetEditor + Node 冒烟 + Admin build + 353-m340-* + 337-m340-* + PR #167 | 嵌套括号 round-trip、EVIDENCE requiredWhen 积木见 M341、Technician 共用执行器 |
-| M341 | EVIDENCE requiredWhen ConditionBuilder 嵌入 | StructuredAssetEditor EVIDENCE + ConditionBuilder + Node 冒烟 + Admin build + 354-m341-* + 338-m341-* + PR #168 | 嵌套括号 round-trip 见 M342、Bundle FORM fieldKey 自动发现 |
-| M342 | 嵌套条件组 round-trip：递归解析 `( )/&&/||` + ConditionGroupBlock UI | serviceosExprV1Blocks ExprParser + ConditionGroupBlock + Node 冒烟 + Admin build + 355-m342-* + 339-m342-* + PR #169 | 一元 ! 积木、Technician 共用执行器 |
-| M343 | REFERENCE_OEM SAMPLE Update/Cancel Mapping：RouteHint + 强制 INBOUND Mapping | Update/Cancel Service/Controller + Security + ReferenceOemInboundUpdateCancelPostgresIT + 356-m343-* + 340-m343-* + PR #170 | 真实 OEM 合同、OpenAPI、吉利联调 |
-| M344 | EVIDENCE 同 stage FORM fieldKey 发现 → formValues 积木 | extractFormFieldKeys + DesignerPage + StructuredAssetEditor + Node 冒烟 + Admin build + 357-m344-* + 341-m344-* + PR #171 | qualityChecks UI、Bundle 运行时解析 |
-| M345 | 一元取反 `!` 条件积木 round-trip + UI | ConditionNot + parseNot + ConditionGroupBlock + Node 冒烟 + Admin build + 358-m345-* + 342-m345-* + PR #172 | De Morgan 规范化、Technician 执行器 |
-| M346 | EVIDENCE qualityChecks 可视编辑（checkType/severity） | StructuredAssetEditor qualityChecks UI + Admin build + 359-m346-* + 343-m346-* + PR #173 | parameters/expression、OCR/CV 运行时 |
-| M347 | Admin INTEGRATION Mapping DSL 可视编辑：messageType + constantValue/defaultValue/enumMap/condition | PolicyAssetEditor INTEGRATION DSL UI + Admin build + 360-m347-* + 344-m347-* + PR #174 | DISPATCH scope/fallback/allocationRatio 编辑器见 M348、Technician 条件执行器、吉利联调 |
-| M348 | DISPATCH 残留编辑器：scope/fallback/allocationRatio（ORDER_COUNT+MONTH 锁定）+ filter order/factorKey 枚举 | PolicyAssetEditor DISPATCH residual UI + Admin build + 361-m348-* + 345-m348-* + PR #175 | AMOUNT/加权、qualityMayOverride、Coverage CRUD |
-| M349 | Technician Web FORM 条件执行器：visibility/requiredWhen SERVICEOS_EXPR_V1 子集 | serviceosExprV1Evaluate + TechnicianPortalTaskDetailPage + Node 冒烟 + technician build + 362-m349-* + 346-m349-* + PR #176 | editableWhen/默认值、iOS 共用执行器、workOrder/region 权威上下文 |
-| M350 | Technician 任务详情表达式上下文头 + H5 validationRules | WorkOrderExpressionContextQuery + TechnicianPortalTaskDetail + OpenAPI 1.0.44 + H5 + IT + 363-m350-* + 347-m350-* + PR #179 | editableWhen/defaultExpression、iOS 共用执行器 |
-| M351 | 平台终审工作区只读组合查询 + Revision 短时下载授权 | FINAL_REVIEW section + FinalReviewWorkspaceQueryService + masked contact + OpenAPI 1.0.48 + IT/SecurityTest + 364-m351-* + 348-m351-* | 终审 UI（M352）、targetDecisions decide（M353）、aggregate_version |
-| M352 | Admin 终审只读 UI + Ant Design Vue 定型 | ant-design-vue + ConfigProvider/zhCN/Token + AppShell + FinalReviewWorkspace + sessionStorage 草稿 + build/unit + 365-m352-* + 349-m352-* | 正式提交 UI（M353）、完整视觉 8 态实拍（M355） |
-| M353 | ReviewCase targetDecisions 正式裁决 | OpenAPI 1.0.49 + V130 + DefaultReviewCaseService.decide + Admin 提交 + Review/Correction/RuleGate IT + 366-m353-* + 350-m353-* | 独立审核 Task 模板分离；完整 28 场景 E2E（M355） |
-| M354 | 终审驳回整改深链与版本链 | Correction 同事务创建 + CorrectionCaseDetail 深链 + Correction/Review IT + 367-m354-* + 351-m354-* | 终审后更正批次 |
-| M355 | 平台终审真实端到端门禁收口 | IT/Client/Admin build 证据矩阵 + 368-m355-* + 352-m355-* | 完整视觉 8 态人工基线、admin-pilot 全量 28 场景实拍 |
-| M356 | FORM/EVIDENCE 客户端能力兼容发布门禁 | OpenAPI 1.0.50 `clientCompatibility` + ClientCapabilityCatalog/Gate + Draft validate/publish 复检 + Admin 设计器报告 + 审计 + Unit/PostgresIT + 369-m356-* + 353-m356-* | 灰度定向发布、iOS 条件全量硬阻断、动态能力注册（运行时拒单见 M357） |
-| M357 | 师傅端运行时客户端能力拒单 | OpenAPI 1.0.51 `CLIENT_CAPABILITY_UNSUPPORTED` + ClientCapabilityRuntimeGate + Technician Form/Evidence 适配层复检 + H5 detail 展示 + Unit/Security + 370-m357-* + 354-m357-* | UNKNOWN 强制升级、iOS 条件全量硬阻断（定向发布见 M358；Feed/详情头见 M359；整改路径见 M361） |
-| M358 | supportedClientKinds 定向发布 | OpenAPI 1.0.52 + Flyway V131 + Draft/侧表持久化 + 子集硬兼容门禁 + 运行时目标外拒单 + Admin 勾选 + Unit/PostgresIT + 371-m358-* + 355-m358-* | 派单级过滤、clientVersion 下限、iOS 条件全量硬阻断、动态能力注册（Feed/详情头见 M359） |
-| M359 | Feed/详情头客户端能力拒单 | OpenAPI 1.0.53 + FrozenBundleClientCapabilityProbe + Feed `clientCapabilityUnsupportedDetail` + 详情 422 + H5 阻断深链 + Unit/Security + 372-m359-* + 356-m359-* | 派单级过滤、iOS 条件全量硬阻断、UNKNOWN 强制升级、整改头级专用增强 |
-| M360 | 终审 8 态视觉基线与 admin-pilot 冒烟加固 | Mock Playwright 8 态金标 + stale-draft + empty 失败关闭修正 + verify-admin-smoke 纳入 visual；无 OpenAPI/Flyway；373-m360-* + 357-m360-* | iOS 执行器、派单过滤、REVIEW_TASK 模板分离 |
-| M361 | 整改路径客户端能力门禁对齐 | OpenAPI 1.0.54 + Correction Service/Controller clientKind + RuntimeGate/定向目标复检 + Unit/Security + 374-m361-* + 358-m361-* | iOS 条件执行器、派单过滤、REVIEW_TASK 模板分离 |
-| M362 | 整改列表/头级客户端能力预检 | OpenAPI 1.0.55 + Correction list/claim/start 注解 clientCapabilityUnsupportedDetail + Probe 复用 + H5 阻断 + Unit/Security + 375-m362-* + 359-m362-* | claim/start 硬 422（见 M363）、Network Portal on-behalf、iOS 执行器、派单过滤、REVIEW_TASK |
-| M363 | 整改领取/启动能力硬拒单 | OpenAPI 1.0.56 + claim/start Probe.requireCompatible 状态迁移前 422 + Unit/Security + 376-m363-* + 360-m363-* | Network Portal on-behalf、iOS 执行器、派单过滤、REVIEW_TASK |
-| M364 | 独立审核 REVIEW_TASK 模板分离 | ADR-087 Accepted + Flyway V132 `review_task_id` + create/reopen/decide/forceApprove/Correction.close 绑定与 completeHandlingTask + 试点模板 REVIEW_TASK + OpenAPI 1.0.57 + Final Review 投影 + ReviewCase/CorrectionCase IT + 377-m364-* + 361-m364-* | CLIENT reviewTaskId、全量模板、审核移动端 |
-| M365 | REVIEW_TASK 工作流门闸推进（A5-B） | 模板 1.1.0 主路径 INSTALL→REVIEW→OEM；REVIEW_TASK=WAITING 门闸；V133 early signal；WorkflowReviewDecidedHandler；HomeCharging IT + ParserTest + 378-m365-* + 362-m365-* | A2-B 工作流 HUMAN reviewTask、CLIENT 门闸、全量模板 |
-| M366 | 派单级 supportedClientKinds 过滤（A1-R～A5-R） | ADR-088 Accepted + V134 师傅声明 + OpenAPI 1.0.58 declare/create + Bundle FORM∩EVIDENCE 求交 + 自动 TECHNICIAN 池硬过滤 + MANUAL/`CLIENT_KIND_TARGET_EMPTY` + DispatchClientKindFilterPostgresIT + 379-m366-* + 363-m366-* | on-behalf、iOS 执行器 |
-| M367 | Manual/Network assign kind 硬拒绝（A1-B） | ADR-088 A1-B + ManualTechnicianClientKindGate + Manual assign/reassign 422/DENY + TechnicianDeclaredClientKindsQuery + ManualAssignClientKindRejectPostgresIT + 380-m367-* + 364-m367-* | on-behalf、iOS 执行器 |
-| M368 | Network Portal on-behalf NETWORK_WEB 能力门禁 | ADR-089 Accepted + Catalog/RuntimeGate/Probe NETWORK_WEB + Portal begin/finalize/snapshot/resubmit 硬校验 + OpenAPI 1.0.59 422 + Unit/Security/PostgresIT + 381-m368-* + 365-m368-* | iOS 执行器、表单代改、Visit |
-| M369 | BUSINESS `clockMode` + Bundle 锁定 `CALENDAR`；纯函数 `deadlineAt` 与业务已用时长；`sla.started@v2`；保留 ELAPSED；无暂停/预警 | ADR-090 D1-R/D2-R/D4-R + OpenAPI 仍 1.0.59 + V135 + sla/calendar schema + SlaClockPostgresIT/单元/Contract/ArchitectureTest | 暂停/恢复、预警/升级/通知、外部节假日 API、非 Task subject、结算落账 |
-| M370 | Admin 设计系统实施对齐：Token v1.0.0、分领域 Presenter、SemanticStatusTag、组件文档、禁止硬编码色扫描 | 纯前端；06 仍 Proposed；383-m370-* + 367-m370-* + `npm run check:tokens/test:unit/build` | AppShell/业务页产品化 |
-| M371 | Admin AppShell 产品化：顶栏/侧栏/ScopeBar/Freshness/用户菜单/诊断抽屉 | 服务端 Navigation 不变；384-m371-* + 368-m371-* | 标准页模板填充 |
-| M372 | 标准页面模板 List/Detail/Workbench/Form/Config/Flow + SavedView 工具栏化 | 385-m372-* + 369-m372-* | 基准业务页 |
-| M373 | 工单中心产品化 ListPage + Ant Table + Presenter | UI_DATA_GAP 诚实展示；386-m373-* + 370-m373-* | 工单详情 |
-| M374 | 工单详情产品化 DetailTabs + 诊断隔离 + 网点分配产品化 | FinalReview/allowed-actions 保留；387-m374-* + 371-m374-* | 项目详情 |
-| M375 | 项目详情产品化 + 范围调整 DedicatedFlow | 无 UUID/命令按钮主文案；388-m375-* + 372-m375-* | 其余导航页 |
-| M376 | 主导航其余页面迁移到产品壳 | WorkbenchPageLayout + PageContainer；389-m376-* + 373-m376-* | 视觉/a11y 关闭 |
-| M377 | Admin 产品化视觉/a11y/回归关闭 | Playwright 产品化截图 + 文档收口；390-m377-* + 374-m377-* | 真实 OIDC 冒烟、全量视觉态人工补齐 |
-| M384 | Admin 产品蓝图与经典专业风基线事实源；纠正 M383 产品状态 | 395-m384-*；无运行语义变更 | M385 履约配置中心产品化 |
-| M385 | 经典专业风共享基础 + 履约配置中心母版 + 新建向导 + Runbook/Compare-Impact（OpenAPI 1.0.62） | 396-m385-* + 379-m385-*；Admin Playwright/截图；PostgresIT | M388 结构化 Draft；M386/M387 |
-| M388 | 履约 Draft 结构化 Document/StageDraft；编辑器去 documentJson 产品路径（OpenAPI 1.0.63） | 397-m388-* + 380-m388-*；DocumentMapperTest + PostgresIT + Playwright | M386/M387 |
-| M386 | Admin 工作流设计器产品页；ConfigurationDraft WORKFLOW API；无 JSON 主编辑 | 398-m386-* + 381-m386-*；Playwright + 截图；Page Registry v19 | M387 Task 模板中心；结构化 Workflow DTO |
-| M387 | 任务模板中心读模型 GET /configuration/task-templates + 产品页 | 399-m387-* + 382-m387-*；PostgresIT + Playwright；Page Registry v20 | 独立写聚合/升级策略；其余母版 |
-| M389 | 工单详情履约工作区：BusinessProgress/AllowedActionBar/当前任务卡/右轨 | 400-m389-* + 383-m389-*；Playwright 截图 | PII 读模型；资料缩略图；人工视觉批准 |
-| M390 | Network 工作台 SummaryStrip + 待分配表 + AssignTechnicianDrawer | 401-m390-* + 384-m390-*；Playwright 截图 | 师傅个人负载/冲突读模型；工作区抽屉联动；人工视觉批准 |
-| M391 | Network 工单工作区产品外壳 + AppointmentCollaborationPanel | 402-m391-* + 385-m391-*；Playwright 截图 | PII 读模型；预约日历；冲突推荐；人工视觉批准 |
-| M392 | Network 整改/异常队列产品化 + 建议动作深链 | 403-m392-* + 386-m392-*；Playwright + M220 回归 | 代补允许标志/正确示例读模型；ACK/resolve；人工视觉批准 |
-| M393 | Technician H5 今日任务：移动壳/概览/任务卡片 | 404-m393-* + 387-m393-*；Playwright 390 截图 | Feed PII/距离/SLA 读模型；作业闭环；人工视觉批准 |
-| M394 | Technician H5 任务详情作业闭环：步骤条/签到/提交前检查/底部主操作 | 405-m394-* + 388-m394-*；Playwright + M262～M265 | 客户地址导航读模型；原生签退；离线；人工视觉批准 |
-| M395 | Technician H5 整改详情 + 同步冲突中心产品化 | 406-m395-* + 389-m395-*；Playwright + correction 回归 | OfflineCommand 队列读模型；正确示例；人工视觉批准 |
-| M396 | Network 师傅列表 + 产能状态产品化 | 407-m396-* + 390-m396-*；Playwright + M220 字段兼容 | 技能/服务区域/最近同步（任务量与资质摘要见 M421）；产能申请写；人工视觉批准 |
-| M397 | Admin 用户管理目录/详情母版产品化 | 408-m397-* + 391-m397-*；Playwright 截图 | 新建用户写流程；组织/角色/最近登录读模型；人工视觉批准 |
-| M398 | Admin 项目管理列表+新建流程、工作台 SummaryStrip | 409-m398-* + 392-m398-*；Playwright 截图 | 方案聚合列；关注项目读模型；实体选择器；人工视觉批准 |
-| M399 | 项目列表 publishedSchemeCount/draftSchemeCount 服务端聚合 | 410-m399-* + 393-m399-*；OpenAPI 1.0.65；PostgresIT + ArchitectureTest + Playwright | 关注项目；实体选择器；人工视觉批准 |
-| M400 | 项目车企/区域/网点实体选择器 | 411-m400-* + 394-m400-*；OpenAPI 1.0.66；PostgresIT + ArchitectureTest + Playwright | 行政区名称树；车企主数据；关注项目；人工视觉批准 |
-| M401 | Admin 关注项目读模型 | 412-m401-* + 395-m401-*；OpenAPI 1.0.67；Flyway V139；PostgresIT + ArchitectureTest + Playwright | 行政区名称树；人工视觉批准（角标已由 M409 关闭） |
-| M402 | Admin 用户登记与目录组织/角色摘要 | 413-m402-* + 396-m402-*；OpenAPI 1.0.68；Flyway V140；PostgresIT + ArchitectureTest + Playwright | 最近登录；组织树任职编辑；人工视觉批准 |
-| M403 | Admin 主体最近登录读模型 | 414-m403-* + 397-m403-*；OpenAPI 1.0.69；Flyway V141；PostgresIT + ArchitectureTest + Playwright | 失败登录；设备指纹；组织树任职；人工视觉批准 |
-| M404 | Admin 用户详情组织任职编辑 | 415-m404-* + 398-m404-*；OpenAPI 1.0.70；PostgresIT + ArchitectureTest + Playwright | 审计时间线；树形拖拽；人工视觉批准 |
-| M405 | Admin 主体变更时间线 | 416-m405-* + 399-m405-*；OpenAPI 1.0.71；PostgresIT + ArchitectureTest + Playwright | 跨聚合时间线；操作者显示名；人工视觉批准 |
-| M406 | 车企主数据与行政区名称目录 | 417-m406-* + 400-m406-*；OpenAPI 1.0.72；Flyway V142；PostgresIT + ArchitectureTest + Playwright | 全量国标树；品牌树 UI；人工视觉批准 |
-| M407 | Network 分配师傅候选摘要 | 418-m407-* + 401-m407-*；OpenAPI 1.0.73；ArchitectureTest + Playwright | 推荐评分；人工视觉批准（日程/距离已由 M408/M410 关闭） |
-| M408 | Network 分配候选预约日程冲突摘要 | 419-m408-* + 402-m408-*；OpenAPI 1.0.74；ArchitectureTest + Playwright | 推荐评分；人工视觉批准（距离已由 M410 关闭） |
-| M409 | Admin 关注项目待办/SLA 角标聚合 | 420-m409-* + 403-m409-*；OpenAPI 1.0.75；PostgresIT + Playwright | 全量国标树；人工视觉批准 |
-| M410 | Network 分配候选行政区距离亲和 | 421-m410-* + 404-m410-*；OpenAPI 1.0.76；单元测试 + PostgresIT + Playwright | 经纬度/路网米制距离；推荐评分；人工视觉批准 |
-| M411 | Network 工作台今日预约时间轴 | 422-m411-* + 405-m411-*；OpenAPI 1.0.77；PostgresIT + Playwright | 客户脱敏 PII；完整预约日历；推荐评分；人工视觉批准 |
-| M412 | Network 分配候选推荐解释 | 423-m412-* + 406-m412-*；OpenAPI 1.0.78；EvaluatorTest + PostgresIT + Playwright | 经纬度/路网距离；数值评分；完整预约日历；人工视觉批准 |
-| M413 | Network 预约日历视图 | 424-m413-* + 407-m413-*；OpenAPI 1.0.79；PostgresIT + Playwright；page-registry-v21 | 客户脱敏 PII；月视图拖拽改约；数值评分；人工视觉批准 |
-| M414 | Admin 主数据治理台 | 425-m414-* + 408-m414-*；OpenAPI 1.0.80；Flyway V143；PostgresIT + Playwright；page-registry-v22 | 全国区县全量；拼音索引；多级子品牌；人工视觉批准 |
-| M415 | Admin 跨聚合主体变更时间线 | 426-m415-* + 409-m415-*；OpenAPI 1.0.81；Contributor SPI + PostgresIT + Playwright | 网点任职并入（M416）；AUTHORIZATION_DENIED 活动流；人工视觉批准 |
-| M416 | Admin 网点任职并入主体变更时间线 | 427-m416-* + 410-m416-*；OpenAPI 1.0.82；`NETWORK_MEMBERSHIP` Contributor + PostgresIT + Playwright | 师傅服务关系（M417）；AUTHORIZATION_DENIED 活动流；人工视觉批准 |
-| M417 | Admin 师傅服务关系并入主体变更时间线 | 428-m417-* + 411-m417-*；OpenAPI 1.0.83；`TECHNICIAN_MEMBERSHIP` Contributor + PostgresIT + Playwright | 师傅档案生命周期（M418）；AUTHORIZATION_DENIED 独立活动流；人工视觉批准 |
-| M418 | Admin 师傅档案生命周期并入主体变更时间线 | 429-m418-* + 412-m418-*；OpenAPI 1.0.84；`TECHNICIAN_PROFILE` Contributor + PostgresIT + Playwright | CLIENT_KINDS_DECLARED；AUTHORIZATION_DENIED 独立活动流（M419）；人工视觉批准 |
-| M419 | Admin 主体授权拒绝安全活动流 | 430-m419-* + 413-m419-*；OpenAPI 1.0.85；Flyway V144；actor 索引 + soft-gate + Playwright | 失败登录/设备指纹；混入 change-timeline（禁止）；人工视觉批准 |
-| M420 | Admin 师傅客户端种类声明并入主体变更时间线 | 431-m420-* + 414-m420-*；OpenAPI 1.0.86；Flyway V145；CLIENT_KINDS 事件投影 + PostgresIT + Playwright | 失败登录/设备指纹；全国区县全量；人工视觉批准 |
-| M421 | Network 师傅列表资质与开放任务摘要 | 432-m421-* + 415-m421-*；OpenAPI 1.0.87；listTechnicians 开放任务/资质摘要 + PostgresIT + Playwright | 技能 taxonomy/服务区域/最近同步/资质到期；人工视觉批准 |
-| M422 | Admin 履约配置中心使用中工单摘要 | 433-m422-* + 416-m422-*；OpenAPI 1.0.88；fulfillment-usage-summary + PostgresIT + Playwright | 按服务产品分拆/精确 COUNT>100；失败登录；人工视觉批准 |
-| M423 | Admin 工单工作区脱敏客户联系摘要 | 434-m423-* + 417-m423-*；OpenAPI 1.0.89；workspace masked* + PostgresIT + Playwright | Network 脱敏联系（M424）；表单缩略图/完整审核记录；人工视觉批准 |
-| M424 | Network 工单工作区脱敏客户联系摘要 | 435-m424-* + 418-m424-*；OpenAPI 1.0.90；NP workspace masked* + PostgresIT + Playwright | 目录客户字段；表单缩略图；人工视觉批准 |
-| M425 | Admin 工单工作区完整审核决策记录产品化 | 436-m425-* + 419-m425-*；OpenAPI 1.0.90（无 bump）；REVIEWS_CORRECTIONS decisions UI + Playwright | 表单资料缩略图/revision 预览（M426）；人工视觉批准 |
-| M426 | Admin 工单工作区表单资料授权预览 | 437-m426-* + 420-m426-*；OpenAPI 1.0.91；latestRevisionId/mimeType + PostgresIT + Playwright | Network 资料缩略图 UI（M427）；非图片内联预览；人工视觉批准 |
-| M427 | Network 工单工作区表单资料授权预览 | 438-m427-* + 421-m427-*；OpenAPI 1.0.91（无 bump）；NP workspace 图片短时授权预览 + Playwright | 非图片内联预览；目录缩略图列；人工视觉批准 |
-| M428 | Network Portal 目录页脱敏客户联系 | 439-m428-* + 422-m428-*；OpenAPI 1.0.92；工单/任务目录 masked* + PostgresIT + Playwright | Admin 目录客户列（M429）；独立 updatedAt；人工视觉批准 |
-| M429 | Admin 工单目录脱敏客户联系 | 440-m429-* + 423-m429-*；OpenAPI 1.0.93；WorkOrder masked* + PostgresIT + Playwright | 服务端客户关键词检索；阶段/责任人/SLA 列；人工视觉批准 |
-| M430 | Admin 工单目录服务区域列 | 441-m430-* + 424-m430-*；OpenAPI 1.0.93（无 bump）；省市区码列 + Playwright | 行政区中文名（M431）；按区域筛选；阶段/责任人/SLA；人工视觉批准 |
-| M431 | Admin 工单目录服务区域中文名 | 442-m431-* + 425-m431-*；OpenAPI 1.0.93（无 bump）；region-catalog 名解析 + Playwright | 全国全量树/拼音；按区域筛选；责任人/SLA；人工视觉批准 |
-| M432 | Admin 工单目录当前阶段列 | 443-m432-* + 426-m432-*；OpenAPI 1.0.94；`currentStageCode` + PostgresIT + Playwright | SLA；按阶段筛选；人工视觉批准 |
-| M433 | Admin 工单目录当前责任人列 | 444-m433-* + 427-m433-*；OpenAPI 1.0.95；`currentClaimedBy`/`currentAssigneeDisplayName` + PostgresIT + Playwright | 网点/师傅列；按责任人筛选；人工视觉批准 |
-| M434 | Admin 工单目录 SLA 风险旁载 | 445-m434-* + 428-m434-*；OpenAPI 1.0.96；页级 `slaRiskSummaries` + soft-gate + PostgresIT + Playwright | 即将超时窗口；按 SLA 筛选；人工视觉批准 |
-| M435 | Admin 工单目录独立 updatedAt | 446-m435-* + 429-m435-*；OpenAPI 1.0.97；Flyway V146；`WorkOrder.updatedAt` + 写路径 bump + PostgresIT + Playwright | 列表 total；筛选扩展；Network 独立 updatedAt；人工视觉批准 |
-| M436 | Admin 工单目录列表 total | 447-m436-* + 430-m436-*；OpenAPI 1.0.98；`totalCount`/`totalCountTruncated`（上限 100）+ PostgresIT + Playwright | 精确全量 COUNT；筛选扩展；人工视觉批准 |
-| M437 | Admin 工单目录按区域筛选 | 448-m437-* + 431-m437-*；OpenAPI 1.0.99；省市区码精确过滤 + PostgresIT + Playwright | 网点/师傅/阶段/SLA 筛选；全国区县全量树；人工视觉批准 |
-| M438 | Admin 工单目录按阶段筛选 | 449-m438-* + 432-m438-*；OpenAPI 1.0.100；`currentStageCode` + task SPI IN 收敛 + PostgresIT + Playwright | 网点/师傅/SLA 筛选；网点/师傅列；人工视觉批准 |
-| M439 | Admin 工单目录网点/师傅列 | 450-m439-* + 433-m439-*；OpenAPI 1.0.101；ACTIVE NETWORK/TECHNICIAN + 显示名 + PostgresIT + Playwright | 按网点/师傅筛选；人工视觉批准 |
-| M440 | Admin 工单目录按网点筛选 | 451-m440-* + 434-m440-*；OpenAPI 1.0.102；`currentNetworkId` + dispatch SPI IN 收敛 + PostgresIT + Playwright | 师傅/SLA/创建时间筛选；人工视觉批准 |
-| M441 | Admin 工单目录按师傅筛选 | 452-m441-* + 435-m441-*；OpenAPI 1.0.103；`currentTechnicianId` + dispatch SPI IN 收敛 + PostgresIT + Playwright | SLA/创建时间筛选；人工视觉批准 |
-| M442 | Admin 工单目录按 SLA 风险筛选 | 453-m442-* + 436-m442-*；OpenAPI 1.0.104；`slaRisk` OPEN/BREACHED + sla SPI IN + PostgresIT + Playwright | 创建时间筛选；即将超时窗口；人工视觉批准 |
-| M443 | Admin 工单目录按创建时间筛选 | 454-m443-* + 437-m443-*；OpenAPI 1.0.105；`receivedFrom`/`receivedTo` + Asia/Shanghai 自然日 + PostgresIT + Playwright | 即将超时窗口（COUNT 已由 M444 关闭）；人工视觉批准 |
-| M444 | Admin 工单目录精确全量 COUNT | 455-m444-* + 438-m444-*；OpenAPI 1.0.106；精确 COUNT(*) + truncated 恒 false + PostgresIT + Playwright | 即将超时窗口（已由 M445 关闭）；人工视觉批准 |
-| M445 | Admin 工单目录即将超时筛选 | 456-m445-* + 439-m445-*；OpenAPI 1.0.107；`slaRisk=NEAR` 30m + sla SPI + PostgresIT + Playwright | 策略化预警阈值；Network Portal NEAR；人工视觉批准 |
-| M446 | Admin 工单目录按任务状态筛选 | 457-m446-* + 440-m446-*；OpenAPI 1.0.108；`currentTaskStatus` + task SPI + PostgresIT + Playwright | 审核/整改筛选；服务端关键词；人工视觉批准 |
-| M447 | Admin 工单目录审核/整改状态筛选 | 458-m447-* + 441-m447-*；OpenAPI 1.0.109；`reviewCorrectionStatus` + evidence SPI + evidence.read soft-gate + PostgresIT + Playwright | 服务端关键词；旁载列；人工视觉批准 |
-| M448 | Admin 工单目录服务端关键词检索 | 459-m448-* + 442-m448-*；OpenAPI 1.0.110；`q` + ILIKE/后四位 + PostgresIT + Playwright | 当前任务名/类型列；异常摘要列；人工视觉批准 |
-| M449 | Admin 工单目录当前任务列 | 460-m449-* + 443-m449-*；OpenAPI 1.0.111；`currentTaskType` + task SPI sidecar + PostgresIT + Playwright | 异常摘要列；人工视觉批准 |
-| M450 | Admin 工单目录异常摘要列 | 461-m450-* + 444-m450-*；OpenAPI 1.0.112；页级 `exceptionSummaries` + soft-gate + PostgresIT + Playwright | 异常筛选；人工视觉批准 |
-| M451 | Admin 工单目录异常摘要深链 | 462-m451-* + 445-m451-*；OpenAPI 仍 1.0.112；列链接 → 异常队列 query 水合 + Playwright | 异常筛选；单异常详情直达；人工视觉批准 |
-| M452 | Admin 关注项目角标精确 COUNT | 463-m452-* + 446-m452-*；OpenAPI 1.0.113；精确 COUNT + `*Truncated=false` + PostgresIT | 履约使用中摘要精确 COUNT；人工视觉批准 |
-| M453 | Admin 责任网点候选与分配产品化 | 464-m453-* + 447-m453-*；OpenAPI 2.0.0；共享硬过滤评估器 + PROJECT Scope 查询 + 命令重校验 + 删除历史双责任外部路径 + 师傅档案/登录主体唯一映射 + PostgresIT/MVC/Admin/真实 OIDC E2E/客户端/L3 门禁 | 通用人工特批、DispatchDecision 查询、人工视觉批准 |
+| Admin Web | `serviceos-frontend/apps/admin` | `product-design/` | `corepack pnpm --dir serviceos-frontend check` + 真实环境人工产品评审 |
+| Network Web | `serviceos-frontend/apps/network` | `product-design/` 与 DEC-006 | Workspace 类型检查/构建 + 真实环境人工产品评审 |
+| Technician Web | `serviceos-frontend/apps/technician` | `product-design/` | Workspace 类型检查/构建 |
+| Technician iOS | `serviceos-technician-ios` | 核心旅程和客户端边界 | `agent-verify.sh technician-ios*`、Simulator/真机证据 |
+| 共享 Web/iOS | `serviceos-frontend/packages`、`serviceos-web-core`、`serviceos-ios-core` | 跨产品共享边界 | `client-foundation`、`web-core`、`ios-core` |
+
+自动化通过只证明对应门禁；视觉、流程可用性和产品完成状态必须由当前产品验收另行确认。
+
+## 4. 变更同步
+
+- 领域规则或职责变化：更新长期架构；重大取舍新增或替代 ADR；
+- HTTP/事件变化：更新机器契约和契约测试；
+- 数据结构变化：新增连续 Flyway 和 PostgreSQL IT；
+- 产品决策变化：更新 `product-design/` 中的基线或决策；
+- 当前完成边界变化：只更新 `implementation-status.md`；
+- Git 历史承担过程追溯，不在仓库新增 PR handoff、逐切片总结或重复验收 Markdown。

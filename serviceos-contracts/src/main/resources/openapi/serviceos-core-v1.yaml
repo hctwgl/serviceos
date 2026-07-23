@@ -12151,7 +12151,10 @@ components:
         regionName: { type: string }
         regionLevel: { enum: [COUNTRY, PROVINCE, CITY, DISTRICT] }
         position: { $ref: '#/components/schemas/ProjectPositionCode' }
-        positionName: { type: string, enum: [客服经理, 项目经理, 项目助理] }
+        positionName:
+          type: string
+          enum: [客服经理, 项目经理, 项目助理]
+          x-enum-varnames: [CustomerServiceManager, ProjectManager, ProjectAssistant]
         memberId: { type: string, format: uuid }
         principalId: { type: string, format: uuid }
         displayName: { type: [string, 'null'] }
@@ -12175,7 +12178,10 @@ components:
         - dataComplete
       properties:
         position: { $ref: '#/components/schemas/ProjectPositionCode' }
-        positionName: { type: string, enum: [客服经理, 项目经理, 项目助理] }
+        positionName:
+          type: string
+          enum: [客服经理, 项目经理, 项目助理]
+          x-enum-varnames: [CustomerServiceManager, ProjectManager, ProjectAssistant]
         assignmentId: { type: string, format: uuid }
         principalId: { type: string, format: uuid }
         displayName: { type: [string, 'null'] }

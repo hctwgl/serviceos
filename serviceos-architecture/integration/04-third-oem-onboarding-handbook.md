@@ -28,7 +28,7 @@ lastUpdated: 2026-07-18
 
 1. **创建适配器包** `integration.<oem3>`（仅协议层）  
    - SignatureVerifier / ReplayGuard / InboundMapper / OutboundMapper  
-   - 实现后委托 `InboundCreateWorkOrderPipeline`（见 ADR-085 / M267）
+   - 实现后委托 `InboundCreateWorkOrderPipeline`（见 ADR-085）
 2. **不要写领域表**；只产生 `InboundEnvelope` → `CanonicalMessage` → `ReceiveExternalWorkOrderCommand`
 3. **发布配置资产**  
    - 优先复用 `configuration/templates/home-charging-survey-install/`  
@@ -42,7 +42,7 @@ lastUpdated: 2026-07-18
    - 适配器认证与 OIDC 分离；Secret 不入库
 7. **测试最低集**  
    - 验签失败 / 重放 / 同键冲突 / 配置零多命中  
-   - 与 BYD、REFERENCE_OEM 并行冒烟（见 M273）  
+   - 与 BYD、REFERENCE_OEM 并行冒烟
    - ArchitectureTest：核心域不得依赖 `integration.<oem3>`
 8. **文档**  
    - 适配器契约、映射表、验收矩阵、更新 `roadmap/06` 与 implementation-status
@@ -56,6 +56,6 @@ lastUpdated: 2026-07-18
 
 ## 4. 参考实现
 
-- BYD：生产向协议切片（M56～M60）  
-- REFERENCE_OEM：SAMPLE SPI 演示（M272）  
-- 标准家充模板：M271
+- BYD：生产向协议适配器
+- REFERENCE_OEM：SAMPLE SPI 演示
+- 标准家充模板：`configuration/templates/home-charging-survey-install/`

@@ -33,12 +33,11 @@ lastUpdated: 2026-07-15
 执行：
 
 ```bash
-bash scripts/verify-milestone-preflight.sh
+bash scripts/verify-repository-preflight.sh
 ```
 
 必须在 Maven、Testcontainers 和镜像构建之前发现：
 
-- 实施状态、README、Architecture Book 和验收矩阵漂移；
 - Flyway 最高版本和迁移数量漂移；
 - 测试仍断言旧 Flyway 版本或旧迁移数量；
 - staging 发布清单与迁移目录不一致；
@@ -54,7 +53,7 @@ bash scripts/verify-milestone-preflight.sh
 
 ### 2.4 完整门禁
 
-R3、准备标记 Implemented 或发布候选时，对最终候选 HEAD 至少执行一次完整 verify，以及适用的客户端生成、staging、Smoke、回滚和恢复演练。
+R3 或发布候选时，对最终候选 HEAD 至少执行一次完整 verify，以及适用的客户端生成、staging、Smoke、回滚和恢复演练。
 
 完整门禁失败时：
 
@@ -100,4 +99,4 @@ bash scripts/migration-baseline.sh
 - 失败后是否重新冻结候选；
 - 当前结果对应的准确提交 SHA。
 
-不得把“新功能测试通过”表述为整个里程碑通过，也不得因为最终要求完整绿色而在每个局部修复后重复全量验证。
+不得把“新功能测试通过”表述为整个产品或能力已经完成，也不得因为最终要求完整绿色而在每个局部修复后重复全量验证。

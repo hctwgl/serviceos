@@ -69,7 +69,7 @@ data.exportSensitive
 
 能力编码是稳定安全契约；菜单和按钮可变化，但不能改变能力语义。
 
-Portal 页面与首批动作的更完整 capability 建议、数据范围和 obligations 见[页面、动作、能力与数据范围矩阵](../product/07-page-action-permission-matrix.md)。其中角色模板仅是默认授权建议，服务端仍按本章模型判定。
+具体页面动作必须以服务端 OpenAPI、当前 Capability 注册和产品决策共同确认；前端建议不能覆盖本章授权模型。
 
 ## 5. 数据范围
 
@@ -94,11 +94,11 @@ Portal 页面与首批动作的更完整 capability 建议、数据范围和 obl
 
 区域授权必须明确是否包含下级区域，不能只依赖字符串前缀。地址变更时重新计算访问投影，并保留变更前后的访问审计。
 
-> M64 已实现首个精确 REGION 子集：Project 创建时原子写入带有效期的 `project_region` 关系，
+> 当前精确 REGION 子集在 Project 创建时原子写入带有效期的 `project_region` 关系，
 > authorization 通过公开端口按 tenant、稳定 regionCode 和有效时刻解析项目集合。该实现不包含区域目录或
-> 下级展开。M65 以同样的失败关闭规则新增显式 `project_network` 关系和 NETWORK 项目集合解析；
-> M66 新增显式完整集合的 REGION/NETWORK 即时修订，提交后授权解析即时变化且旧游标失败关闭；
-> M184 已实现企业内部 Organization/OrgUnit/closure/任职与 LOCAL/EXTERNAL_AUTHORITATIVE 同步收据；
+> 下级展开。同样的失败关闭规则适用于显式 `project_network` 关系和 NETWORK 项目集合解析；
+> REGION/NETWORK 支持完整集合即时修订，提交后授权解析即时变化且旧游标失败关闭；
+> 企业内部 Organization/OrgUnit/closure/任职与 LOCAL/EXTERNAL_AUTHORITATIVE 同步收据已经存在；
 > ServiceNetwork/合作组织目录、计划生效/审批及 ORGANIZATION DataScope 匹配仍未实现。
 
 ## 6. 动作授权

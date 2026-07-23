@@ -5,11 +5,11 @@ script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd "${script_directory}/../.." && pwd)"
 generated_directory="${repository_root}/serviceos-contracts/target/generated-clients/typescript-fetch"
 artifact_directory="${repository_root}/serviceos-contracts/target/client-artifacts/typescript-fetch"
-typescript_bin="${SERVICEOS_TYPESCRIPT_BIN:-${repository_root}/serviceos-admin-web/node_modules/.bin/tsc}"
+typescript_bin="${SERVICEOS_TYPESCRIPT_BIN:-${repository_root}/serviceos-frontend/node_modules/.bin/tsc}"
 
 if [[ ! -x "${typescript_bin}" ]]; then
   echo "未找到仓库锁定的 TypeScript 编译器：${typescript_bin}" >&2
-  echo "请先在 serviceos-admin-web 执行 npm ci，或设置 SERVICEOS_TYPESCRIPT_BIN。" >&2
+  echo "请先在 serviceos-frontend 执行 corepack pnpm install，或设置 SERVICEOS_TYPESCRIPT_BIN。" >&2
   exit 1
 fi
 
