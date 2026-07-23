@@ -74,7 +74,8 @@ class DefaultNetworkPortalEvidenceServiceTest {
                         UUID.randomUUID(), NETWORK, PRINCIPAL, "MEMBER", "ACTIVE", NOW, null,
                         "fixture", NOW, null, null, null, 1)));
         when(responsibilities.find("tenant-a", TASK)).thenReturn(Optional.of(
-                new ActiveServiceResponsibility(TASK, NETWORK.toString(), TECH.toString())));
+                new ActiveServiceResponsibility(
+                        TASK, NETWORK.toString(), TECH.toString(), PRINCIPAL.toString())));
         when(technicians.listActiveTechnicians("tenant-a", NETWORK)).thenReturn(List.of(
                 new NetworkPortalTechnicianView(
                         UUID.randomUUID(), TECH, TECH_PRINCIPAL, "师傅A", "ACTIVE", "ACTIVE",

@@ -1,5 +1,7 @@
 package com.serviceos.dispatch.application;
 
+import com.serviceos.authorization.api.AuthorizationRequest;
+import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.dispatch.api.ActivateServiceAssignmentCommand;
 import com.serviceos.dispatch.api.CapacityAuthorityService;
 import com.serviceos.dispatch.api.CompleteServiceAssignmentActivationCommand;
@@ -33,31 +35,39 @@ import java.util.UUID;
  * 事务边界：双责任激活/改派同事务提交，避免 NETWORK 已 ACTIVE 而 TECHNICIAN 失败的半成品。
  * 幂等：子步骤键由 HTTP Idempotency-Key 派生，重复请求走 SPI 冻结回放。
  * M367/ADR-088 A1-B：TECHNICIAN 激活前按冻结 Bundle 定向目标硬校验师傅声明；不兼容 422。
- * 明确不做：评分、DispatchDecision、ServiceNetwork 生命周期、跨网点改派。
+ * M453：人工派网点提交前按冻结策略重新计算硬过滤候选，禁止自动创建/扩容 NETWORK 容量。
+ * 明确不做：跨网点改派和普通人工覆盖不可覆盖硬规则。
  */
 @Service
 final class DefaultManualServiceAssignmentService implements ManualServiceAssignmentService {
     private static final int CAPACITY_HEADROOM = 50;
+    private static final String ASSIGNMENT_CAPABILITY = "dispatch.assignment.manage";
 
     private final TaskFulfillmentContextService tasks;
+    private final AuthorizationService authorization;
     private final CapacityAuthorityService capacities;
     private final ServiceAssignmentService assignments;
     private final ManualTechnicianClientKindGate clientKindGate;
+    private final NetworkDispatchCandidateEvaluator networkCandidates;
     private final JdbcClient jdbc;
     private final Clock clock;
 
     DefaultManualServiceAssignmentService(
             TaskFulfillmentContextService tasks,
+            AuthorizationService authorization,
             CapacityAuthorityService capacities,
             ServiceAssignmentService assignments,
             ManualTechnicianClientKindGate clientKindGate,
+            NetworkDispatchCandidateEvaluator networkCandidates,
             JdbcClient jdbc,
             Clock clock
     ) {
         this.tasks = tasks;
+        this.authorization = authorization;
         this.capacities = capacities;
         this.assignments = assignments;
         this.clientKindGate = clientKindGate;
+        this.networkCandidates = networkCandidates;
         this.jdbc = jdbc;
         this.clock = clock;
     }
@@ -119,18 +129,65 @@ final class DefaultManualServiceAssignmentService implements ManualServiceAssign
             throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
                     "Only a HUMAN Task supports network acceptance");
         }
+        authorizeNetworkAssignment(principal, metadata.correlationId(), taskId);
+
+        var existing = activeAssignee(principal.tenantId(), taskId, ResponsibilityLevel.NETWORK);
+        if (existing.isPresent()) {
+            if (!existing.get().assigneeId().equals(networkAssigneeId)) {
+                throw new BusinessProblem(
+                        ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
+                        "当前任务已经由其他责任网点承接");
+            }
+            return new NetworkPortalAcceptAssignmentReceipt(
+                    taskId,
+                    task.workOrderId(),
+                    existing.get().serviceAssignmentId(),
+                    networkAssigneeId,
+                    clock.instant());
+        }
+
+        NetworkDispatchCandidateEvaluator.Evaluation evaluation =
+                networkCandidates.evaluate(principal.tenantId(), task);
+        if (!evaluation.workOrder().serviceProductCode().equals(businessType)) {
+            throw new BusinessProblem(
+                    ProblemCode.VALIDATION_FAILED,
+                    "请求业务类型与工单权威服务类型不一致，请刷新工单后重试");
+        }
+        NetworkDispatchCandidateEvaluator.CandidateFacts facts =
+                evaluation.requireAssignable(networkAssigneeId);
 
         String key = metadata.idempotencyKey();
-        ensureCapacity(principal, metadata, ResponsibilityLevel.NETWORK,
-                networkAssigneeId, businessType, key + "-cap-network");
-        ServiceAssignmentReceipt network = activateLevel(
+        ServiceAssignmentReceipt network = activateLevelWithCapacityVersion(
                 principal, metadata, task.workOrderId(), taskId,
                 ResponsibilityLevel.NETWORK, networkAssigneeId,
-                businessType, key + "-network");
+                businessType, facts.capacity().version(), key + "-network");
         return new NetworkPortalAcceptAssignmentReceipt(
                 taskId, task.workOrderId(),
                 network.serviceAssignmentId(), networkAssigneeId,
                 clock.instant());
+    }
+
+    /**
+     * 幂等回放可能在进入底层 ServiceAssignment 之前直接返回既有责任，因此必须在读取并返回
+     * 责任详情之前完成同等授权。Network Portal 委托沿用 NETWORK Scope，Admin 仍使用 TENANT Scope。
+     */
+    private void authorizeNetworkAssignment(
+            CurrentPrincipal principal, String correlationId, UUID taskId
+    ) {
+        String networkScope = NetworkScopedDispatchAuthorization.currentNetworkId();
+        AuthorizationRequest request = networkScope == null
+                ? AuthorizationRequest.tenantCapability(
+                ASSIGNMENT_CAPABILITY,
+                principal.tenantId(),
+                "ServiceAssignment",
+                taskId.toString())
+                : AuthorizationRequest.networkCapability(
+                ASSIGNMENT_CAPABILITY,
+                principal.tenantId(),
+                "ServiceAssignment",
+                taskId.toString(),
+                networkScope);
+        authorization.require(principal, request, correlationId);
     }
 
     @Override
@@ -249,6 +306,33 @@ final class DefaultManualServiceAssignmentService implements ManualServiceAssign
 
         long capacityVersion = capacityVersion(
                 principal.tenantId(), level, assigneeId, businessType);
+        return activateLevelWithCapacityVersion(
+                principal,
+                metadata,
+                workOrderId,
+                taskId,
+                level,
+                assigneeId,
+                businessType,
+                capacityVersion,
+                key);
+    }
+
+    /**
+     * 使用候选评估时读取的容量版本进入预占。若查询后容量发生竞争，容量权威会以版本冲突拒绝，
+     * 整个外层事务回滚，不会产生无容量的责任关系。
+     */
+    private ServiceAssignmentReceipt activateLevelWithCapacityVersion(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            UUID workOrderId,
+            UUID taskId,
+            ResponsibilityLevel level,
+            String assigneeId,
+            String businessType,
+            long capacityVersion,
+            String key
+    ) {
         ServiceAssignmentReceipt pending = assignments.prepare(
                 principal, child(metadata, key + "-prepare"),
                 new PrepareServiceAssignmentCommand(

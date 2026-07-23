@@ -380,7 +380,7 @@ final class DefaultVisitService implements VisitService {
     ) {
         if (!principal.principalId().equals(appointment.technicianId())
                 || !principal.principalId().equals(task.responsiblePrincipalId())
-                || !principal.principalId().equals(responsibility.technicianId())
+                || !principal.principalId().equals(responsibility.technicianPrincipalId())
                 || !Objects.equals(appointment.assignedNetworkId(), responsibility.networkId())) {
             throw new BusinessProblem(ProblemCode.TECHNICIAN_ASSIGNMENT_CHANGED,
                     "Appointment, Task and active service responsibility no longer belong to this technician");
@@ -393,7 +393,7 @@ final class DefaultVisitService implements VisitService {
     ) {
         if (!principal.principalId().equals(visit.technicianId())
                 || !principal.principalId().equals(task.responsiblePrincipalId())
-                || !principal.principalId().equals(responsibility.technicianId())
+                || !principal.principalId().equals(responsibility.technicianPrincipalId())
                 || !Objects.equals(visit.networkId(), responsibility.networkId())) {
             throw new BusinessProblem(ProblemCode.TECHNICIAN_ASSIGNMENT_CHANGED,
                     "Visit and active service responsibility no longer belong to this technician");

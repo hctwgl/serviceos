@@ -476,7 +476,9 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                         TASK_READ_ASSIGNED, actor.tenantId(), "ServiceNetwork",
                         networkId.toString(), networkId.toString()),
                 correlationId);
-        List<String> assigneeIds = List.of(principalId.toString(), profile.id().toString());
+        // TECHNICIAN 服务责任的唯一受让人标识是师傅档案 ID。登录主体只用于认证和授权，
+        // 先通过权威目录解析档案后再查责任，禁止继续双读 principalId 兼容旧责任数据。
+        List<String> assigneeIds = List.of(profile.id().toString());
         return new AuthorizedTechnicianContext(networkId, principalId, profile.id(), assigneeIds);
     }
 

@@ -4,9 +4,9 @@ import com.serviceos.ServiceOsApplication;
 import com.serviceos.dispatch.api.ManualAssignServiceAssignmentCommand;
 import com.serviceos.dispatch.api.ManualServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ManualServiceAssignmentService;
-import com.serviceos.dispatch.api.NetworkPortalAcceptAssignmentReceipt;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.CommandMetadata;
+import com.serviceos.shared.BusinessProblem;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** M144：人工初派编排经真实 PostgreSQL 落到双 ACTIVE 责任与 COMPLETED saga。 */
 @Testcontainers(disabledWithoutDocker = true)
@@ -112,33 +113,28 @@ class ManualServiceAssignmentPostgresIT {
     }
 
     @Test
-    void manualAssignNetworkActivatesNetworkOnly() {
+    void manualAssignNetworkWithoutFrozenPolicyFailsClosedAndDoesNotCreateCapacity() {
         UUID workOrderId = UUID.randomUUID();
         UUID taskId = seedHumanTask(workOrderId);
 
-        NetworkPortalAcceptAssignmentReceipt receipt = manualAssignments.manualAssignNetwork(
+        assertThatThrownBy(() -> manualAssignments.manualAssignNetwork(
                 manager(), metadata("manual-network-only"),
-                taskId, "network-pilot-1", BUSINESS_TYPE);
-
-        assertThat(receipt.workOrderId()).isEqualTo(workOrderId);
-        assertThat(receipt.networkAssigneeId()).isEqualTo("network-pilot-1");
+                taskId, "network-pilot-1", BUSINESS_TYPE))
+                .isInstanceOf(BusinessProblem.class)
+                .hasMessageContaining("缺少已冻结的派单配置");
         assertThat(jdbc.sql("""
-                        SELECT responsibility_level || ':' || assignee_id || ':' || status
-                          FROM dsp_service_assignment
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                         ORDER BY responsibility_level
+                        SELECT count(*) FROM dsp_capacity_counter
+                         WHERE tenant_id = :tenantId AND responsibility_level = 'NETWORK'
                         """)
-                .param("tenantId", TENANT).param("taskId", taskId)
-                .query(String.class).list())
-                .containsExactly("NETWORK:network-pilot-1:ACTIVE");
+                .param("tenantId", TENANT)
+                .query(Long.class).single())
+                .isZero();
         assertThat(jdbc.sql("""
                         SELECT count(*) FROM dsp_service_assignment
                          WHERE tenant_id = :tenantId AND task_id = :taskId
-                           AND responsibility_level = 'TECHNICIAN'
                         """)
                 .param("tenantId", TENANT).param("taskId", taskId)
-                .query(Long.class).single())
-                .isZero();
+                .query(Long.class).single()).isZero();
     }
 
     private UUID seedHumanTask(UUID workOrderId) {

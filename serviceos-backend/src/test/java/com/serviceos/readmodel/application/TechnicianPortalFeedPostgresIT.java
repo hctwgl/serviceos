@@ -107,7 +107,7 @@ class TechnicianPortalFeedPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("146");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("149");
         assertThat(flyway.info().applied()).hasSizeGreaterThanOrEqualTo(127);
 
         seedPrincipal(TECH_PRINCIPAL, "Technician A");
@@ -129,12 +129,12 @@ class TechnicianPortalFeedPostgresIT {
         seedHumanTask(TASK_A, WO_A, PROJECT_A);
         seedHumanTask(TASK_B, WO_B, UUID.randomUUID());
         seedHumanTask(TASK_OTHER, UUID.randomUUID(), UUID.randomUUID());
-        // 本人 ACTIVE：assignee = principalId
-        seedActivePair(NETWORK_A, WO_A, TASK_A, TECH_PRINCIPAL.toString(), TECH_ASSIGNMENT_A);
+        // TECHNICIAN 服务责任保存师傅档案 ID；登录主体只用于认证、Task 和现场操作。
+        seedActivePair(NETWORK_A, WO_A, TASK_A, TECH_PROFILE_A.toString(), TECH_ASSIGNMENT_A);
         // 同网点另一师傅责任（不应出现在本人 feed）
         seedActivePair(NETWORK_A, UUID.randomUUID(), TASK_OTHER, "other-assignee", UUID.randomUUID());
         // 跨网点师傅责任
-        seedActivePair(NETWORK_B, WO_B, TASK_B, OTHER_TECH_PRINCIPAL.toString(), UUID.randomUUID());
+        seedActivePair(NETWORK_B, WO_B, TASK_B, TECH_PROFILE_B.toString(), UUID.randomUUID());
         seedAppointment(APPOINTMENT_A, TASK_A, WO_A, PROJECT_A);
         seedContactAttempt(CONTACT_ATTEMPT_A, TASK_A, WO_A, PROJECT_A);
         seedVisit(VISIT_A, APPOINTMENT_A, TASK_A, WO_A, PROJECT_A);
@@ -169,7 +169,7 @@ class TechnicianPortalFeedPostgresIT {
         UUID projectId = UUID.randomUUID();
         UUID appointmentId = UUID.randomUUID();
         seedHumanTask(taskId, workOrderId, projectId);
-        seedActivePair(NETWORK_A, workOrderId, taskId, TECH_PRINCIPAL.toString(), UUID.randomUUID());
+        seedActivePair(NETWORK_A, workOrderId, taskId, TECH_PROFILE_A.toString(), UUID.randomUUID());
         jdbc.sql("""
                 INSERT INTO tsk_task_assignment (
                     task_assignment_id, tenant_id, task_id, assignment_kind,
@@ -217,7 +217,7 @@ class TechnicianPortalFeedPostgresIT {
         UUID workOrderId = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();
         seedHumanTask(taskId, workOrderId, projectId);
-        seedActivePair(NETWORK_A, workOrderId, taskId, TECH_PRINCIPAL.toString(), UUID.randomUUID());
+        seedActivePair(NETWORK_A, workOrderId, taskId, TECH_PROFILE_A.toString(), UUID.randomUUID());
         jdbc.sql("""
                 INSERT INTO tsk_task_assignment (
                     task_assignment_id, tenant_id, task_id, assignment_kind,
@@ -341,6 +341,23 @@ class TechnicianPortalFeedPostgresIT {
                 actor(TECH_PRINCIPAL), "corr-other", context, "TECHNICIAN_WEB", TASK_OTHER))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
+    }
+
+    @Test
+    void taskDetailStillReturnsAppointmentAfterCheckInAdvancesItToInProgress() {
+        // 回归：签到把预约从 CONFIRMED 推进为 IN_PROGRESS 后，任务详情仍必须返回该预约。
+        // 否则完成任务的前置检查「已有预约安排」在签到后永远无法满足，形成必然死锁。
+        jdbc.sql("UPDATE apt_appointment SET status='IN_PROGRESS' WHERE appointment_id=:id")
+                .param("id", APPOINTMENT_A).update();
+
+        TechnicianPortalTaskDetail detail = portal.taskDetail(
+                actor(TECH_PRINCIPAL), "corr-inprogress",
+                "TECHNICIAN|NETWORK|" + NETWORK_A, "TECHNICIAN_WEB", TASK_A);
+
+        assertThat(detail.appointments()).singleElement().satisfies(appointment -> {
+            assertThat(appointment.appointmentId()).isEqualTo(APPOINTMENT_A);
+            assertThat(appointment.taskId()).isEqualTo(TASK_A);
+        });
     }
 
     @Test

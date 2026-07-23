@@ -99,17 +99,21 @@ async function loadNetworks() {
 }
 
 async function loadDetail() {
+  // 路由切换会先更新 params，再卸载旧页面。一次加载必须固定使用启动时的项目标识，
+  // 否则异步请求返回后继续读取 projectId.value，可能误发 /projects//... 请求并触发全局登录态清理。
+  const requestedProjectId = projectId.value
+  if (!requestedProjectId) return
   loading.value = true
   error.value = null
   errorCode.value = null
   try {
-    detail.value = await getAuthorizedProject(projectId.value)
+    detail.value = await getAuthorizedProject(requestedProjectId)
     try {
-      fulfillmentProfiles.value = await listProjectFulfillmentProfiles(projectId.value)
+      fulfillmentProfiles.value = await listProjectFulfillmentProfiles(requestedProjectId)
     } catch {
       fulfillmentProfiles.value = []
     }
-    await loadRevisions()
+    await loadRevisions(undefined, requestedProjectId)
     const latest = revisions.value?.items?.[0]
     const regions = latest?.regionCodes ?? detail.value.project.regionCodes ?? []
     const nets = latest?.networkIds ?? detail.value.project.networkIds ?? []
@@ -119,12 +123,12 @@ async function loadDetail() {
     baselineNetworkIds.value = [...nets]
     recordRecentVisit({
       resourceType: 'PROJECT',
-      resourceId: projectId.value,
+      resourceId: requestedProjectId,
       pageId: 'ADMIN.PROJECT.DETAIL',
       displayRef: detail.value.project.name || detail.value.project.code,
     })
     try {
-      const status = await getFollowedProjectStatus(projectId.value)
+      const status = await getFollowedProjectStatus(requestedProjectId)
       followed.value = status.followed
     } catch {
       followed.value = false
@@ -132,7 +136,7 @@ async function loadDetail() {
     diagnostics.pushDiagnostic({
       title: '项目详情技术上下文',
       fields: {
-        projectId: projectId.value,
+        projectId: requestedProjectId,
         version: detail.value.project.version,
         asOf: detail.value.asOf,
         clientId: detail.value.project.clientId,
@@ -149,8 +153,9 @@ async function loadDetail() {
   }
 }
 
-async function loadRevisions(next?: string) {
-  const page = await listAuthorizedProjectScopeRevisions(projectId.value, {
+async function loadRevisions(next?: string, requestedProjectId = projectId.value) {
+  if (!requestedProjectId) return
+  const page = await listAuthorizedProjectScopeRevisions(requestedProjectId, {
     cursor: next,
     limit: '20',
   })

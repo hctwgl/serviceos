@@ -52,7 +52,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class ProjectFulfillmentProfilePostgresIT {
     private static final String TENANT = "tenant-pfp-m378-it";
-    private static final String ACTOR = "pfp-operator";
+    private static final UUID ACTOR_ID = UUID.fromString("bf17b71d-cdd7-4a4a-9cc9-2d79b9ca9378");
+    private static final String ACTOR = ACTOR_ID.toString();
     private static final String PROJECT_CODE = "PFP-M378";
 
     @Container
@@ -90,6 +91,7 @@ class ProjectFulfillmentProfilePostgresIT {
                     aud_audit_record, auth_role_grant, auth_role_capability, auth_role
                     CASCADE
                 """).update();
+        seedActorIdentity();
         seedGrants();
         projectId = UUID.randomUUID();
         jdbc.sql("""
@@ -236,6 +238,12 @@ class ProjectFulfillmentProfilePostgresIT {
         assertThat(published.versionNo()).isEqualTo(1);
         assertThat(published.contentDigest()).matches("[0-9a-f]{64}");
         assertThat(published.manifestJson()).contains("HOME_CHARGING_SURVEY_INSTALL");
+        assertThat(published.publishedBy()).isEqualTo(ACTOR);
+        assertThat(published.publishedByDisplayName()).isEqualTo("履约配置管理员");
+        assertThat(profiles.listRevisions(
+                principal(), "corr-revisions", projectId, created.profileId()))
+                .extracting(ProjectFulfillmentRevisionView::publishedByDisplayName)
+                .containsExactly("履约配置管理员");
 
         assertThatThrownBy(() -> jdbc.sql("""
                 UPDATE cfg_project_fulfillment_revision
@@ -403,6 +411,34 @@ class ProjectFulfillmentProfilePostgresIT {
                 .param("tenant", TENANT)
                 .param("principal", ACTOR)
                 .param("role", fulfillmentRoleId)
+                .update();
+    }
+
+    private void seedActorIdentity() {
+        jdbc.sql("""
+                INSERT INTO idn_security_principal (
+                    principal_id, tenant_id, principal_type, principal_status,
+                    aggregate_version, created_at, updated_at
+                ) VALUES (:id, :tenant, 'USER', 'ACTIVE', 1, now(), now())
+                ON CONFLICT (principal_id) DO NOTHING
+                """)
+                .param("id", ACTOR_ID)
+                .param("tenant", TENANT)
+                .update();
+        jdbc.sql("""
+                INSERT INTO idn_person_profile (
+                    principal_id, tenant_id, display_name, employee_number,
+                    profile_version, created_at, updated_at, updated_by
+                ) VALUES (
+                    :id, :tenant, '履约配置管理员', 'PFP-M378-ADMIN',
+                    1, now(), now(), 'test'
+                )
+                ON CONFLICT (principal_id) DO UPDATE
+                   SET display_name = EXCLUDED.display_name,
+                       updated_at = EXCLUDED.updated_at
+                """)
+                .param("id", ACTOR_ID)
+                .param("tenant", TENANT)
                 .update();
     }
 

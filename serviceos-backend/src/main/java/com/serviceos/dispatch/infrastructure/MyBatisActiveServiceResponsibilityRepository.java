@@ -35,7 +35,7 @@ final class MyBatisActiveServiceResponsibilityRepository
         Object id = row.get("taskId");
         return new ActiveServiceResponsibility(
                 id instanceof UUID uuid ? uuid : UUID.fromString(id.toString()),
-                text(row, "networkId"), text(row, "technicianId"));
+                text(row, "networkId"), text(row, "technicianId"), null);
     }
 
     private ServiceAssignmentSummary summary(Map<String, Object> row) {

@@ -3,7 +3,7 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Work Order",
-        allowedDependencies = {"shared", "reliability::api", "audit::api", "project::api",
+        allowedDependencies = {"shared", "reliability::api", "audit::api",
                 "identity::api", "authorization::api"}
 )
 package com.serviceos.workorder;

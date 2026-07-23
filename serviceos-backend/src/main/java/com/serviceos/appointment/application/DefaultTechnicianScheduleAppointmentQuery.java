@@ -44,7 +44,11 @@ final class DefaultTechnicianScheduleAppointmentQuery implements TechnicianSched
                             ON r.revision_id = a.current_revision_id
                          WHERE a.tenant_id = :tenantId
                            AND a.task_id IN (:taskIds)
-                           AND a.status IN ('PROPOSED', 'CONFIRMED')
+                           -- 必须包含 IN_PROGRESS / COMPLETED：签到会把预约从 CONFIRMED 推进为
+                           -- IN_PROGRESS、签退推进为 COMPLETED。完成任务的前置检查依赖任务详情里
+                           -- 「已有预约安排」，若只保留 PROPOSED/CONFIRMED，则签到后预约会从任务详情
+                           -- 消失，导致师傅签到后永远无法完成任务（必然死锁）。仅排除失败/放弃态。
+                           AND a.status IN ('PROPOSED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED')
                          ORDER BY r.window_start, a.appointment_id
                         """)
                 .param("tenantId", tenantId)

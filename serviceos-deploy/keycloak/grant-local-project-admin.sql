@@ -61,6 +61,7 @@ INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
 VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.create', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.team.manage', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'workOrder.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.assign', now()),
@@ -97,6 +98,7 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'file.download', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.readSensitive', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.register', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageLinks', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageLifecycle', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageProfile', now()),
@@ -134,7 +136,10 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.revision.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.snapshot.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.techRef.read', now()),
-    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'pricing.snapshot.read', now())
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'pricing.snapshot.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'configuration.draft.write', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'configuration.approve', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'configuration.publish', now())
 ON CONFLICT (role_id, capability_code) DO NOTHING;
 
 INSERT INTO auth_role_grant (
@@ -148,7 +153,7 @@ INSERT INTO auth_role_grant (
 ) ON CONFLICT (grant_id) DO NOTHING;
 
 -- M187 低权限 viewer：Keycloak create 不保证自定义 UUID，由
--- verify-admin-smoke.sh#ensure_m187_viewer 按实际 subject 幂等回填。
+-- 本地产品场景重置按 Keycloak 实际 subject 幂等回填。
 
 -- BYD 适配器 SERVICE 主体：外发 HTTP 成功后同租户落 CLIENT Case / Route。
 INSERT INTO auth_role (

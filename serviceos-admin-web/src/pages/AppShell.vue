@@ -73,13 +73,6 @@ const recentError = ref<string | null>(null)
 const collapsed = ref(localStorage.getItem(COLLAPSE_KEY) === '1')
 const routeProgress = ref(false)
 
-const networkPortalUrl =
-  import.meta.env.VITE_NETWORK_PORTAL_URL?.trim() ||
-  (import.meta.env.DEV ? 'http://localhost:5174' : '')
-const technicianPortalUrl =
-  import.meta.env.VITE_TECHNICIAN_PORTAL_URL?.trim() ||
-  (import.meta.env.DEV ? 'http://localhost:5175' : '')
-
 const TEST_IDS: Record<string, string> = {
   'ADMIN.WORKBENCH': 'nav-workbench',
   'ADMIN.SEARCH': 'nav-search',
@@ -92,7 +85,6 @@ const TEST_IDS: Record<string, string> = {
   'ADMIN.MASTERDATA.CATALOG': 'nav-master-data',
 }
 
-const showDevTools = import.meta.env.DEV
 const diagnostics = useDeveloperDiagnostics()
 const route = useRoute()
 const router = useRouter()
@@ -332,61 +324,6 @@ onMounted(() => {
           </Menu>
         </section>
 
-        <section class="nav-section">
-          <h2 v-if="!collapsed" class="nav-section__title">工单运营</h2>
-          <Menu mode="inline" :inline-collapsed="collapsed">
-            <Menu.Item key="golden-path">
-              <RouterLink to="/work-orders/golden-path" data-testid="nav-golden-path">
-                工单全流程演练
-              </RouterLink>
-            </Menu.Item>
-          </Menu>
-        </section>
-
-        <section class="nav-section">
-          <h2 v-if="!collapsed" class="nav-section__title">系统管理</h2>
-          <Menu mode="inline" :inline-collapsed="collapsed">
-            <Menu.Item key="prefs">
-              <RouterLink to="/settings/preferences" data-testid="nav-ui-preferences">
-                界面偏好
-              </RouterLink>
-            </Menu.Item>
-            <Menu.Item v-if="showDevTools" key="demo">
-              <RouterLink to="/system/demo-data" data-testid="nav-demo-data">
-                演示数据管理
-              </RouterLink>
-            </Menu.Item>
-            <Menu.Item key="token">
-              <RouterLink to="/settings/token">身份登录</RouterLink>
-            </Menu.Item>
-          </Menu>
-        </section>
-
-        <section v-if="showDevTools" class="nav-section">
-          <h2 v-if="!collapsed" class="nav-section__title">运维与开发者工具</h2>
-          <Menu mode="inline" :inline-collapsed="collapsed">
-            <Menu.Item key="lookup">
-              <RouterLink to="/work-orders/lookup">按 ID 打开</RouterLink>
-            </Menu.Item>
-            <Menu.Item key="inbound">
-              <RouterLink to="/integration/inbound">入站队列</RouterLink>
-            </Menu.Item>
-            <Menu.Item key="outbound">
-              <RouterLink to="/integration/outbound">外发队列</RouterLink>
-            </Menu.Item>
-            <Menu.Item key="stubs">
-              <RouterLink to="/portal-stubs" data-testid="nav-portal-stubs">
-                Portal 诊断
-              </RouterLink>
-            </Menu.Item>
-            <Menu.Item v-if="networkPortalUrl" key="network-portal">
-              <a :href="networkPortalUrl" data-testid="nav-network-portal">网点端</a>
-            </Menu.Item>
-            <Menu.Item v-if="technicianPortalUrl" key="technician-portal">
-              <a :href="technicianPortalUrl" data-testid="nav-technician-portal">师傅端</a>
-            </Menu.Item>
-          </Menu>
-        </section>
       </nav>
 
       <section

@@ -137,6 +137,17 @@ class DefaultTechnicianEvidenceServiceTest {
     }
 
     @Test
+    void nullResponsiblePrincipalIsNotFoundNotNpe() {
+        // 任务完成/未指派时 responsiblePrincipalId 为 null；不可变 List.contains(null) 不得抛 NPE（500），
+        // 应按“非当前责任人”返回 RESOURCE_NOT_FOUND。
+        when(tasks.find("tenant-264", TASK)).thenReturn(Optional.of(task(null)));
+        assertThatThrownBy(() -> service.listItems(
+                principal(), "corr-null-responsible", context(), "TECHNICIAN_WEB", TASK))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
+    }
+
+    @Test
     void dualInputCompletionRebuildsTrustedRefsAndDigestsOnServer() {
         UUID snapshotId = UUID.randomUUID();
         UUID submissionId = UUID.randomUUID();

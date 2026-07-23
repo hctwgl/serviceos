@@ -20,7 +20,7 @@ status: Proposed
 | authorization | ARCH-07、ARCH-21、M63～M67、ADR-025/026、M186、M188、M196～M242 | API-01/02/07、Core OpenAPI 1.0.8、ProjectScopeAuthorizationService、治理 HTTP、`/me*` | DATA-02、V064～V067、V089～V090、V096～V100 | M2 AUTH、M6 SEC、M63～M67、M186、M188、M196～M242 | E1/E4 |
 | audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
 | authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
-| configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
+| configuration | ARCH-05、AD-014、DEC-007（Accepted 目标）、ADR-091 | API-01/02/07 | DATA-01 | M2 CFG、M378〜M383、履约方案匹配验收（目标） | E2 |
 | files | ARCH-10、ARCH-21、ARCH-25 | API-03 资料引用、API-08 文件控制面 | DATA-03、V010 物理迁移 | M3 FILE、M6 SEC、M11 | E1/E3 |
 | reliability | ARCH-20、ADR-014 | API-01 通用命令/事件 | DATA-01 | M6 TX | E1 |
 | readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032/033/040/041/043/044/045/046/047/048/049/050/051/052/053/054/055/056/057/058/059/060/061/062/063/064/065/066/067/068/069/070/071/072/073/074/075/076/077/078/079/080、M189～M195、M202～M203、M205～M242 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读/整改/异常/资质/师傅关系/工作台 enrichment/产能页/整改详情/异常详情/资质详情/关系详情/限定工作区/协作深链/预约联系 fan-in/师傅 fan-in/目录 fan-in/队列字段展示/工作区 SLA 摘要/Visit 与表单提交摘要/Evidence 槽位与资料项摘要/工作台 SLA 风险计数/工作区整改摘要/工作区运营异常摘要/工作区预约联系服务端摘要/工作区师傅服务端摘要/工作区审核案例服务端摘要/目录页师傅服务端摘要/目录页预约服务端摘要/目录页联系尝试服务端摘要/目录页资料整改服务端摘要/目录页 SLA 风险服务端摘要/目录页资料 Evidence 服务端摘要/目录页工单头字段/工作台统计时间展示/预约联系历史字段展示/工作区 Visit 表单 Evidence 字段展示/工作区协作摘要字段展示/预约联系历史残余字段展示/整改详情残余字段展示 + §11 Technician Feed/字段展示/ME 页壳）、Core OpenAPI 1.0.16 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M195、M202～M203、M205～M242 | U0/U1 |
@@ -35,7 +35,7 @@ status: Proposed
 | evidence | ARCH-10、ADR-008/018/022/039/040、M201～M202 | API-03、Core OpenAPI 0.94.0 Network Portal evidence on-behalf / correction queue、evidence.slots-reresolved@v1 | DATA-03、V053、V099 | M3 EVD/FILE、M53、M201、M202 | E3 |
 | review | ARCH-10 | API-03、OpenAPI 0.30.0、client-review-case-created@v1 | DATA-03、V049/V054/V056 | M3 REV/COR、M55/M57 | E3 |
 | network | ARCH-11、ADR-024/042/043/044、M185、M204～M206 | API-04、Core OpenAPI 1.0.0 Network Portal manage-technician + qualification/membership list | DATA-04、V088、V100 | M4 NET、M185、M204～M206 | E4 |
-| dispatch | ARCH-11、ADR-009、ADR-034/038、M144、M196、M200 | API-04、Core OpenAPI 0.92.0 Network Portal assign/reassign-technician | DATA-04、V024、V096、V098 | M4 DSP/ASN、M144、M196、M200 | E4 |
+| dispatch | ARCH-11、ADR-009、ADR-034/038、M144、M196、M200、M453 | API-04、Core OpenAPI 2.0.0 责任网点候选与两阶段责任链 | DATA-04、V024、V096、V098（M453 无迁移） | M4 DSP/ASN、M144、M196、M200、M453 | E4 |
 | sla | ARCH-12、M61～M66 | sla.started/breached/met@v1；API-04、OpenAPI Core 0.38.0 | DATA-04、V061～V066 | M4 SLA、M61～M66 | E4 |
 | integration | ARCH-13、ADR-010/014、M57～M60 | API-04、OpenAPI Core 0.32.0、BYD CPIM 0.3.0、outbound-delivery-created/acknowledged/replay-requested/recovered@v1、route/callback 事件 | DATA-04、V055～V060 | M4 INT/DLV、M56～M60 | E2/E4 |
 | notification | ARCH-14 | API-04 | DATA-04 | M4 NTF | E4 |
@@ -238,7 +238,7 @@ Feature gate/authority: if applicable
 | M141 | Admin 入站同单表单/资料/审核/外发 E2E：`BYD:INSTALL:` 系谱、formRef+PILOT_SURVEY Evidence、visit→form→snapshot→INTERNAL APPROVED→BYD ACK→厂端回调→dual complete→FULFILLED；SA 仍为本地夹具 | PRODUCT-01/02 + ARCH-08/09/10/11/13/19 + BYD Inbound/Outbound + Form/Evidence/Review + Admin Web build/E2E + `154-m141-*` + `138-m141-*` | Admin 派单 HTTP、同单整改分支、真实 sandbox、完整 ADMIN-PILOT-09 |
 | M142 | Admin 入站同单整改补传复审外发 E2E：visit→form→REJECTED→CorrectionCase→同 Item 补传→resubmit/close→复审 APPROVED→BYD ACK→厂端回调→FULFILLED；SA 仍为本地夹具 | PRODUCT-01/02 + ARCH-08/09/10/11/13/19 + BYD Inbound/Outbound + Form/Evidence/Review/Correction + Admin Web build/E2E + `155-m142-*` + `139-m142-*` | Admin 派单 HTTP、真实 sandbox、完整 ADMIN-PILOT-09 |
 | M143 | Admin 试点 SPI ServiceAssignment 种子：field-ops/入站工单经 Capacity+Assignment SPI 注入 ACTIVE NETWORK/TECHNICIAN、CONFIRMED reservation 与 COMPLETED saga；删除 SQL 直插 | PRODUCT-01/02 + ARCH-11/19 + Dispatch SPI + Admin pilot smoke + `156-m143-*` + `140-m143-*` | Admin 派单 HTTP、真实 sandbox、完整 ADMIN-PILOT-09 |
-| M144 | Admin 人工初派 ServiceAssignment HTTP：`manual-assign` OpenAPI 0.72.0 + 编排门面；Admin UI；field-ops/入站 Playwright；删除 SPI 种子；入站证明 ADMIN-PILOT-09（窄化派单） | PRODUCT-01/02 + ARCH-11/19 + Core OpenAPI 0.72.0 + Dispatch ManualAssign + Admin Web E2E + `157-m144-*` + `141-m144-*` | 评分/硬过滤/ServiceNetwork 生命周期、真实 sandbox |
+| M144 | 历史 Admin 双责任 HTTP 试点；M453 已删除外部路径与 Admin UI，内部原子编排仅供 Network Portal 指派师傅复用 | PRODUCT-01/02 + ARCH-11/19 + Dispatch ManualAssign 内部编排 + `157-m144-*` + `141-m144-*` | 当前产品入口以 M453 两阶段责任链为准 |
 | M145 | Admin 入站 Envelope/Canonical 详情深链：工作区 INTEGRATION → `/integration/inbound/{id}`；复用已 Implemented GET；Playwright 断言 Envelope/Canonical/`BYD:INSTALL:` | PRODUCT-01/02 + ARCH-13/19 + Inbound GET APIs + Admin Web E2E + `158-m145-*` + `142-m145-*` | 专用入站队列列表 API、原文下载、真实 sandbox |
 | M146 | Admin 外发交付队列筛选：OutboundQueuePage 绑定 Accepted OpenAPI 单值筛选（默认 UNKNOWN）；Playwright ACK 后 `status=ACKNOWLEDGED` 可见交付 | PRODUCT-01/02 + ARCH-13/19 + API-06 §6 outbound-deliveries + Admin Web E2E + `159-m146-*` + `143-m146-*` | 多 status OR、SavedView、专用入站队列列表 API、真实 sandbox |
 | M147 | Admin 工作区外发交付详情深链：INTEGRATION `outboundDeliveries[]` → `/integration/outbound/{id}`；复用已 Implemented GET/详情页；Playwright 断言 | PRODUCT-01/02 + ARCH-13/19 + API-06 workspace INTEGRATION + Outbound GET + Admin Web E2E + `160-m147-*` + `144-m147-*` | 专用入站队列列表 API、SavedView、真实 sandbox |
@@ -541,4 +541,4 @@ Feature gate/authority: if applicable
 | M450 | Admin 工单目录异常摘要列 | 461-m450-* + 444-m450-*；OpenAPI 1.0.112；页级 `exceptionSummaries` + soft-gate + PostgresIT + Playwright | 异常筛选；人工视觉批准 |
 | M451 | Admin 工单目录异常摘要深链 | 462-m451-* + 445-m451-*；OpenAPI 仍 1.0.112；列链接 → 异常队列 query 水合 + Playwright | 异常筛选；单异常详情直达；人工视觉批准 |
 | M452 | Admin 关注项目角标精确 COUNT | 463-m452-* + 446-m452-*；OpenAPI 1.0.113；精确 COUNT + `*Truncated=false` + PostgresIT | 履约使用中摘要精确 COUNT；人工视觉批准 |
-
+| M453 | Admin 责任网点候选与分配产品化 | 464-m453-* + 447-m453-*；OpenAPI 2.0.0；共享硬过滤评估器 + PROJECT Scope 查询 + 命令重校验 + 删除历史双责任外部路径 + 师傅档案/登录主体唯一映射 + PostgresIT/MVC/Admin/真实 OIDC E2E/客户端/L3 门禁 | 通用人工特批、DispatchDecision 查询、人工视觉批准 |

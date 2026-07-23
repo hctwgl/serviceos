@@ -96,6 +96,7 @@ class WorkOrderWorkspaceControllerSecurityTest {
                         "technician-m92", now.minusSeconds(60), "TECHNICIAN_SELECTED"),
                 null,
                 null,
+                List.of(),
                 "UNKNOWN",
                 new WorkOrderWorkspaceSourceVersions(3),
                 new WorkOrderWorkspaceMeta(now, "work-order-core-timeline.v1:gen:1", "UNKNOWN", "q-1"),

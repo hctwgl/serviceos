@@ -205,6 +205,50 @@ INSERT INTO auth_role_grant (
     now()
 ) ON CONFLICT (grant_id) DO NOTHING;
 
+-- Admin Pilot 与演示门户共用这一组真实网点运营事实。候选查询只接受明确覆盖和既有容量，
+-- 因此测试夹具也不得依赖人工派单命令临时创建容量或把任意网点当作默认值。
+INSERT INTO net_service_network_coverage (
+    coverage_id, tenant_id, service_network_id, brand_code, business_type,
+    region_code, coverage_status, valid_from, valid_to, created_at
+) VALUES
+(
+    'd3500000-1000-4000-8000-000000000014', 'tenant-local',
+    'd3500000-1000-4000-8000-000000000002', 'BYD_OCEAN',
+    'HOME_CHARGING_SURVEY_INSTALL', '370000', 'ACTIVE', now() - interval '1 day', NULL, now()
+),
+(
+    'd3500000-1000-4000-8000-000000000015', 'tenant-local',
+    'd3500000-1000-4000-8000-000000000002', 'BYD_OCEAN',
+    'ADMIN_PILOT_COMPLETION', '370000', 'ACTIVE', now() - interval '1 day', NULL, now()
+)
+ON CONFLICT (coverage_id) DO NOTHING;
+
+INSERT INTO dsp_capacity_counter (
+    capacity_counter_id, tenant_id, responsibility_level, assignee_id,
+    business_type, max_units, occupied_units, version, updated_by, updated_at
+) VALUES
+(
+    'd3500000-1000-4000-8000-000000000016', 'tenant-local', 'NETWORK',
+    'd3500000-1000-4000-8000-000000000002', 'HOME_CHARGING_SURVEY_INSTALL',
+    100, 0, 1, 'demo-fixture', now()
+),
+(
+    'd3500000-1000-4000-8000-000000000017', 'tenant-local', 'TECHNICIAN',
+    'd3500000-1000-4000-8000-000000000004', 'HOME_CHARGING_SURVEY_INSTALL',
+    100, 0, 1, 'demo-fixture', now()
+),
+(
+    'd3500000-1000-4000-8000-000000000018', 'tenant-local', 'NETWORK',
+    'd3500000-1000-4000-8000-000000000002', 'ADMIN_PILOT_COMPLETION',
+    100, 0, 1, 'demo-fixture', now()
+),
+(
+    'd3500000-1000-4000-8000-000000000019', 'tenant-local', 'TECHNICIAN',
+    'd3500000-1000-4000-8000-000000000004', 'ADMIN_PILOT_COMPLETION',
+    100, 0, 1, 'demo-fixture', now()
+)
+ON CONFLICT (tenant_id, responsibility_level, assignee_id, business_type) DO NOTHING;
+
 -- Technician Portal 读取指派任务
 INSERT INTO auth_role (
     role_id, tenant_id, role_code, role_name, role_status, created_at

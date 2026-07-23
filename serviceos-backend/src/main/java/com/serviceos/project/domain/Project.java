@@ -58,6 +58,15 @@ public record Project(
                 status.name(), version, createdAt, publishedSchemeCount, draftSchemeCount);
     }
 
+    /** 草稿项目只能显式激活一次，避免配置发布流程猜测项目是否已投入运营。 */
+    public Project activate() {
+        if (status != Status.DRAFT) {
+            throw new IllegalStateException("仅草稿项目可以激活");
+        }
+        return new Project(id, tenantId, code, clientId, name, startsOn, endsOn, regionCodes, networkIds,
+                Status.ACTIVE, version + 1, createdAt);
+    }
+
     /**
      * 校验并冻结新的整组范围关系。关系的有效期追加由应用层事务完成，聚合只决定新版本与目标集合。
      */

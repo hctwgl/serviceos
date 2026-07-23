@@ -12,6 +12,7 @@ use_existing="${1:-}"
 if [[ "${use_existing}" != "--use-existing" ]]; then
   rm -rf "${generated_directory}"
   "${repository_root}/mvnw" --batch-mode --no-transfer-progress \
+    -f "${repository_root}/pom.xml" \
     -pl serviceos-contracts openapi-generator:generate@generate-typescript-fetch-client
 fi
 
@@ -19,6 +20,24 @@ if [[ ! -f "${generated_directory}/package.json" ]]; then
   echo "Generated TypeScript client is missing: ${generated_directory}" >&2
   exit 1
 fi
+
+# 生成目录是独立制品，不能再由旧 Web 工程通过 file: 依赖触发 lifecycle build。
+# 在这里显式安装生成客户端自己的开发依赖并编译，确保 tsc 来源稳定且错误在契约生成阶段暴露。
+if [[ "$(node --version 2>/dev/null || true)" != v22.* ]]; then
+  if [[ -s "${NVM_DIR:-${HOME}/.nvm}/nvm.sh" ]]; then
+    # shellcheck disable=SC1090
+    source "${NVM_DIR:-${HOME}/.nvm}/nvm.sh"
+    nvm use 22 >/dev/null
+  else
+    echo "TypeScript client generation requires Node 22 LTS." >&2
+    exit 1
+  fi
+fi
+(
+  cd "${generated_directory}"
+  corepack pnpm install --ignore-workspace --frozen-lockfile=false
+  corepack pnpm run build:client
+)
 
 rm -rf "${artifact_directory}"
 mkdir -p "${artifact_directory}"
@@ -36,7 +55,7 @@ files_manifest="${artifact_directory}/files.sha256"
   cd "${generated_directory}"
   while IFS= read -r generated_file; do
     printf '%s  %s\n' "$(checksum "${generated_file}")" "${generated_file#./}"
-  done < <(find . -type f -print | LC_ALL=C sort)
+  done < <(find . -path './node_modules' -prune -o -type f -print | LC_ALL=C sort)
 ) > "${files_manifest}"
 
 contract_sha256="$(checksum "${contract_path}")"

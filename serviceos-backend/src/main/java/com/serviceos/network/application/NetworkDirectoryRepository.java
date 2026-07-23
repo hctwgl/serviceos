@@ -1,6 +1,7 @@
 package com.serviceos.network.application;
 
 import com.serviceos.network.api.ClearanceWorkItemView;
+import com.serviceos.network.api.ServiceNetworkCoverageView;
 import com.serviceos.network.domain.NetworkMembership;
 import com.serviceos.network.domain.NetworkTechnicianMembership;
 import com.serviceos.network.domain.PartnerOrganization;
@@ -25,6 +26,9 @@ public interface NetworkDirectoryRepository {
     void insertNetwork(ServiceNetwork network);
     boolean deactivateNetwork(String tenantId, UUID serviceNetworkId, long expectedVersion,
             String reason, String actorId, Instant now);
+
+    Optional<ServiceNetworkCoverageView> findCoverage(String tenantId, UUID coverageId);
+    void insertCoverage(String tenantId, ServiceNetworkCoverageView coverage, Instant validFrom, Instant createdAt);
 
     Optional<NetworkMembership> findMembership(String tenantId, UUID membershipId);
     Optional<NetworkMembership> findMembershipForUpdate(String tenantId, UUID membershipId);

@@ -459,6 +459,7 @@ title: ServiceOS 里程碑索引
 | M450 | M450 Admin 工单目录异常摘要列 | [461-m450-admin-work-order-directory-exception-summary.md](../architecture/461-m450-admin-work-order-directory-exception-summary.md) | [444-m450-admin-work-order-directory-exception-summary-acceptance.md](../testing/444-m450-admin-work-order-directory-exception-summary-acceptance.md) |
 | M451 | M451 Admin 工单目录异常摘要深链 | [462-m451-admin-work-order-directory-exception-queue-deeplink.md](../architecture/462-m451-admin-work-order-directory-exception-queue-deeplink.md) | [445-m451-admin-work-order-directory-exception-queue-deeplink-acceptance.md](../testing/445-m451-admin-work-order-directory-exception-queue-deeplink-acceptance.md) |
 | M452 | M452 Admin 关注项目角标精确 COUNT | [463-m452-admin-followed-project-badge-exact-count.md](../architecture/463-m452-admin-followed-project-badge-exact-count.md) | [446-m452-admin-followed-project-badge-exact-count-acceptance.md](../testing/446-m452-admin-followed-project-badge-exact-count-acceptance.md) |
+| M453 | M453 Admin 责任网点候选与分配产品化 | [464-m453-admin-network-assignment-productization.md](../architecture/464-m453-admin-network-assignment-productization.md) | [447-m453-admin-network-assignment-productization-acceptance.md](../testing/447-m453-admin-network-assignment-productization-acceptance.md) |
 
 ## 未关联里程碑的文档
 
@@ -487,9 +488,11 @@ title: ServiceOS 里程碑索引
 - `serviceos-architecture/architecture/20-transaction-messaging-concurrency-blueprint.md`
 - `serviceos-architecture/architecture/21-security-nfr-deployment-blueprint.md`
 - `serviceos-architecture/architecture/36-persistence-engineering-guideline.md`
+- `serviceos-architecture/architecture/AD-014-fulfillment-plan-matching-and-version-binding.md`
 - `serviceos-architecture/architecture/system-wide-redaction-switch.md`
 - `serviceos-architecture/testing/README.md`
 - `serviceos-architecture/testing/admin-pilot-readiness-acceptance.md`
+- `serviceos-architecture/testing/fulfillment-plan-matching-version-binding-acceptance.md`
 - `serviceos-architecture/testing/identity-organization-governance-program-acceptance.md`
 - `serviceos-architecture/testing/multi-client-portal-program-acceptance.md`
 - `serviceos-architecture/testing/multi-oem-platform-kernel-program-acceptance.md`

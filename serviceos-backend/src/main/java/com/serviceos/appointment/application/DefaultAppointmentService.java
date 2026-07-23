@@ -536,14 +536,14 @@ final class DefaultAppointmentService implements AppointmentService {
 
     private ActiveServiceResponsibility responsibility(String tenantId, UUID taskId) {
         return responsibilities.find(tenantId, taskId)
-                .orElse(new ActiveServiceResponsibility(taskId, null, null));
+                .orElse(new ActiveServiceResponsibility(taskId, null, null, null));
     }
 
     private static String alignedTechnician(
             TaskFulfillmentContext task, ActiveServiceResponsibility responsibility
     ) {
         String taskResponsible = task.responsiblePrincipalId();
-        String serviceResponsible = responsibility.technicianId();
+        String serviceResponsible = responsibility.technicianPrincipalId();
         if (taskResponsible != null && serviceResponsible != null
                 && !taskResponsible.equals(serviceResponsible)) {
             throw new BusinessProblem(ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,

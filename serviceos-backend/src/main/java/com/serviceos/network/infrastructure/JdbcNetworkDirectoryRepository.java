@@ -1,6 +1,7 @@
 package com.serviceos.network.infrastructure;
 
 import com.serviceos.network.api.ClearanceWorkItemView;
+import com.serviceos.network.api.ServiceNetworkCoverageView;
 import com.serviceos.network.application.NetworkDirectoryRepository;
 import com.serviceos.network.domain.NetworkMembership;
 import com.serviceos.network.domain.NetworkTechnicianMembership;
@@ -173,6 +174,55 @@ final class JdbcNetworkDirectoryRepository implements NetworkDirectoryRepository
                 .param("now", dbTime(now)).param("actor", actorId).param("reason", reason)
                 .param("tenant", tenantId).param("id", serviceNetworkId).param("expected", expectedVersion)
                 .update() == 1;
+    }
+
+    @Override
+    public Optional<ServiceNetworkCoverageView> findCoverage(String tenantId, UUID coverageId) {
+        return jdbc.sql("""
+                SELECT coverage_id, service_network_id, brand_code, business_type, region_code
+                  FROM net_service_network_coverage
+                 WHERE tenant_id = :tenantId AND coverage_id = :coverageId
+                """)
+                .param("tenantId", tenantId)
+                .param("coverageId", coverageId)
+                .query((rs, rowNum) -> new ServiceNetworkCoverageView(
+                        rs.getObject("coverage_id", UUID.class),
+                        rs.getObject("service_network_id", UUID.class),
+                        rs.getString("brand_code"),
+                        rs.getString("business_type"),
+                        rs.getString("region_code")))
+                .optional();
+    }
+
+    @Override
+    public void insertCoverage(
+            String tenantId,
+            ServiceNetworkCoverageView coverage,
+            Instant validFrom,
+            Instant createdAt
+    ) {
+        try {
+            jdbc.sql("""
+                    INSERT INTO net_service_network_coverage (
+                        coverage_id, tenant_id, service_network_id, brand_code, business_type,
+                        region_code, coverage_status, valid_from, valid_to, created_at
+                    ) VALUES (
+                        :coverageId, :tenantId, :networkId, :brandCode, :businessType,
+                        :regionCode, 'ACTIVE', :validFrom, NULL, :createdAt
+                    )
+                    """)
+                    .param("coverageId", coverage.coverageId())
+                    .param("tenantId", tenantId)
+                    .param("networkId", coverage.serviceNetworkId())
+                    .param("brandCode", coverage.brandCode())
+                    .param("businessType", coverage.businessType())
+                    .param("regionCode", coverage.regionCode())
+                    .param("validFrom", dbTime(validFrom))
+                    .param("createdAt", dbTime(createdAt))
+                    .update();
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessProblem(ProblemCode.NETWORK_AUTHORITY_CONFLICT, "该网点已存在相同的有效服务覆盖范围");
+        }
     }
 
     @Override

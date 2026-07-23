@@ -1,0 +1,55 @@
+{
+  "formKey": "product.byd-ocean.survey-form",
+  "version": "1.0.0",
+  "title": "家充现场勘测单",
+  "stage": "SURVEY",
+  "sections": [
+    {
+      "sectionKey": "site",
+      "title": "现场条件",
+      "fields": [
+        {
+          "fieldKey": "survey.meterLocation",
+          "label": "电表箱位置",
+          "dataType": "STRING",
+          "binding": "task.input.survey.meterLocation",
+          "required": true
+        },
+        {
+          "fieldKey": "survey.parkingType",
+          "label": "车位类型",
+          "dataType": "STRING",
+          "binding": "task.input.survey.parkingType",
+          "required": true
+        },
+        {
+          "fieldKey": "survey.cableLengthMeters",
+          "label": "预估线缆长度（米）",
+          "dataType": "DECIMAL",
+          "binding": "task.input.survey.cableLengthMeters",
+          "required": true
+        }
+      ]
+    },
+    {
+      "sectionKey": "conclusion",
+      "title": "勘测结论",
+      "fields": [
+        {
+          "fieldKey": "survey.conclusion",
+          "label": "勘测结论",
+          "dataType": "STRING",
+          "binding": "task.input.survey.conclusion",
+          "required": true
+        },
+        {
+          "fieldKey": "survey.note",
+          "label": "现场备注",
+          "dataType": "TEXT",
+          "binding": "task.input.survey.note",
+          "required": false
+        }
+      ]
+    }
+  ]
+}

@@ -27,6 +27,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -261,12 +262,46 @@ class VisitPostgresIT {
                 VALUES (:id, :tenant, :taskId, 'RESPONSIBLE', 'USER', :technician,
                     :status, 'MANUAL', 'M32-FIXTURE', now(), 'fixture', now())
                 """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("taskId", taskId)
-                .param("technician", technician).param("status", status).update();
+                .param("technician", principalId(technician)).param("status", status).update();
     }
 
     private void seedResponsibility(UUID taskId, String networkId, String technicianId) {
+        seedTechnicianIdentity(technicianId);
         insertServiceAssignment(taskId, "NETWORK", networkId, "ACTIVE");
-        insertServiceAssignment(taskId, "TECHNICIAN", technicianId, "ACTIVE");
+        insertServiceAssignment(taskId, "TECHNICIAN", profileId(technicianId), "ACTIVE");
+    }
+
+    private void seedTechnicianIdentity(String label) {
+        String principal = principalId(label);
+        String profile = profileId(label);
+        jdbc.sql("""
+                INSERT INTO idn_security_principal (
+                    principal_id, tenant_id, principal_type, principal_status,
+                    aggregate_version, created_at, updated_at
+                ) VALUES (:principal, :tenant, 'USER', 'ACTIVE', 1, now(), now())
+                ON CONFLICT (principal_id) DO NOTHING
+                """).param("principal", UUID.fromString(principal)).param("tenant", TENANT).update();
+        jdbc.sql("""
+                INSERT INTO net_technician_profile (
+                    technician_profile_id, tenant_id, principal_id, display_name, profile_status,
+                    aggregate_version, created_at, updated_at
+                ) VALUES (:profile, :tenant, :principal, :name, 'ACTIVE', 1, now(), now())
+                ON CONFLICT (technician_profile_id) DO NOTHING
+                """).param("profile", UUID.fromString(profile))
+                .param("tenant", TENANT)
+                .param("principal", UUID.fromString(principal))
+                .param("name", label)
+                .update();
+    }
+
+    private static String principalId(String label) {
+        return UUID.nameUUIDFromBytes(("visit-principal:" + label)
+                .getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    private static String profileId(String label) {
+        return UUID.nameUUIDFromBytes(("visit-profile:" + label)
+                .getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     private void insertServiceAssignment(UUID taskId, String level, String assigneeId, String status) {
@@ -336,7 +371,8 @@ class VisitPostgresIT {
                     valid_from, source_code, approval_ref, created_at)
                 VALUES (:grant, :tenant, :actor, :role, 'PROJECT', :project,
                     now() - interval '1 day', 'TEST_FIXTURE', 'M32-TEST', now())
-                """).param("grant", UUID.randomUUID()).param("tenant", TENANT).param("actor", actor)
+                """).param("grant", UUID.randomUUID()).param("tenant", TENANT)
+                .param("actor", principalId(actor))
                 .param("role", role).param("project", PROJECT.toString()).update();
     }
 
@@ -345,7 +381,7 @@ class VisitPostgresIT {
     }
 
     private CurrentPrincipal principal(String actor) {
-        return new CurrentPrincipal(actor, TENANT, CurrentPrincipal.PrincipalType.USER,
+        return new CurrentPrincipal(principalId(actor), TENANT, CurrentPrincipal.PrincipalType.USER,
                 "visit-it", Set.of());
     }
 

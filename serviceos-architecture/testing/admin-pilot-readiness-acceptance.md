@@ -32,7 +32,7 @@ lastUpdated: 2026-07-17
 | ADMIN-PILOT-08ACT | 真实入站激活与同单预约上门 | 可解析 WORKFLOW → ACTIVE + HUMAN Task；assign/claim/start + propose→confirm→check-in→check-out | PASS |
 | ADMIN-PILOT-08FUL | 真实入站同单表单/资料/审核/外发完结 | BYD:INSTALL 系谱；form→snapshot→INTERNAL APPROVED→BYD ACK→厂端回调→dual complete→FULFILLED | PASS |
 | ADMIN-PILOT-08COR | 真实入站同单整改补传复审外发完结 | REJECTED→CorrectionCase→同 Item 补传→resubmit/close→复审 APPROVED→BYD ACK→厂端回调→FULFILLED | PASS |
-| ADMIN-PILOT-08SA | 真实 Admin HTTP 人工初派 | `manual-assign` → ACTIVE NETWORK/TECHNICIAN + CONFIRMED + COMPLETED；`created_by` 为 Admin 主体 | PASS |
+| ADMIN-PILOT-08SA | 真实两阶段服务责任分配 | M453 `manual-assign-network` → Network Portal `assign-technician` → ACTIVE NETWORK/TECHNICIAN；平台不能越过网点直接派师傅 | PASS |
 | ADMIN-PILOT-08ID | 真实入站 Envelope/Canonical 详情深链 | INTEGRATION → `/integration/inbound/{id}`；GET Envelope+Canonical；`BYD:INSTALL:` | PASS |
 | ADMIN-PILOT-08OQ | 真实外发队列 Accepted OpenAPI 筛选 | 默认 UNKNOWN；ACK 后 `status=ACKNOWLEDGED` 可见 externalOrderCode | PASS |
 | ADMIN-PILOT-08OD | 真实工作区外发交付详情深链 | INTEGRATION → `/integration/outbound/{id}`；GET 详情；可见 externalOrderCode | PASS |

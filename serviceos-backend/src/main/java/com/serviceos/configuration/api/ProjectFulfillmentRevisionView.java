@@ -19,6 +19,7 @@ public record ProjectFulfillmentRevisionView(
         Instant effectiveTo,
         UUID supersedesRevisionId,
         String publishedBy,
+        String publishedByDisplayName,
         Instant publishedAt,
         Instant createdAt
 ) {

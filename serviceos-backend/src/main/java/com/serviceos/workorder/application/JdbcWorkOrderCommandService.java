@@ -18,6 +18,8 @@ import com.serviceos.workorder.api.WorkOrderCommandService;
 import com.serviceos.workorder.api.WorkOrderExternalDetailsUpdatedPayload;
 import com.serviceos.workorder.api.WorkOrderFulfilledPayload;
 import com.serviceos.workorder.api.WorkOrderFulfillmentReceipt;
+import com.serviceos.workorder.api.WorkOrderProjectPersonnelResolution;
+import com.serviceos.workorder.api.WorkOrderProjectPersonnelResolver;
 import com.serviceos.workorder.api.WorkOrderReceipt;
 import com.serviceos.workorder.api.WorkOrderReceivedPayload;
 import com.serviceos.workorder.api.WorkOrderReopenReceipt;
@@ -48,21 +50,29 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     private final OutboxAppender outbox;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final WorkOrderProjectPersonnelResolver projectPersonnelResolver;
 
     @Autowired
-    JdbcWorkOrderCommandService(JdbcClient jdbc, OutboxAppender outbox, ObjectMapper objectMapper) {
-        this(jdbc, outbox, objectMapper, Clock.systemUTC());
+    JdbcWorkOrderCommandService(
+            JdbcClient jdbc,
+            OutboxAppender outbox,
+            ObjectMapper objectMapper,
+            WorkOrderProjectPersonnelResolver projectPersonnelResolver
+    ) {
+        this(jdbc, outbox, objectMapper, projectPersonnelResolver, Clock.systemUTC());
     }
 
     JdbcWorkOrderCommandService(
             JdbcClient jdbc,
             OutboxAppender outbox,
             ObjectMapper objectMapper,
+            WorkOrderProjectPersonnelResolver projectPersonnelResolver,
             Clock clock
     ) {
         this.jdbc = jdbc;
         this.outbox = outbox;
         this.objectMapper = objectMapper;
+        this.projectPersonnelResolver = projectPersonnelResolver;
         this.clock = clock;
     }
 
@@ -120,6 +130,11 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                 .update();
 
         if (inserted == 1) {
+            // 工单与项目岗位人员快照必须在同一事务写入。区域分工后续变化不能改变本工单
+            // 已经确认的客服经理、项目经理和项目助理；缺失岗位同样固化为显式异常状态。
+            WorkOrderProjectPersonnelResolution personnel = projectPersonnelResolver.resolve(
+                    command.tenantId(), command.projectId(), personnelRegionCode(command), receivedAt);
+            insertProjectPersonnelSnapshot(command.tenantId(), id, personnel);
             appendReceivedEvent(id, command, receivedAt);
             return receipt(id, command, false, receivedAt);
         }
@@ -141,6 +156,56 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                 command.externalOrderCode(), existing.status(), existing.bundleId(),
                 existing.bundleCode(), existing.bundleVersion(), existing.bundleDigest(),
                 true, existing.receivedAt());
+    }
+
+    private void insertProjectPersonnelSnapshot(
+            String tenantId,
+            UUID workOrderId,
+            WorkOrderProjectPersonnelResolution resolution
+    ) {
+        for (WorkOrderProjectPersonnelResolution.Item item : resolution.items()) {
+            jdbc.sql("""
+                    INSERT INTO wo_project_personnel_snapshot (
+                        snapshot_id, tenant_id, work_order_id, position_code,
+                        principal_id, principal_name, source_assignment_id,
+                        requested_region_code, matched_region_code, matched_region_name,
+                        match_status, inherited, matched_at, valid_from,
+                        adjustment_reason, snapshot_status, created_at
+                    ) VALUES (
+                        :snapshotId, :tenantId, :workOrderId, :positionCode,
+                        :principalId, :principalName, :assignmentId,
+                        :requestedRegionCode, :matchedRegionCode, :matchedRegionName,
+                        :matchStatus, :inherited, :matchedAt, :validFrom,
+                        NULL, 'CURRENT', :createdAt
+                    )
+                    """)
+                    .param("snapshotId", UUID.randomUUID())
+                    .param("tenantId", tenantId)
+                    .param("workOrderId", workOrderId)
+                    .param("positionCode", item.positionCode())
+                    .param("principalId", item.principalId())
+                    .param("principalName", item.displayName())
+                    .param("assignmentId", item.assignmentId())
+                    .param("requestedRegionCode", resolution.requestedRegionCode())
+                    .param("matchedRegionCode", item.matchedRegionCode())
+                    .param("matchedRegionName", item.matchedRegionName())
+                    .param("matchStatus", item.status())
+                    .param("inherited", item.inherited())
+                    .param("matchedAt", java.sql.Timestamp.from(resolution.matchedAt()))
+                    .param("validFrom", java.sql.Timestamp.from(resolution.matchedAt()))
+                    .param("createdAt", java.sql.Timestamp.from(resolution.matchedAt()))
+                    .update();
+        }
+    }
+
+    private static String personnelRegionCode(ReceiveExternalWorkOrderCommand command) {
+        if (command.districtCode() != null && !command.districtCode().isBlank()) {
+            return command.districtCode();
+        }
+        if (command.cityCode() != null && !command.cityCode().isBlank()) {
+            return command.cityCode();
+        }
+        return command.provinceCode();
     }
 
     @Override

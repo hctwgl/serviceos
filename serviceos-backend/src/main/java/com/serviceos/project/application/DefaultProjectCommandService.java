@@ -134,6 +134,66 @@ final class DefaultProjectCommandService implements ProjectCommandService {
 
     @Override
     @Transactional
+    public ProjectView activate(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            UUID projectId,
+            long expectedVersion
+    ) {
+        CommandContext context = new CommandContext(
+                principal.tenantId(), principal.principalId(),
+                metadata.correlationId(), metadata.idempotencyKey());
+        AuthorizationDecision authorizationDecision = authorization.require(
+                principal,
+                AuthorizationRequest.projectCapability(
+                        "project.create", context.tenantId(), "Project",
+                        projectId.toString(), projectId.toString()),
+                context.correlationId());
+        String operation = "project.activate";
+        String requestDigest = Sha256.digest(projectId + "|" + expectedVersion);
+        IdempotencyDecision decision = idempotency.begin(context, operation, requestDigest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return projects.findById(context.tenantId(), projectId)
+                    .map(Project::toView)
+                    .orElseThrow(() -> new IllegalStateException("幂等结果引用的项目不存在"));
+        }
+
+        Project current = projects.findByIdForUpdate(context.tenantId(), projectId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "项目不存在"));
+        if (current.version() != expectedVersion) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "项目版本已变化，期望 " + expectedVersion + "，实际 " + current.version());
+        }
+        Project activated;
+        try {
+            activated = current.activate();
+        } catch (IllegalStateException exception) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, exception.getMessage());
+        }
+        if (!projects.activate(context.tenantId(), projectId, expectedVersion)) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "项目状态或版本已被并发修改");
+        }
+
+        Instant now = clock.instant();
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), context.tenantId(), context.actorId(), "PROJECT_ACTIVATED",
+                operation, "Project", projectId.toString(), "ALLOW",
+                authorizationDecision.matchedGrantIds(), authorizationDecision.policyVersion(),
+                "SUCCEEDED", null, requestDigest, context.correlationId(), now));
+        String eventPayload = canonicalJson(new ProjectActivatedPayload(
+                projectId, context.tenantId(), activated.version(), now));
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "project", "project.activated", 1,
+                "Project", projectId.toString(), activated.version(), context.tenantId(),
+                context.correlationId(), context.idempotencyKey(), projectId.toString(),
+                eventPayload, Sha256.digest(eventPayload), now));
+        ProjectView result = activated.toView();
+        idempotency.complete(context, operation, projectId.toString(), Sha256.digest(canonicalJson(result)));
+        return result;
+    }
+
+    @Override
+    @Transactional
     public ProjectClientDirectoryItem registerClient(
             CurrentPrincipal principal,
             CommandMetadata metadata,
@@ -444,6 +504,14 @@ final class DefaultProjectCommandService implements ProjectCommandService {
             java.util.List<String> regionCodes,
             java.util.List<String> networkIds,
             String status,
+            long aggregateVersion,
+            Instant occurredAt
+    ) {
+    }
+
+    private record ProjectActivatedPayload(
+            UUID projectId,
+            String tenantId,
             long aggregateVersion,
             Instant occurredAt
     ) {

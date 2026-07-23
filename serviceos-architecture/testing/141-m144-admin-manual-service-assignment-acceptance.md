@@ -6,6 +6,9 @@ lastUpdated: 2026-07-17
 
 # M144 Admin 人工初派 ServiceAssignment 验收
 
+> 本矩阵记录 M144 当时的历史验收事实。M453 已删除 Admin 双责任 HTTP 入口，当前验收以
+> `447-m453-admin-network-assignment-productization-acceptance.md` 的两阶段责任链为准。
+
 | ID | 场景 | 证据 | 结果 |
 |---|---|---|---|
 | M144-01 | OpenAPI 暴露人工初派 | Core 0.72.0 `.../service-assignments:manual-assign` | PASS |

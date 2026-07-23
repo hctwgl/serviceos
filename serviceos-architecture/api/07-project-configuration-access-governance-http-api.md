@@ -74,17 +74,17 @@ SaveDraft 只保存草稿；不能直接影响运行工单。服务端使用 ass
 | `POST /api/v1/configuration-releases/{id}:stop-new-bindings` | StopNewBindings | reason、effectiveAt | 200 |
 | `POST /api/v1/configuration-releases/{id}:replace` | ReplaceRelease | replacementReleaseId、effectiveAt、reason | 200 |
 
-ReleaseCandidate 可继续整组校验/审批，但一旦审批后内容 digest 变化，审批失效。Publish 从已批准 candidate 原子生成不可变 PublishedVersions 与 ConfigurationRelease；失败不产生部分可绑定 release。已绑定工单不随 stop/replace 漂移；迁移走 MigrateConfiguration。
+ReleaseCandidate 可继续整组校验/审批，但一旦审批后内容 digest 变化，审批失效。Publish 从已批准 candidate 原子生成不可变 PublishedVersions 与 ConfigurationRelease；失败不产生部分可绑定 release。已绑定工单不随 stop/replace 漂移；迁移走 MigrateConfiguration。产品层以单个履约方案版本为原子发布单位（见 DEC-007 / AD-014）：发布一个履约方案版本对应一次 ConfigurationRelease，不同方案独立发布、互不影响。
 
 ## 6. 配置解析与 Bundle 预览
 
 | 方法与路径 | 命令/用途 | 关键载荷 | 成功 |
 |---|---|---|---|
-| `POST /api/v1/configuration-resolution:preview` | PreviewResolution | project/brand/product/region/businessDate/context | 200 |
+| `POST /api/v1/configuration-resolution:preview` | PreviewResolution | project/brand/businessType/deviceCategory/region/faultLevel/priority/warranty/source/customerGrade/businessDate | 200 |
 | `GET /api/v1/configuration-bundles/{id}` | Bundle manifest 和版本 | — | 200 |
 | `GET /api/v1/configuration-bundles/{id}/explanation` | 候选、命中/排除和解析器版本 | — | 200 |
 
-Preview 不创建可被工单引用的 Bundle，除非明确 `purpose=CREATE_WORK_ORDER` 且由内部受信命令完成。多命中/零命中返回明确错误，不选择“最新一个”。
+Preview 先按结构化条件匹配唯一履约方案（matchPriority 降序、同级按规则具体度），再解析该方案生效版本的 Bundle。不创建可被工单引用的 Bundle，除非明确 `purpose=CREATE_WORK_ORDER` 且由内部受信命令完成。同优先级同具体度多命中或零命中不得随机选择、不得默认第一条方案，返回明确错误并可进入待确认（见 DEC-007 / AD-014）。
 
 ## 7. 组织、角色和能力查询
 
@@ -146,6 +146,8 @@ Explain 需要专用能力并增强审计。它返回匹配 grant/policy/obligat
 | `CONFIGURATION_VALIDATION_REQUIRED` | 409 | 缺少当前内容的有效校验 |
 | `CONFIGURATION_APPROVAL_REQUIRED` | 403/409 | 审批/MFA/职责分离未满足 |
 | `CONFIGURATION_RESOLUTION_NOT_UNIQUE` | 422 | 零命中或多命中 |
+| `FULFILLMENT_PLAN_NOT_MATCHED` | 422 | 无匹配履约方案，工单进入待确认 |
+| `FULFILLMENT_PLAN_AMBIGUOUS` | 422 | 同优先级同具体度多命中，工单进入待确认 |
 | `ROLE_GRANT_ESCALATION_FORBIDDEN` | 403 | 超过可授予范围 |
 | `ROLE_GRANT_DUTY_CONFLICT` | 422 | 职责分离冲突 |
 | `DELEGATION_SCOPE_TOO_BROAD` | 422 | 委托超过原授权 |

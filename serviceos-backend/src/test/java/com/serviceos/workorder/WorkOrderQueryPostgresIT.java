@@ -499,8 +499,8 @@ class WorkOrderQueryPostgresIT {
     .isInstanceOfSatisfying(BusinessProblem.class,p->assertThat(p.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
   assertThat(jdbc.sql("SELECT risk_level FROM auth_capability WHERE capability_code='workOrder.read'").query(String.class).single()).isEqualTo("NORMAL");
   assertThat(jdbc.sql("SELECT count(*) FROM pg_indexes WHERE indexname='ix_wo_work_order_tenant_project_received'").query(Long.class).single()).isOne();
-  assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("146");
-  assertThat(flyway.info().applied()).hasSize(148);
+  assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("149");
+  assertThat(flyway.info().applied()).hasSize(151);
  }
 
  private Scope scope(String tenant,String code){return scope(tenant,code,false);}

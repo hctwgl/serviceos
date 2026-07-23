@@ -1,0 +1,26 @@
+{
+  "name": "@serviceos/design-system",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./reset.css": "./src/reset.css",
+    "./tokens.css": "./src/tokens.css"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings=0",
+    "test:unit": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@ant-design/icons-vue": "^7.0.1",
+    "ant-design-vue": "^4.2.6"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.2",
+    "typescript": "~6.0.2",
+    "vitest": "^4.0.18"
+  }
+}

@@ -32,6 +32,7 @@ workOrderId
 externalOrderRefs[]
 serviceRequestId
 clientId / projectId / brandId / serviceProductId
+fulfillmentPlanId / fulfillmentPlanVersionId
 configurationBundleId
 customerRef / vehicleRef / assetRefs[]
 lifecycleStatus

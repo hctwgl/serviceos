@@ -21,8 +21,11 @@ export type WorkOrderWorkspace = {
   currentTaskSummary: {
     taskId: string
     taskType?: string
+    taskKind?: string
     status: string
     stageCode?: string | null
+    claimedBy?: string | null
+    version?: number
   } | null
   sectionAvailability: Record<string, 'AVAILABLE' | 'EMPTY' | 'UNAVAILABLE'>
   allowedActionLink: string | null

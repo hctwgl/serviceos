@@ -19,3 +19,5 @@ target/
 !.env.development.example
 !**/.env.development.example
 /tmp/
+node_modules/
+.pnpm-store/

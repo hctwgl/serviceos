@@ -1,0 +1,35 @@
+{
+  "name": "serviceos-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=22.18.0 <23"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @serviceos/admin dev",
+    "dev:network": "pnpm --filter @serviceos/network dev",
+    "dev:technician": "pnpm --filter @serviceos/technician dev",
+    "build": "pnpm --filter @serviceos/admin build",
+    "typecheck": "pnpm --filter @serviceos/admin... typecheck",
+    "lint": "eslint apps/admin/src packages/*/src --max-warnings=0",
+    "test:unit": "pnpm --filter @serviceos/admin... test:unit",
+    "check:product": "node scripts/verify-product-boundaries.mjs",
+    "check": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm check:product && pnpm build",
+    "contracts:generate": "bash ../serviceos-contracts/scripts/generate-client-artifact.sh",
+    "product-data:reset": "bash ../serviceos-deploy/product-development/reset.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@vue/eslint-config-typescript": "^14.6.0",
+    "eslint": "^9.39.2",
+    "eslint-plugin-vue": "^10.6.2",
+    "@tailwindcss/vite": "catalog:",
+    "@tsdown/css": "catalog:",
+    "tailwindcss": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.53.0"
+  }
+}

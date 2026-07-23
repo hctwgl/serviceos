@@ -8,6 +8,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Outbox 单步执行器：短事务认领，事务外发布，再用短事务保存结果。
@@ -16,6 +18,7 @@ import java.util.Objects;
  * 下游必须用 Inbox 或等价业务唯一约束去重。</p>
  */
 public final class OutboxWorker {
+    private static final Logger log = LoggerFactory.getLogger(OutboxWorker.class);
     public enum RunResult { EMPTY, PUBLISHED, FAILED }
 
     private final OutboxQueue queue;
@@ -77,6 +80,10 @@ public final class OutboxWorker {
             publisher.publish(message);
         } catch (Exception exception) {
             String errorCode = exception.getClass().getSimpleName();
+            log.error(
+                    "Outbox 事件发布失败：eventType={}, eventId={}, aggregateType={}, aggregateId={}",
+                    message.eventType(), message.eventId(), message.aggregateType(), message.aggregateId(),
+                    exception);
             queue.markFailed(message, workerId, startedAt, errorCode, maxAttempts);
             return RunResult.FAILED;
         }

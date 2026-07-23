@@ -1,6 +1,7 @@
 package com.serviceos.workorder.infrastructure;
 
 import com.serviceos.workorder.api.WorkOrderView;
+import com.serviceos.workorder.api.WorkOrderProjectPersonnelView;
 import com.serviceos.workorder.application.WorkOrderQueryRepository;
 import org.springframework.stereotype.Repository;
 import java.time.Instant;
@@ -82,6 +83,28 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
                 string(row, "customerMobile"),
                 string(row, "serviceAddress")));
     }
+
+    @Override
+    public List<WorkOrderProjectPersonnelView> findProjectPersonnel(String tenantId, UUID workOrderId) {
+        return mapper.findProjectPersonnel(tenantId, workOrderId).stream()
+                .map(row -> new WorkOrderProjectPersonnelView(
+                        string(row, "positionCode"), positionName(string(row, "positionCode")),
+                        nullableUuid(row, "principalId"), string(row, "displayName"),
+                        string(row, "requestedRegionCode"), string(row, "matchedRegionCode"),
+                        string(row, "matchedRegionName"), string(row, "matchStatus"),
+                        Boolean.TRUE.equals(row.get("inherited")), instant(row, "matchedAt"),
+                        string(row, "adjustmentReason")))
+                .toList();
+    }
+
+    private static String positionName(String code) {
+        return switch (code) {
+            case "CUSTOMER_SERVICE_MANAGER" -> "客服经理";
+            case "PROJECT_MANAGER" -> "项目经理";
+            case "PROJECT_ASSISTANT" -> "项目助理";
+            default -> throw new IllegalStateException("未知项目岗位：" + code);
+        };
+    }
     private static WorkOrderView view(Map<String,Object> r) {
         return new WorkOrderView(uuid(r,"id"), string(r,"tenantId"), uuid(r,"projectId"),
                 string(r,"clientCode"), string(r,"brandCode"), string(r,"serviceProductCode"),
@@ -94,6 +117,7 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
     }
     private static String string(Map<String,Object> r,String k) { Object v=r.get(k); return v==null?null:v.toString(); }
     private static UUID uuid(Map<String,Object> r,String k) { Object v=r.get(k); return v instanceof UUID u?u:UUID.fromString(v.toString()); }
+    private static UUID nullableUuid(Map<String,Object> r,String k) { Object v=r.get(k); return v==null?null:(v instanceof UUID u?u:UUID.fromString(v.toString())); }
     private static Instant instant(Map<String,Object> r,String k) {
         Object v=r.get(k); if(v==null)return null; if(v instanceof Instant i)return i;
         if(v instanceof OffsetDateTime o)return o.toInstant(); if(v instanceof LocalDateTime l)return l.toInstant(ZoneOffset.UTC);

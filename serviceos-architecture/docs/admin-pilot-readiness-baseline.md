@@ -153,11 +153,14 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 - field-ops 与入站工单的 Visit 所需 ServiceAssignment 曾经 Capacity/Assignment SPI 编排注入；
   M144 起改为 Admin HTTP，SPI 种子已删除。
 
-已追加证明（M144 / ADMIN-PILOT-09）：
+已追加历史证明（M144 / ADMIN-PILOT-09；外部入口已由 M453 删除并替换）：
 
-- Admin HTTP `service-assignments:manual-assign` 人工初派 NETWORK+TECHNICIAN；
+- 当时通过 Admin HTTP `service-assignments:manual-assign` 人工初派 NETWORK+TECHNICIAN；
 - 入站同单：接单→Admin 派单→预约上门→表单/资料→驳回整改补传复审→外发→完结；
 - 派单为窄化 Manual Assign（无评分/硬过滤/ServiceNetwork 生命周期）。
+
+当前 M453 产品链路为：Admin 从权威候选派责任网点，随后由可信 Network Portal 上下文指派师傅；
+现场履约 E2E 也使用这两个正式入口准备责任数据，不再调用旧双责任 HTTP。
 
 已追加证明（M145）：
 

@@ -20,7 +20,8 @@ INSERT INTO cfg_configuration_asset_version (
           "name":"试点终态验证",
           "stageCode":"OTHER",
           "taskType":"PILOT_COMPLETION",
-          "formRef":"admin.pilot-completion-form"
+          "formRef":"admin.pilot-completion-form",
+          "dispatchPolicyRef":"admin-pilot-dispatch"
         },
         {"nodeId":"END","nodeType":"END","name":"结束"}
       ],
@@ -121,6 +122,11 @@ INSERT INTO cfg_configuration_bundle_item (
     '20000000-0000-4000-8000-000000000004', repeat('5', 64)
 ),
 (
+    'tenant-local', '30000000-0000-4000-8000-000000000002', 'DISPATCH',
+    '20000000-0000-4000-8000-000000000010',
+    '2c4bad148cb0e2f281b08e8e17722f6c0af110d94883fc006121b5adc051f2db'
+),
+(
     'tenant-local', '30000000-0000-4000-8000-000000000002', 'EVIDENCE',
     '20000000-0000-4000-8000-000000000005', repeat('6', 64)
 ),
@@ -173,7 +179,7 @@ INSERT INTO tsk_task (
     created_at, updated_at, project_id, work_order_id, workflow_instance_id,
     stage_instance_id, workflow_node_instance_id, workflow_node_id,
     workflow_definition_version_id, workflow_definition_digest, configuration_bundle_id,
-    configuration_bundle_digest, stage_code, form_ref
+    configuration_bundle_digest, stage_code, form_ref, dispatch_policy_ref
 ) VALUES (
     :'completion_task_id', 'tenant-local', 'PILOT_COMPLETION', 'HUMAN',
     :'completion_external_code', repeat('7', 64), 500, 'READY', now(), 0, 3,
@@ -182,7 +188,7 @@ INSERT INTO tsk_task (
     :'completion_workflow_id', :'completion_stage_id', :'completion_node_id',
     'PILOT_COMPLETION_NODE', '20000000-0000-4000-8000-000000000003', repeat('f', 64),
     '30000000-0000-4000-8000-000000000002', repeat('9', 64), 'OTHER',
-    'admin.pilot-completion-form'
+    'admin.pilot-completion-form', 'admin-pilot-dispatch'
 );
 
 INSERT INTO wfl_node_instance (

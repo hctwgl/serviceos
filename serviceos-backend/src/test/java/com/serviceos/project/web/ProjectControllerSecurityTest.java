@@ -220,6 +220,33 @@ class ProjectControllerSecurityTest {
     }
 
     @Test
+    void activateProjectUsesTrustedPrincipalAndQuotedVersion() throws Exception {
+        UUID projectId = UUID.fromString("19dac447-73fd-4f24-8178-a9eac8d9ed34");
+        CurrentPrincipal principal = new CurrentPrincipal(
+                "project-admin", "tenant-trusted", CurrentPrincipal.PrincipalType.USER,
+                "admin-web", Set.of("project.create"));
+        ProjectView active = new ProjectView(
+                projectId, "tenant-trusted", "BYD-2026", "client-byd", "比亚迪项目",
+                LocalDate.of(2026, 1, 1), null, java.util.List.of("CN-3702"),
+                java.util.List.of("network-qingdao-a"), "ACTIVE", 2,
+                Instant.parse("2026-07-22T08:00:00Z"), 1, 0);
+        when(principals.current()).thenReturn(principal);
+        when(commands.activate(eq(principal), any(), eq(projectId), eq(1L))).thenReturn(active);
+
+        mvc.perform(post("/api/v1/projects/{projectId}:activate", projectId)
+                        .with(jwt().jwt(token -> token.subject("project-admin")
+                                .claim("tenant_id", "tenant-trusted")))
+                        .header("Idempotency-Key", "idem-project-activate")
+                        .header("If-Match", "\"1\"")
+                        .header("X-Correlation-Id", "corr-project-activate"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"2\""))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        verify(commands).activate(eq(principal), any(), eq(projectId), eq(1L));
+    }
+
+    @Test
     void reviseScopeRelationsRejectsMissingExplicitSetAndUnquotedIfMatch() throws Exception {
         UUID projectId = UUID.fromString("19dac447-73fd-4f24-8178-a9eac8d9ed34");
 

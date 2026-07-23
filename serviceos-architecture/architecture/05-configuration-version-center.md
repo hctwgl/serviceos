@@ -73,12 +73,25 @@ classDiagram
     bundleId
     resolutionContextDigest
   }
+  class FulfillmentPlan {
+    planId
+    projectId
+    matchPriority
+    status
+  }
+  class FulfillmentPlanVersion {
+    versionId
+    versionNo
+    status
+  }
 
   ConfigurationAsset "1" --> "many" DraftRevision
   DraftRevision "many" --> "zero or one" PublishedVersion : publishes
   ReleaseCandidate "1" --> "many" DraftRevision
   ConfigurationRelease "1" --> "many" PublishedVersion
   ConfigurationBundle "1" --> "many" PublishedVersion : locks
+  FulfillmentPlan "1" --> "many" FulfillmentPlanVersion
+  FulfillmentPlanVersion "1" --> "zero or one" ConfigurationBundle : snapshots
 ```
 
 ### 3.1 稳定身份与版本身份
@@ -137,7 +150,7 @@ DRAFT -> VALIDATING -> REVIEW_PENDING -> APPROVED -> PUBLISHED -> RETIRED
 
 ## 6. 配置发布单元
 
-单个资产独立发布容易产生不兼容组合，例如流程引用了尚未发布的表单。平台使用 `ConfigurationRelease` 作为原子发布单元。
+单个资产独立发布容易产生不兼容组合，例如流程引用了尚未发布的表单。配置资产层使用 `ConfigurationRelease` 作为资产版本的原子发布单元。产品层的原子发布单位是单个履约方案版本（FulfillmentPlanVersion，见 DEC-007 与 [AD-014](AD-014-fulfillment-plan-matching-and-version-binding.md)）：发布方案版本时把解析后的资产版本冻结为该版本快照并对应一个 `ConfigurationRelease`/`ConfigurationBundle`，不同履约方案独立发布、互不影响。
 
 一个发布单元可以包含多个资产版本，并生成 manifest：
 
@@ -192,21 +205,21 @@ integrationMappingVersion: MAP-17-V6
 - 流程可达性和终止性检查；
 - 权限死锁检查。
 
-## 8. 配置解析与工单锁定
+## 8. 履约方案匹配与工单锁定
 
-工单创建时使用确定性的 `ConfigurationResolver`：
+工单正式受理时，先由履约方案匹配确定唯一方案与其生效版本，再锁定对应配置：
 
 ```text
-输入：客户、项目、品牌、业务产品、区域、桩型、车型、业务日期
-→ 查找生效的 ConfigurationRelease
-→ 校验唯一命中
-→ 解析 manifest 中的全部 PublishedVersion
-→ 生成 ConfigurationBundle
-→ 保存解析上下文摘要、manifest 摘要和版本引用
-→ 创建工单
+输入：项目、品牌、业务类型、设备类型、行政区域、故障等级、优先级、保内外、来源、客户等级、业务日期
+→ 候选：项目下 ENABLED 且有 ACTIVE 版本的履约方案
+→ 结构化硬匹配排除不满足的方案
+→ 按 matchPriority 降序、同级按规则具体度确定唯一方案
+→ 锁定该方案 ACTIVE 版本对应的 ConfigurationRelease/Bundle
+→ 保存 fulfillmentPlanId、fulfillmentPlanVersionId、匹配解释与版本引用
+→ 完成受理并创建流程实例
 ```
 
-零命中或多命中都必须拒绝自动创建并进入接入异常队列，不能猜测“最接近”的配置。
+零命中或同优先级同具体度多命中不得随机选择、不得默认项目第一条方案，工单进入“待确认履约方案 / 履约配置异常”，由具备权限的角色处理。匹配算法与冲突检查见 [AD-014](AD-014-fulfillment-plan-matching-and-version-binding.md)。
 
 ## 9. 生效时间和业务时间
 

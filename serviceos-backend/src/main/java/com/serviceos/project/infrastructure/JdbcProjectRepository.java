@@ -146,6 +146,23 @@ final class JdbcProjectRepository implements ProjectRepository {
     }
 
     @Override
+    public boolean activate(String tenantId, UUID projectId, long expectedVersion) {
+        return jdbc.sql("""
+                        UPDATE prj_project
+                           SET project_status = 'ACTIVE',
+                               aggregate_version = aggregate_version + 1
+                         WHERE tenant_id = :tenantId
+                           AND project_id = :projectId
+                           AND project_status = 'DRAFT'
+                           AND aggregate_version = :expectedVersion
+                        """)
+                .param("tenantId", tenantId)
+                .param("projectId", projectId)
+                .param("expectedVersion", expectedVersion)
+                .update() == 1;
+    }
+
+    @Override
     public void reviseRegionBindings(
             String tenantId, UUID projectId, List<String> removed, List<String> added,
             String actorId, Instant revisedAt

@@ -3,15 +3,23 @@ package com.serviceos.project.web;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.project.api.CreateProjectCommand;
+import com.serviceos.project.api.AddProjectTeamMemberCommand;
+import com.serviceos.project.api.AssignProjectRegionPersonnelCommand;
 import com.serviceos.project.api.ProjectCommandService;
 import com.serviceos.project.api.ProjectDetail;
 import com.serviceos.project.api.ProjectPage;
 import com.serviceos.project.api.ProjectQuery;
 import com.serviceos.project.api.ProjectQueryService;
 import com.serviceos.project.api.ProjectReferenceOptions;
+import com.serviceos.project.api.ProjectPositionCode;
+import com.serviceos.project.api.ProjectRegionPersonnelAssignmentView;
+import com.serviceos.project.api.ProjectRegionPersonnelMatchResult;
 import com.serviceos.project.api.ProjectScopeRelationRevisionPage;
 import com.serviceos.project.api.ProjectScopeRelationRevisionView;
 import com.serviceos.project.api.ProjectView;
+import com.serviceos.project.api.ProjectTeamMemberView;
+import com.serviceos.project.api.ProjectTeamService;
+import com.serviceos.project.api.ProjectTeamWorkspaceView;
 import com.serviceos.project.api.ReviseProjectScopeRelationsCommand;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
@@ -42,15 +50,18 @@ import java.util.UUID;
 final class ProjectController {
     private final ProjectCommandService commands;
     private final ProjectQueryService queries;
+    private final ProjectTeamService teams;
     private final CurrentPrincipalProvider principals;
 
     ProjectController(
             ProjectCommandService commands,
             ProjectQueryService queries,
+            ProjectTeamService teams,
             CurrentPrincipalProvider principals
     ) {
         this.commands = commands;
         this.queries = queries;
+        this.teams = teams;
         this.principals = principals;
     }
 
@@ -110,6 +121,31 @@ final class ProjectController {
                 .body(page);
     }
 
+    /** 项目团队和区域岗位分工属于项目日常主数据，不属于履约配置版本。 */
+    @GetMapping("/{projectId}/team-regions")
+    ResponseEntity<ProjectTeamWorkspaceView> teamWorkspace(
+            @PathVariable UUID projectId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        ProjectTeamWorkspaceView result = teams.workspace(principals.current(), correlationId, projectId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(result);
+    }
+
+    @GetMapping("/{projectId}/team-regions:match")
+    ResponseEntity<ProjectRegionPersonnelMatchResult> matchRegionPersonnel(
+            @PathVariable UUID projectId,
+            @RequestParam String regionCode,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        ProjectRegionPersonnelMatchResult result = teams.match(
+                principals.current(), correlationId, projectId, regionCode);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(result);
+    }
+
     @PostMapping
     ResponseEntity<ProjectView> create(
             @RequestHeader("Idempotency-Key") String idempotencyKey,
@@ -142,6 +178,61 @@ final class ProjectController {
                         projectId, version(ifMatch), request.regionCodes(), request.networkIds(), request.reason()));
         return ResponseEntity.ok()
                 .eTag(Long.toString(result.aggregateVersion()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(result);
+    }
+
+    @PostMapping("/{projectId}:activate")
+    ResponseEntity<ProjectView> activate(
+            @PathVariable UUID projectId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        ProjectView result = commands.activate(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                projectId, version(ifMatch));
+        return ResponseEntity.ok()
+                .eTag(Long.toString(result.version()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(result);
+    }
+
+    @PostMapping("/{projectId}/team-members")
+    ResponseEntity<ProjectTeamMemberView> addTeamMember(
+            @PathVariable UUID projectId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody AddProjectTeamMemberRequest request
+    ) {
+        ProjectTeamMemberView result = teams.addMember(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                new AddProjectTeamMemberCommand(projectId, request.principalId()));
+        return ResponseEntity
+                .created(URI.create("/api/v1/projects/" + projectId + "/team-regions"))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(result);
+    }
+
+    @PostMapping("/{projectId}/region-personnel:assign")
+    ResponseEntity<ProjectRegionPersonnelAssignmentView> assignRegionPersonnel(
+            @PathVariable UUID projectId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody AssignProjectRegionPersonnelRequest request
+    ) {
+        ProjectPositionCode position;
+        try {
+            position = ProjectPositionCode.valueOf(request.positionCode());
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("项目岗位编码无效", exception);
+        }
+        ProjectRegionPersonnelAssignmentView result = teams.assign(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                new AssignProjectRegionPersonnelCommand(
+                        projectId, request.regionCode(), position, request.principalId(),
+                        request.expectedCurrentAssignmentId(), request.allowInheritance(), request.reason()));
+        return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(result);
     }

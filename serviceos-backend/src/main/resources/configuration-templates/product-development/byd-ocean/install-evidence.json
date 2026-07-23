@@ -1,0 +1,53 @@
+{
+  "templateKey": "product.byd-ocean.install-evidence",
+  "version": "1.0.0",
+  "title": "家充安装完工资料",
+  "stage": "INSTALLATION",
+  "items": [
+    {
+      "evidenceKey": "install.chargerPhoto",
+      "name": "充电桩安装完成照片",
+      "description": "充电桩整机固定完成后正面照片",
+      "mediaType": "PHOTO",
+      "required": true,
+      "capture": {
+        "allowCamera": true,
+        "allowGallery": true,
+        "minCount": 1,
+        "maxCount": 3,
+        "maxSizeBytes": 5242880
+      },
+      "reviewPolicy": { "reviewRequired": true }
+    },
+    {
+      "evidenceKey": "install.wiringPhoto",
+      "name": "接线与漏电保护照片",
+      "description": "接线端子、漏电保护器与接地可靠性照片",
+      "mediaType": "PHOTO",
+      "required": true,
+      "capture": {
+        "allowCamera": true,
+        "allowGallery": true,
+        "minCount": 1,
+        "maxCount": 3,
+        "maxSizeBytes": 5242880
+      },
+      "reviewPolicy": { "reviewRequired": true }
+    },
+    {
+      "evidenceKey": "install.customerSignPhoto",
+      "name": "客户验收签字照片",
+      "description": "客户验收单签字页照片",
+      "mediaType": "PHOTO",
+      "required": true,
+      "capture": {
+        "allowCamera": true,
+        "allowGallery": true,
+        "minCount": 1,
+        "maxCount": 2,
+        "maxSizeBytes": 5242880
+      },
+      "reviewPolicy": { "reviewRequired": true }
+    }
+  ]
+}
