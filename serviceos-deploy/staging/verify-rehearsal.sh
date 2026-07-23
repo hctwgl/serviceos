@@ -3,9 +3,9 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/../.." && pwd)"
-current_image="${1:-serviceos-backend:m17-rehearsal}"
+current_image="${1:-serviceos-backend:rehearsal}"
 rollback_ref="${2:-HEAD^}"
-rollback_image="${3:-serviceos-backend:m17-rollback-rehearsal}"
+rollback_image="${3:-serviceos-backend:rollback-rehearsal}"
 env_file="$(mktemp)"
 bad_env_file="$(mktemp)"
 evidence_dir="${repo_root}/target/staging-rehearsal"

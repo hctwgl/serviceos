@@ -56,6 +56,23 @@ git status --short --branch
 - 新模块、职责迁移、长期外部兼容或基础设施选型；
 - 不可逆外部副作用或生产数据损失。
 
+### 2.1 当前工程拓扑
+
+| 工程 | 构建系统 | 当前组成 |
+|---|---|---|
+| 根 Maven Reactor | Maven | `serviceos-backend`、`serviceos-contracts` |
+| Web Workspace | pnpm | `apps/admin`、`apps/network`、`apps/technician`；共享包见 `serviceos-frontend/AGENTS.md` |
+| iOS 共享基础 | Swift Package | `serviceos-ios-core` |
+| Technician iOS | Xcode Workspace + Swift Package | `serviceos-technician-ios` |
+| 部署 | Docker Compose/Shell | `serviceos-deploy` 的 local、product-development、observability、staging |
+| 事实源 | Markdown/机器契约 | `serviceos-architecture`、`serviceos-contracts`、Flyway |
+
+已删除的 `serviceos-admin-web`、`serviceos-network-web`、`serviceos-technician-web` 和
+`serviceos-web-core` 不再是工程入口。不得为通过旧脚本重建空壳目录；应修正调用方到当前拓扑。
+
+前端 `vben/` 是 Admin 使用的上游 UI 基础包集合，不是第四个产品应用。业务代码不得写入
+`vben/`，除非任务明确要求修复该基础层。
+
 ## 3. 风险和验证
 
 | 等级 | 典型变更 | 最低验证 |
@@ -75,7 +92,7 @@ bash scripts/agent-verify.sh test RelevantTest
 bash scripts/agent-verify.sh it RelevantPostgresIT
 bash scripts/agent-verify.sh arch
 bash scripts/agent-verify.sh contracts origin/master
-bash scripts/agent-verify.sh frontend
+bash scripts/agent-verify.sh frontend   # 三个 Web App + 全部 @serviceos/* 共享包
 bash scripts/agent-verify.sh docs
 bash scripts/verify-repository-preflight.sh
 ```

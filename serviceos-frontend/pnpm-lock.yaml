@@ -687,18 +687,6 @@ importers:
         specifier: ^4.0.18
         version: 4.1.10(@types/node@24.13.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.101.3)(terser@5.49.0)(yaml@2.9.0))
 
-  packages/observability:
-    devDependencies:
-      eslint:
-        specifier: ^9.39.2
-        version: 9.39.5(jiti@2.7.0)
-      typescript:
-        specifier: ~6.0.2
-        version: 6.0.3
-      vitest:
-        specifier: ^4.0.18
-        version: 4.1.10(@types/node@24.13.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.101.3)(terser@5.49.0)(yaml@2.9.0))
-
   packages/product-language:
     devDependencies:
       eslint:
@@ -710,8 +698,6 @@ importers:
       vitest:
         specifier: ^4.0.18
         version: 4.1.10(@types/node@24.13.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.101.3)(terser@5.49.0)(yaml@2.9.0))
-
-  packages/testing: {}
 
   vben/internal/lint-configs/commitlint-config:
     dependencies:

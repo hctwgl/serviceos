@@ -2,8 +2,7 @@
 import type { TaskAllowedAction, WorkOrderWorkspaceTask } from '@serviceos/api-client'
 import { claimTask, completeTask, releaseTask, startTask } from '@serviceos/api-client'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { Button, Input, Radio } from '@serviceos/design-system'
-import { message, Modal } from 'ant-design-vue'
+import { Button, Input, message, Modal, Radio } from '@serviceos/design-system'
 import { ref, watch } from 'vue'
 import PageError from './PageError.vue'
 

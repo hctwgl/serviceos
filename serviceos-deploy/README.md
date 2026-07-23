@@ -131,8 +131,8 @@ serviceos-deploy/staging/verify-rehearsal.sh
 分步执行：
 
 ```bash
-serviceos-deploy/staging/generate-local-env.sh /tmp/serviceos-staging.env serviceos-backend:m14-local
-serviceos-deploy/staging/build-image.sh serviceos-backend:m14-local
+serviceos-deploy/staging/generate-local-env.sh /tmp/serviceos-staging.env serviceos-backend:local
+serviceos-deploy/staging/build-image.sh serviceos-backend:local
 serviceos-deploy/staging/deploy.sh /tmp/serviceos-staging.env
 serviceos-deploy/staging/smoke.sh /tmp/serviceos-staging.env
 serviceos-deploy/staging/cleanup.sh /tmp/serviceos-staging.env

@@ -21,8 +21,8 @@ lastUpdated: 2026-07-23
 
 | 任务 | 最小必读 | 直接工程入口 |
 |---|---|---|
-| 产品、页面、交互 | `product-design/README.md`、对应页面边界/旅程/DEC | `serviceos-frontend/apps/<portal>` 或 `serviceos-technician-ios` |
-| 前端共享能力 | 产品设计基线、共享边界决策 | `serviceos-frontend/packages`、当前消费者 |
+| 产品、页面、交互 | `product-design/README.md`、对应页面边界/旅程/DEC、`serviceos-frontend/AGENTS.md` | `serviceos-frontend/apps/<portal>` 或 `serviceos-technician-ios` |
+| 前端共享能力 | `serviceos-frontend/AGENTS.md`、产品设计基线、共享边界决策 | `serviceos-frontend/packages`、当前消费者 |
 | 身份、组织、授权 | `architecture/07-identity-authorization-audit.md`、相关 Accepted ADR | `identity`/`organization`/`authorization` 模块及安全测试 |
 | 项目、工单、任务 | `architecture/03-domain-model.md`、`06-work-order-task-execution-kernel.md` | 对应模块、Core OpenAPI、直接测试 |
 | 配置、履约方案、工作流 | `architecture/05-*`、`06-*`、`AD-014-*`、相关产品 DEC | `configuration`/`workflow`、Schema、迁移和测试 |

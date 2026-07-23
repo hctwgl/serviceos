@@ -15,12 +15,12 @@ set -euo pipefail
 #   bash scripts/agent-verify.sh client-identities  Page/Feature/Action 注册、跨端生成与未知动作门禁
 #   bash scripts/agent-verify.sh client-metadata    Web/iOS Header、后端低基数观测与 OpenAPI 元数据门禁
 #   bash scripts/agent-verify.sh client-foundation  Track A 全部生成物、独立消费者与契约兼容总门禁
-#   bash scripts/agent-verify.sh frontend           当前 Web Workspace 静态检查、单测与构建
+#   bash scripts/agent-verify.sh frontend           三个 Web App 与全部 @serviceos/* 包的静态检查、单测与构建
 #   bash scripts/agent-verify.sh technician-ios      Technician iOS Keychain/OIDC/Context/生成客户端基础门禁
 #   bash scripts/agent-verify.sh technician-ios-app  Technician iOS Xcode/Simulator App、XCTest 与 XCUITest 门禁
 #   bash scripts/agent-verify.sh technician-ios-distribution Technician iOS Production archive、隐私与签名失败关闭门禁
 #   bash scripts/agent-verify.sh ios-core           iOS auth/context/error/trace 基础构建与消费门禁
-#   bash scripts/agent-verify.sh docs               git diff --check + 脚本语法
+#   bash scripts/agent-verify.sh docs               工程拓扑、脚本语法、迁移基线与 Git 空白预检
 #
 # 全量 L3 验证统一走 bash scripts/verify-local.sh，不在本脚本内提供。
 
@@ -28,7 +28,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${root}"
 
 usage() {
-  sed -n '3,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '/^# 用法：$/,/^#$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit "${1:-2}"
 }
 
@@ -119,9 +119,7 @@ case "${command_name}" in
     scripts/verify-ios-core.sh
     ;;
   docs)
-    git diff --check
-    bash -n scripts/*.sh
-    echo "docs 检查通过。"
+    exec bash scripts/verify-repository-preflight.sh
     ;;
   *)
     usage 2

@@ -150,7 +150,8 @@ watch(
               <td data-testid="correction-project-id">{{ item.projectId }}</td>
               <td>
                 <span data-testid="correction-reason-codes">{{ reasonLabel(item.reasonCodes) }}</span>
-                <div class="muted">来源审核
+                <div class="muted">
+                  来源审核
                   <span data-testid="correction-source-review">
                     {{ item.sourceReviewCaseId }} / {{ item.sourceReviewDecisionId }}
                   </span>

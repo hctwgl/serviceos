@@ -17,7 +17,7 @@ baselineCommit: "afbbd9ab3752f4c319a869302077ea1e525b516f"
 | 后端 | Java 21、Spring Boot、Spring Modulith 模块化单体，源码位于 `serviceos-backend` |
 | 数据库 | PostgreSQL + Flyway；版本和数量由 `bash scripts/migration-baseline.sh` 从迁移目录推导 |
 | HTTP/事件契约 | Core OpenAPI 2.0.0、BYD CPIM OpenAPI 0.3.0、版本化事件 JSON Schema，位于 `serviceos-contracts` |
-| Web | `serviceos-frontend` pnpm Workspace；包含 Admin、Network、Technician 三个独立应用和共享包 |
+| Web | `serviceos-frontend` pnpm Workspace；包含 Admin、Network、Technician 三个应用，以及 api-client、auth-context、design-system、product-language 四个共享包 |
 | iOS | `serviceos-technician-ios` 原生 App、`serviceos-ios-core` 共享基础 |
 | 部署 | 本地、产品开发、staging、可观测性入口位于 `serviceos-deploy` |
 | 可靠性门禁 | PostgreSQL Testcontainers、Spring Modulith `ArchitectureTest`、契约兼容、客户端生成与 staging 检查 |

@@ -27,6 +27,11 @@ serviceos-architecture/    当前产品与架构事实源
 scripts/                   当前构建和验证入口
 ```
 
+Web Workspace 的产品应用只有 `admin`、`network`、`technician`；当前业务共享包只有
+`api-client`、`auth-context`、`design-system`、`product-language`。`vben/` 是 Admin
+依赖的上游 UI 基础，不是独立产品应用。详细依赖边界见
+[serviceos-frontend/AGENTS.md](serviceos-frontend/AGENTS.md)。
+
 ## 开发入口
 
 开始任务前：
@@ -52,7 +57,7 @@ bash scripts/agent-verify.sh arch
 
 ```bash
 bash scripts/agent-verify.sh contracts origin/master
-bash scripts/agent-verify.sh frontend
+bash scripts/agent-verify.sh frontend # 同时验证三个 Web 应用和全部 ServiceOS 共享包
 bash scripts/agent-verify.sh docs
 ```
 

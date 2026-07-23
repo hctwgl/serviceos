@@ -6,8 +6,7 @@ import type {
 } from '@serviceos/api-client'
 import { authorizeEvidenceRevisionDownload } from '@serviceos/api-client'
 import { useMutation } from '@tanstack/vue-query'
-import { Button, Empty } from '@serviceos/design-system'
-import { message } from 'ant-design-vue'
+import { Button, Empty, message } from '@serviceos/design-system'
 import { computed } from 'vue'
 import {
   evidenceItemStatusLabel,
@@ -253,7 +252,7 @@ const preview = useMutation({
 }
 
 .fe-required {
-  color: var(--sos-danger-text, #cf1322);
+  color: var(--sos-danger-text);
   font-size: 11px;
   font-style: normal;
   font-weight: 600;

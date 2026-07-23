@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/../.." && pwd)"
 output_file="${1:-}"
-image_ref="${2:-serviceos-backend:m17-local}"
+image_ref="${2:-serviceos-backend:local}"
 if [[ -z "${output_file}" ]]; then
   echo "usage: $0 <output-env-file> [image-ref]" >&2
   exit 64

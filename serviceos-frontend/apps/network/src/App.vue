@@ -71,11 +71,14 @@ onMounted(() => { if (accessToken()) void refresh() })
         </aside>
         <section class="boundary-card">
           <h2>服务端导航</h2>
-          <section v-for="(items, section) in groupedNavigation" :key="section"><h3>{{ section }}</h3>
-            <ul><li v-for="item in items" :key="item.pageId" :data-page-id="item.pageId">
-              <RouterLink v-if="routeForPage(item.pageId)" :to="routeForPage(item.pageId)!">{{ item.title }}</RouterLink>
-              <span v-else>{{ item.title }}（当前版本不可用）</span>
-            </li></ul>
+          <section v-for="(items, section) in groupedNavigation" :key="section">
+            <h3>{{ section }}</h3>
+            <ul>
+              <li v-for="item in items" :key="item.pageId" :data-page-id="item.pageId">
+                <RouterLink v-if="routeForPage(item.pageId)" :to="routeForPage(item.pageId)!">{{ item.title }}</RouterLink>
+                <span v-else>{{ item.title }}（当前版本不可用）</span>
+              </li>
+            </ul>
           </section>
           <p>导航可见性不替代 API 授权；所有业务请求仍由服务端按当前 Network Context 鉴权。</p>
         </section>

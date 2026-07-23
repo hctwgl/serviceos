@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# M259 Technician iOS App 精准门禁。
+# Technician iOS App 精准门禁。
 #
 # 默认要求用户已经手动启动一台 Simulator，并执行 XCTest/XCUITest。仅需验证工程能否编译时，
 # 可显式设置 SERVICEOS_IOS_REQUIRE_BOOTED_SIMULATOR=false；该模式不能作为最终运行态证据。

@@ -10,8 +10,25 @@ export default tseslint.config(
   {
     files: ['**/*.vue'],
     languageOptions: {
-      globals: { window: 'readonly', navigator: 'readonly', document: 'readonly', crypto: 'readonly' },
+      globals: {
+        crypto: 'readonly',
+        document: 'readonly',
+        Event: 'readonly',
+        File: 'readonly',
+        GeolocationPosition: 'readonly',
+        HTMLInputElement: 'readonly',
+        HTMLTextAreaElement: 'readonly',
+        navigator: 'readonly',
+        sessionStorage: 'readonly',
+        window: 'readonly',
+      },
       parserOptions: { parser: tseslint.parser },
+    },
+  },
+  {
+    files: ['**/*.mjs'],
+    languageOptions: {
+      globals: { console: 'readonly' },
     },
   },
   {

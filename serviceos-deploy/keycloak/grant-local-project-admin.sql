@@ -35,7 +35,7 @@ INSERT INTO idn_principal_lifecycle_event (
     'LOCAL_FIXTURE', 'local-fixture', repeat('0', 64), 'local-fixture', now()
 ) ON CONFLICT (lifecycle_event_id) DO NOTHING;
 
--- M188：ADMIN 上下文要求有效 INTERNAL_EMPLOYEE Persona + RoleGrant。
+-- ADMIN 上下文要求有效 INTERNAL_EMPLOYEE Persona + RoleGrant。
 INSERT INTO idn_principal_persona (
     persona_id, tenant_id, principal_id, persona_type, persona_status,
     valid_from, valid_to, persona_version, created_by, created_at
@@ -102,7 +102,7 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageLinks', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageLifecycle', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageProfile', now()),
-    -- M187 Admin 统一用户中心：组织 / 网点 / 授权治理能力
+    -- Admin 统一用户中心：组织 / 网点 / 授权治理能力
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'organization.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'organization.manageStructure', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'organization.manageMembership', now()),
@@ -121,11 +121,11 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.revokeGrant', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.delegate', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.explain', now()),
-    -- M191 Admin 共享 SavedView
+    -- Admin 共享 SavedView
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'preference.shareSavedView', now()),
-    -- M192 Admin 受控全局搜索
+    -- Admin 受控全局搜索
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'search.read', now()),
-    -- M378+ 项目履约配置
+    -- Admin 项目履约配置
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.create', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.draft.write', now()),
@@ -152,7 +152,7 @@ INSERT INTO auth_role_grant (
     'TENANT', 'tenant-local', now(), 'LOCAL_FIXTURE', 'local-only', now()
 ) ON CONFLICT (grant_id) DO NOTHING;
 
--- M187 低权限 viewer：Keycloak create 不保证自定义 UUID，由
+-- 低权限 viewer：Keycloak create 不保证自定义 UUID，由
 -- 本地产品场景重置按 Keycloak 实际 subject 幂等回填。
 
 -- BYD 适配器 SERVICE 主体：外发 HTTP 成功后同租户落 CLIENT Case / Route。

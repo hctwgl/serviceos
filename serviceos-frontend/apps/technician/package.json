@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "typecheck": "vue-tsc -b",
+    "test:unit": "node --experimental-strip-types src/expression/serviceosExprV1Evaluate.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

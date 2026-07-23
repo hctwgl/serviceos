@@ -10,11 +10,11 @@ import {
   Button,
   Drawer,
   Input,
+  message,
   SearchOutlined,
   Select,
   UserAddOutlined,
 } from '@serviceos/design-system'
-import { message } from 'ant-design-vue'
 import { computed, ref, watch } from 'vue'
 import PageError from '../../../components/PageError.vue'
 import StatusPill from '../../../components/StatusPill.vue'
@@ -80,8 +80,8 @@ const canSubmitGrant = computed(() =>
 
 const scopeTypeOptions: Array<{ value: RoleGrantScopeType; label: string; hint: string }> = [
   { value: 'TENANT', label: '全平台', hint: '固定为当前租户 tenant-local，授权覆盖租户内全部项目与网点。' },
-  { value: 'PROJECT', label: '项目', hint: '填写项目 ID（UUID），授权仅在该项目范围内生效。' },
-  { value: 'NETWORK', label: '网点', hint: '填写网点 ID（UUID），授权仅在该网点范围内生效。' },
+  { value: 'PROJECT', label: '项目', hint: '填写项目标识，授权仅在该项目范围内生效。' },
+  { value: 'NETWORK', label: '网点', hint: '填写网点标识，授权仅在该网点范围内生效。' },
   { value: 'REGION', label: '区域', hint: '填写标准行政区域编码，例如 310115。' },
 ]
 const grantStatusMeta: Record<RoleGrantStatus, { tone: 'green' | 'orange' | 'red' | 'gray'; label: string }> = {

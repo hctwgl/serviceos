@@ -425,7 +425,7 @@ async function onStickyAction() {
 }
 
 function browserDeviceId() {
-  const key = 'serviceos-technician-web-device-id'
+  const key = 'serviceos-technician-device-id'
   const existing = sessionStorage.getItem(key)
   if (existing) return existing
   const next = `web-session-${crypto.randomUUID()}`
@@ -1052,7 +1052,9 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
                     || formConditionState.ruleFailures.length > 0
                 "
                 data-testid="technician-online-form-submit"
-              >{{ formSubmitting ? '提交中…' : '提交不可变表单' }}</button>
+              >
+                {{ formSubmitting ? '提交中…' : '提交不可变表单' }}
+              </button>
             </form>
           </template>
           <ul v-if="formIssues.length > 0" class="error" data-testid="technician-online-form-errors">
@@ -1181,7 +1183,9 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           "
           data-testid="technician-task-complete"
           @click="completeTask"
-        >{{ taskSubmitting ? '服务器复核并完成中…' : '冻结资料并完成任务' }}</button>
+        >
+          {{ taskSubmitting ? '服务器复核并完成中…' : '冻结资料并完成任务' }}
+        </button>
         <p v-if="taskSubmissionMessage" role="status" data-testid="technician-task-submission-message">
           {{ taskSubmissionMessage }}
         </p>

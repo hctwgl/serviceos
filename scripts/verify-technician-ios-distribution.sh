@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# M261/M262 发布就绪性门禁：在没有 Apple 账号材料的机器上也能证明 Production archive 结构、
+# 发布就绪性门禁：在没有 Apple 账号材料的机器上也能证明 Production archive 结构、
 # App Store 图标、隐私清单和 dSYM；真实签名仍必须走 archive-technician-ios-release.sh。
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -1,7 +1,7 @@
 ---
 title: ServiceOS 验证执行策略
 status: Accepted
-lastUpdated: 2026-07-15
+lastUpdated: 2026-07-23
 ---
 
 # ServiceOS 验证执行策略
@@ -41,7 +41,19 @@ bash scripts/verify-repository-preflight.sh
 - Flyway 最高版本和迁移数量漂移；
 - 测试仍断言旧 Flyway 版本或旧迁移数量；
 - staging 发布清单与迁移目录不一致；
-- Bash 语法和 Git 空白错误。
+- Maven、pnpm、Swift、部署关键工程入口缺失；
+- 已删除的独立 Web/Web Core 根目录被重新引入；
+- 根目录、契约、部署脚本的 Bash/Node 语法错误；
+- Git 空白错误。
+
+Web Workspace 的统一门禁执行：
+
+```bash
+bash scripts/agent-verify.sh frontend
+```
+
+该入口必须覆盖 Admin、Network、Technician 三个应用以及全部 `@serviceos/*` 共享包；不得只验证
+Admin 的依赖闭包后宣称整个 Workspace 已通过。
 
 ### 2.2 精准验证
 

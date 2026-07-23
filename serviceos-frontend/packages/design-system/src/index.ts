@@ -15,6 +15,8 @@ export {
   Form,
   Input,
   Menu,
+  message,
+  Modal,
   Pagination,
   Radio,
   Result,

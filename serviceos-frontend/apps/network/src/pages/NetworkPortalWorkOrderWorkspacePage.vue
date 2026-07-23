@@ -346,8 +346,8 @@ watch(
                 阶段 {{ statusLabel(currentTask.stageCode || '') || '—' }} · 师傅
                 {{
                   resolveTechnician(currentTask.technicianId)?.displayName ||
-                  currentTask.technicianId ||
-                  '未指派'
+                    currentTask.technicianId ||
+                    '未指派'
                 }}
               </p>
               <button

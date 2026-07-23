@@ -11,8 +11,7 @@ import {
   getReviewCase,
 } from '@serviceos/api-client'
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { Button, Checkbox, Empty, Input } from '@serviceos/design-system'
-import { message, Modal } from 'ant-design-vue'
+import { Button, Checkbox, Empty, Input, message, Modal } from '@serviceos/design-system'
 import { computed, ref } from 'vue'
 import {
   correctionStatusLabel,
