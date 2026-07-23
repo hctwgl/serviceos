@@ -1,5 +1,6 @@
 export * from './http'
 export * from './admin'
+export * from './reviews'
 export * from './security-principals'
 export * from './authorization-roles'
 export * from './organizations'

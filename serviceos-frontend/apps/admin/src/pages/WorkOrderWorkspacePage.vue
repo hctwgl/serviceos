@@ -3,12 +3,10 @@ import type { WorkOrderWorkspaceTask } from '@serviceos/api-client'
 import { loadAdminWorkOrderWorkspace, loadWorkspaceSection } from '@serviceos/api-client'
 import { useQuery } from '@tanstack/vue-query'
 import {
-  Button,
   Card,
   CheckOutlined,
   ClockCircleOutlined,
   CopyOutlined,
-  Empty,
   Space,
   Tabs,
   ToolOutlined,
@@ -16,13 +14,21 @@ import {
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Page } from '@vben/common-ui'
+import AppointmentsVisitsSection from '../components/AppointmentsVisitsSection.vue'
 import AssignmentDrawer from '../components/AssignmentDrawer.vue'
+import FormsEvidenceSection from '../components/FormsEvidenceSection.vue'
+import IntegrationSection from '../components/IntegrationSection.vue'
 import PageError from '../components/PageError.vue'
+import ReviewsCorrectionsSection from '../components/ReviewsCorrectionsSection.vue'
 import StatusPill from '../components/StatusPill.vue'
+import TaskActionButtons from '../components/TaskActionButtons.vue'
+import TimelineAuditSection from '../components/TimelineAuditSection.vue'
+import WorkOrderOverviewFacts from '../components/WorkOrderOverviewFacts.vue'
 import {
   formatDateTime,
   stageLabel,
   taskLabel,
+  timelineEventLabel,
 } from '../presenters/work-order'
 
 const route = useRoute()
@@ -46,8 +52,26 @@ const section = useQuery({
   enabled: computed(() => activeTab.value !== 'overview' && activeTab.value !== 'TASKS'),
 })
 
+// 右侧栏「最近时间线」独立加载；与 TIMELINE_AUDIT tab 共用同一 queryKey，自动去重。
+const timelineSection = useQuery({
+  queryKey: computed(() => ['work-order-workspace', workOrderId.value, 'TIMELINE_AUDIT']),
+  queryFn: () => loadWorkspaceSection(workOrderId.value, 'TIMELINE_AUDIT'),
+})
+const railTimeline = computed(() => timelineSection.data.value?.timeline?.items.slice(0, 3) ?? [])
+
 const currentTask = computed(() => workspace.data.value?.workspace.currentTaskSummary ?? null)
-const stageOrder = ['PILOT_INTAKE', 'PILOT_DISPATCH', 'PILOT_APPOINTMENT', 'PILOT_SURVEY', 'PILOT_INSTALLATION', 'FINAL_REVIEW', 'CLIENT_CALLBACK']
+// 同时兼容新版 SURVEY/INSTALLATION 与历史 PILOT_* 阶段码。
+const stageOrder = [
+  'PILOT_INTAKE',
+  'PILOT_DISPATCH',
+  'PILOT_APPOINTMENT',
+  'SURVEY',
+  'PILOT_SURVEY',
+  'INSTALLATION',
+  'PILOT_INSTALLATION',
+  'FINAL_REVIEW',
+  'CLIENT_CALLBACK',
+]
 const activeStageIndex = computed(() => Math.max(0, stageOrder.indexOf(currentTask.value?.stageCode ?? '')))
 const projectPersonnel = computed(() => workspace.data.value?.workspace.projectPersonnel ?? [])
 
@@ -57,11 +81,7 @@ function taskTitle(task: WorkOrderWorkspaceTask | null): string {
 
 function copyOrderCode() {
   const value = workspace.data.value?.workspace.header.externalOrderCode
-  if (value) void navigator.clipboard.writeText(value)
-}
-
-function isAssignmentAction(code: string): boolean {
-  return code === 'dispatch.assignment.manage'
+  if (value) void globalThis.navigator.clipboard.writeText(value)
 }
 </script>
 
@@ -76,15 +96,12 @@ function isAssignmentAction(code: string): boolean {
       #extra
     >
       <Space wrap>
-        <Button
-          v-for="action in workspace.data.value.allowedActions.slice(0, 4)"
-          :key="action.code"
-          :type="isAssignmentAction(action.code) ? 'primary' : 'default'"
-          @click="isAssignmentAction(action.code) ? drawerOpen = true : undefined"
-        >
-          {{ action.label }}
-        </Button>
-        <Button>更多操作</Button>
+        <TaskActionButtons
+          :actions="workspace.data.value.allowedActions"
+          :task="currentTask"
+          :service-assignment-summary="workspace.data.value.workspace.serviceAssignmentSummary"
+          @manage-assignment="drawerOpen = true"
+        />
       </Space>
     </template>
 
@@ -184,14 +201,12 @@ function isAssignmentAction(code: string): boolean {
                 </dl>
               </div>
               <aside class="task-actions">
-                <span>允许操作</span><Button
-                  v-for="action in workspace.data.value.allowedActions"
-                  :key="action.code"
-                  :type="isAssignmentAction(action.code) || action.code.includes('SUBMIT') ? 'primary' : 'default'"
-                  @click="isAssignmentAction(action.code) ? drawerOpen = true : undefined"
-                >
-                  {{ action.label }}
-                </Button><p v-if="!workspace.data.value.allowedActions.length">
+                <span>允许操作</span><TaskActionButtons
+                  :actions="workspace.data.value.allowedActions"
+                  :task="currentTask"
+                  :service-assignment-summary="workspace.data.value.workspace.serviceAssignmentSummary"
+                  @manage-assignment="drawerOpen = true"
+                /><p v-if="!workspace.data.value.allowedActions.length">
                   当前没有可执行操作
                 </p>
               </aside>
@@ -210,17 +225,10 @@ function isAssignmentAction(code: string): boolean {
               />
             </Tabs>
             <div class="tab-content">
-              <template v-if="activeTab === 'FORMS_EVIDENCE'">
-                <div class="form-summary">
-                  <h3>表单摘要</h3><p>资料模板</p><strong>当前任务资料</strong><p>提交状态</p><strong>{{ section.data.value?.formsEvidence ? '资料已登记' : '暂无资料' }}</strong>
-                </div>
-                <div class="evidence-gallery">
-                  <div class="gallery-heading">
-                    <h3>资料照片</h3>
-                  </div>
-                  <Empty description="暂无可预览资料" />
-                </div>
-              </template>
+              <WorkOrderOverviewFacts
+                v-if="activeTab === 'overview'"
+                :view="workspace.data.value"
+              />
               <template v-else-if="activeTab === 'TASKS'">
                 <div
                   v-for="item in tasks.data.value?.tasks?.items ?? []"
@@ -229,13 +237,43 @@ function isAssignmentAction(code: string): boolean {
                 >
                   <strong>{{ taskLabel(item.taskType) }}</strong><span>{{ item.status }}</span>
                 </div>
+                <p
+                  v-if="!tasks.data.value?.tasks?.items?.length"
+                  class="section-state"
+                >
+                  <ClockCircleOutlined /><strong>暂无任务记录</strong>
+                </p>
               </template>
+              <PageError
+                v-else-if="section.isError.value"
+                :detail="section.error.value?.message ?? '业务区块加载失败'"
+              />
               <div
-                v-else
+                v-else-if="section.isLoading.value"
                 class="section-state"
               >
-                <ClockCircleOutlined /><strong>{{ section.isLoading.value ? '正在加载业务区块' : '业务区块已加载' }}</strong><p>页面仅展示服务端返回的正式业务数据。</p>
+                <ClockCircleOutlined /><strong>正在加载业务区块</strong><p>页面仅展示服务端返回的正式业务数据。</p>
               </div>
+              <AppointmentsVisitsSection
+                v-else-if="activeTab === 'APPOINTMENTS_VISITS'"
+                :data="section.data.value?.appointmentsVisits ?? null"
+              />
+              <FormsEvidenceSection
+                v-else-if="activeTab === 'FORMS_EVIDENCE'"
+                :data="section.data.value?.formsEvidence ?? null"
+              />
+              <ReviewsCorrectionsSection
+                v-else-if="activeTab === 'REVIEWS_CORRECTIONS'"
+                :data="section.data.value?.reviewsCorrections ?? null"
+              />
+              <IntegrationSection
+                v-else-if="activeTab === 'INTEGRATION'"
+                :data="section.data.value?.integration ?? null"
+              />
+              <TimelineAuditSection
+                v-else-if="activeTab === 'TIMELINE_AUDIT'"
+                :data="section.data.value?.timeline ?? null"
+              />
             </div>
           </Card>
         </div>
@@ -278,7 +316,17 @@ function isAssignmentAction(code: string): boolean {
           <section><h2>外部集成信息</h2><dl><div><dt>来源系统</dt><dd>{{ workspace.data.value.clientName }}</dd></div><div><dt>配置版本</dt><dd>{{ workspace.data.value.workspace.header.configurationBundleVersion }}</dd></div></dl></section>
           <section>
             <h2>最近时间线</h2><ol class="timeline">
-              <li><span /><div><strong>工作区数据已更新</strong><small>{{ formatDateTime(workspace.data.value.workspace.meta.asOf) }}</small></div></li><li><span /><div><strong>{{ workspace.data.value.taskName }}</strong><small>当前任务</small></div></li>
+              <template v-if="railTimeline.length">
+                <li
+                  v-for="item in railTimeline"
+                  :key="item.id"
+                >
+                  <span /><div><strong>{{ timelineEventLabel(item.eventType) }}</strong><small>{{ formatDateTime(item.occurredAt) }}</small></div>
+                </li>
+              </template>
+              <template v-else>
+                <li><span /><div><strong>工作区数据已更新</strong><small>{{ formatDateTime(workspace.data.value.workspace.meta.asOf) }}</small></div></li><li><span /><div><strong>{{ workspace.data.value.taskName }}</strong><small>当前任务</small></div></li>
+              </template>
             </ol>
           </section>
         </aside>

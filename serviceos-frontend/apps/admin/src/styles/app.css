@@ -110,7 +110,7 @@ body { overflow: hidden; }
 .workspace-primary { display: grid; gap: 12px; min-width: 0; }
 .progress-panel, .current-task-panel, .workspace-tabs-panel, .context-rail section { border: 1px solid var(--sos-border); border-radius: var(--sos-radius); background: var(--sos-surface); }
 .progress-panel { padding: 0; box-shadow: 0 1px 3px rgb(15 23 42 / 4%); }.progress-panel > .ant-card-body { padding: 15px 18px 17px; }.progress-panel h2, .current-task-panel h2, .context-rail h2 { margin: 0 0 14px; font-size: 15px; }
-.progress-steps { display: grid; grid-template-columns: repeat(7, 1fr); }
+.progress-steps { display: grid; grid-template-columns: repeat(9, 1fr); }
 .progress-step { position: relative; display: grid; justify-items: center; gap: 5px; color: var(--sos-text-disabled); font-size: 11px; text-align: center; }
 .progress-step::before { content: ''; position: absolute; top: 12px; left: -50%; width: 100%; height: 1px; background: var(--sos-step-line); }.progress-step:first-child::before { display: none; }
 .step-dot { position: relative; z-index: 1; display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid var(--sos-step-border); border-radius: 50%; background: var(--sos-surface); }
@@ -207,3 +207,17 @@ body { overflow: hidden; }
 @media (max-width: 900px) {
   .workbench-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* 用户详情抽屉内的角色授权管理区 */
+.role-grant-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--sos-border); }
+.role-grant-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.role-grant-heading h3, .role-grant-heading p { margin: 0; }
+.role-grant-heading p { margin-top: 4px; color: var(--sos-text-secondary); font-size: 12px; }
+.grant-form { display: grid; gap: 13px; margin-bottom: 16px; padding: 14px; border: 1px solid var(--sos-border); border-radius: 7px; background: var(--sos-canvas-subtle); }
+.grant-form label { display: grid; gap: 6px; }
+.grant-form label > span { color: var(--sos-text-strong); font-size: 13px; font-weight: 600; }
+.grant-form .field-hint { color: var(--sos-text-muted); font-size: 12px; }
+.grant-form-note { margin: 0; color: var(--sos-text-secondary); font-size: 12px; line-height: 1.6; }
+.role-grant-table td { padding: 8px; }
+.revoke-confirm { margin-top: 14px; padding: 14px; border: 1px solid var(--sos-danger-border); border-radius: 7px; background: var(--sos-danger-soft); }
+.revoke-confirm p { margin: 0 0 10px; color: var(--sos-text-strong); font-size: 13px; line-height: 1.6; }
