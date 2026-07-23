@@ -58,8 +58,11 @@ status: Proposed
 
 | 命令 | 聚合 | 关键前置条件 | 结果事件 |
 |---|---|---|---|
-| `CreateWorkOrder` | WorkOrder | 配置唯一命中、外部幂等通过 | `WorkOrderCreated` |
-| `ActivateWorkOrder` | WorkOrder | 必需初始信息完整 | `WorkOrderActivated` |
+| `CreateWorkOrder` | WorkOrder | 外部幂等通过（履约方案版本在受理时绑定） | `WorkOrderCreated` |
+| `ActivateWorkOrder` | WorkOrder | 必需初始信息完整、匹配唯一履约方案并绑定其生效版本；无法唯一确定进入待确认 | `WorkOrderActivated`、`WorkOrderFulfillmentPlanMatched` |
+| `ManualAssignFulfillmentPlan` | WorkOrder | 待确认/异常；方案属本项目、ENABLED、有生效版本、用户有权限、生命周期允许、不匹配填例外原因 | `WorkOrderFulfillmentPlanMatched` |
+| `RematchFulfillmentPlan` | WorkOrder | 已受理未派网点；阶段允许重匹配 | `WorkOrderFulfillmentPlanRematched` |
+| `AdjustFulfillmentPlan` | WorkOrder | 已派网点未开工；高风险授权；重校验责任链与 SLA | `WorkOrderFulfillmentPlanAdjusted` |
 | `CreateTask` | Task | 定义版本存在、业务键不重复 | `TaskCreated` |
 | `ClaimTask` | Task | READY、操作者为候选人 | `TaskClaimed` |
 | `ReleaseTask` | Task | CLAIMED、操作者为当前领取人或管理员 | `TaskReleased` |
@@ -103,7 +106,8 @@ status: Proposed
 
 | 事件 | 主要消费者 | 最小载荷 |
 |---|---|---|
-| `WorkOrderCreated` | 流程适配器、审计、投影 | 工单、项目、业务产品、配置包 ID |
+| `WorkOrderCreated` | 流程适配器、审计、投影 | 工单、项目、业务产品（履约方案版本在受理时绑定，见 WorkOrderFulfillmentPlanMatched） |
+| `WorkOrderFulfillmentPlanMatched` | 流程适配器、SLA、投影、审计 | 工单、fulfillmentPlanId、fulfillmentPlanVersionId、matchMode、匹配解释 |
 | `TaskReady` | 待办投影、通知、SLA | 任务、类型、候选人、SLA ID |
 | `TaskStarted` | 时间线、SLA | 任务、执行人、输入版本 |
 | `TaskCompleted` | 流程适配器、时间线 | 任务、定义版本、完成结果引用 |

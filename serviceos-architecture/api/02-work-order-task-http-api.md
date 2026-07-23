@@ -42,7 +42,7 @@ status: Proposed
 | 403 | `ACTION_FORBIDDEN`、`DATA_SCOPE_DENIED` | 授权拒绝 |
 | 404 | `WORK_ORDER_NOT_FOUND` | 对象不存在或为防泄露而隐藏 |
 | 409 | `VERSION_CONFLICT`、`TASK_STATE_CONFLICT`、`IDEMPOTENCY_CONFLICT` | 并发/状态/幂等冲突 |
-| 422 | `BUSINESS_PRECONDITION_FAILED`、`CONFIGURATION_NOT_RESOLVED` | 业务前置条件不满足 |
+| 422 | `BUSINESS_PRECONDITION_FAILED`、`CONFIGURATION_NOT_RESOLVED`、`FULFILLMENT_PLAN_NOT_MATCHED`、`FULFILLMENT_PLAN_AMBIGUOUS` | 业务前置条件不满足；无匹配或同级多命中方案进入待确认 |
 | 429 | `RATE_LIMITED` | 限流 |
 | 503 | `DEPENDENCY_TEMPORARILY_UNAVAILABLE` | 可重试外部依赖失败 |
 
@@ -60,6 +60,9 @@ status: Proposed
 | `POST /work-orders/{id}:cancel` | CancelWorkOrder | reasonCode、note | 200/202 |
 | `POST /work-orders/{id}:reopen` | ReopenWorkOrder | mode、reason、recoveryPoint、approvalRef | 200/202 |
 | `POST /work-orders/{id}:migrate-configuration` | MigrateConfiguration | migrationPlanId、approvalRef | 202 |
+| `POST /work-orders/{id}:assign-fulfillment-plan` | ManualAssignFulfillmentPlan | fulfillmentPlanId、reason、exceptionReason? | 200 |
+| `POST /work-orders/{id}:rematch-fulfillment-plan` | RematchFulfillmentPlan | reason? | 200 |
+| `POST /work-orders/{id}:adjust-fulfillment-plan` | AdjustFulfillmentPlan | reason、impactAcknowledgement、approvalRef | 200/202 |
 | `POST /work-orders/{id}/data-corrections` | CorrectWorkOrderData | fieldChanges、reason、evidenceRefs?、approvalRef? | 200/202 |
 
 `mode` 枚举：`CORRECTION`、`RESTORE_CANCELLED`、`AUTHORIZED_CLOSED_REOPEN`。不同 mode 使用独立授权能力。
@@ -90,7 +93,7 @@ CorrectWorkOrderData 仅更正由 workorder 拥有的基础字段，按 fieldCod
 }
 ```
 
-成功响应必须包含 `workOrderId`、`configurationBundleId`、生命周期和聚合版本。流程初始化通过 Outbox 异步启动，因此响应不承诺首批任务已经创建；返回 `initializationOperationId` 和任务查询链接。客户端可查询 operation 或工单任务列表，不能把“201 已创建工单”误解为“流程初始化已完成”。
+成功响应必须包含 `workOrderId`、生命周期和聚合版本；履约方案在正式受理时匹配，`fulfillmentPlanId`/`fulfillmentPlanVersionId` 及其锁定的 `configurationBundleId` 在受理成功后返回，无法唯一匹配时工单进入待确认。流程初始化通过 Outbox 异步启动，因此响应不承诺首批任务已经创建；返回 `initializationOperationId` 和任务查询链接。客户端可查询 operation 或工单任务列表，不能把“201 已创建工单”误解为“流程初始化已完成”。
 
 进入 CreateWorkOrder 事务前，服务端依据 `tenant + source + external order + service product` 形成 creationBusinessKey，并通过 authority 模块幂等 ReserveCreationAuthority。只有 SERVICEOS authority 才创建权威工单；事务重新锁定并复核 assignment/version，成功响应同时返回 `authorityAssignmentId/authorityVersion`。LEGACY/SHADOW_ONLY 路由不在 ServiceOS 创建可写工单，返回/记录明确路由结果，不能双主写入。
 

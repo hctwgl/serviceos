@@ -20,7 +20,7 @@ status: Proposed
 | authorization | ARCH-07、ARCH-21、M63～M67、ADR-025/026、M186、M188、M196～M242 | API-01/02/07、Core OpenAPI 1.0.8、ProjectScopeAuthorizationService、治理 HTTP、`/me*` | DATA-02、V064～V067、V089～V090、V096～V100 | M2 AUTH、M6 SEC、M63～M67、M186、M188、M196～M242 | E1/E4 |
 | audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
 | authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
-| configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
+| configuration | ARCH-05、AD-014、DEC-007（Accepted 目标）、ADR-091 | API-01/02/07 | DATA-01 | M2 CFG、M378〜M383、履约方案匹配验收（目标） | E2 |
 | files | ARCH-10、ARCH-21、ARCH-25 | API-03 资料引用、API-08 文件控制面 | DATA-03、V010 物理迁移 | M3 FILE、M6 SEC、M11 | E1/E3 |
 | reliability | ARCH-20、ADR-014 | API-01 通用命令/事件 | DATA-01 | M6 TX | E1 |
 | readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032/033/040/041/043/044/045/046/047/048/049/050/051/052/053/054/055/056/057/058/059/060/061/062/063/064/065/066/067/068/069/070/071/072/073/074/075/076/077/078/079/080、M189～M195、M202～M203、M205～M242 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读/整改/异常/资质/师傅关系/工作台 enrichment/产能页/整改详情/异常详情/资质详情/关系详情/限定工作区/协作深链/预约联系 fan-in/师傅 fan-in/目录 fan-in/队列字段展示/工作区 SLA 摘要/Visit 与表单提交摘要/Evidence 槽位与资料项摘要/工作台 SLA 风险计数/工作区整改摘要/工作区运营异常摘要/工作区预约联系服务端摘要/工作区师傅服务端摘要/工作区审核案例服务端摘要/目录页师傅服务端摘要/目录页预约服务端摘要/目录页联系尝试服务端摘要/目录页资料整改服务端摘要/目录页 SLA 风险服务端摘要/目录页资料 Evidence 服务端摘要/目录页工单头字段/工作台统计时间展示/预约联系历史字段展示/工作区 Visit 表单 Evidence 字段展示/工作区协作摘要字段展示/预约联系历史残余字段展示/整改详情残余字段展示 + §11 Technician Feed/字段展示/ME 页壳）、Core OpenAPI 1.0.16 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M195、M202～M203、M205～M242 | U0/U1 |

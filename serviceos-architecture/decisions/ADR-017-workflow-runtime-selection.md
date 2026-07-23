@@ -41,7 +41,7 @@ MVP 和首个试点采用方案 3：
 - 业务推进通过命令和领域事件完成；
 - 长等待依赖持久化定时器、事件订阅和可靠消息；
 - 自动任务失败进入统一重试和人工接管模型；
-- 工单创建时锁定 Workflow Version 与 Configuration Bundle；
+- 工单正式受理时锁定履约方案版本，并由该版本锁定 Workflow Version 与 Configuration Bundle；
 - 首期不建设完整 BPMN 设计器，不承诺 BPMN 全语义兼容；
 - 运行时通过接口隔离，后续可替换为 Flowable、Camunda 或其他引擎。
 

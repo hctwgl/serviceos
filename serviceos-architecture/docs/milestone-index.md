@@ -488,9 +488,11 @@ title: ServiceOS 里程碑索引
 - `serviceos-architecture/architecture/20-transaction-messaging-concurrency-blueprint.md`
 - `serviceos-architecture/architecture/21-security-nfr-deployment-blueprint.md`
 - `serviceos-architecture/architecture/36-persistence-engineering-guideline.md`
+- `serviceos-architecture/architecture/AD-014-fulfillment-plan-matching-and-version-binding.md`
 - `serviceos-architecture/architecture/system-wide-redaction-switch.md`
 - `serviceos-architecture/testing/README.md`
 - `serviceos-architecture/testing/admin-pilot-readiness-acceptance.md`
+- `serviceos-architecture/testing/fulfillment-plan-matching-version-binding-acceptance.md`
 - `serviceos-architecture/testing/identity-organization-governance-program-acceptance.md`
 - `serviceos-architecture/testing/multi-client-portal-program-acceptance.md`
 - `serviceos-architecture/testing/multi-oem-platform-kernel-program-acceptance.md`

@@ -2,7 +2,7 @@
 title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
-lastUpdated: 2026-07-22
+lastUpdated: 2026-07-23
 baselineCommit: "c1018a2fbc9fc4fdc60c99c6ce7840fdae302da9"
 latestMilestone: M453
 ---
@@ -144,7 +144,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink/API Schema 已预留 Consumer Persona | 身份治理序列之后的独立 Epic；待登录、隐私、客户主数据与注销策略确认；不得宣称已实现 | 后续正式 Epic |
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
-| 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M296 设计器/治理 + **M303～M309** 六类运行时 + **M310～M315** 设计器 + **M321～M350** 配置驱动履约主链路；**M356～M363** 客户端能力门禁；**M366** Bundle 定向目标派单求交；**M378～M383** Profile/Revision/Manifest/Resolver/发布/冻结；**M385** 配置中心母版 + Runbook/Compare-Impact；**M388** 结构化 Draft Document（OpenAPI 1.0.63） | Workflow/Task 模板中心（M386/M387）；完整校验 30 条；AMOUNT/加权、editableWhen、iOS 条件全量硬阻断；BUSINESS 暂停/预警 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296、M303～M315、M321～M350、M356～M363、M366、M378～M388 |
+| 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M296 设计器/治理 + **M303～M309** 六类运行时 + **M310～M315** 设计器 + **M321～M350** 配置驱动履约主链路；**M356～M363** 客户端能力门禁；**M366** Bundle 定向目标派单求交；**M378～M383** Profile/Revision/Manifest/Resolver/发布/冻结；**M385** 配置中心母版 + Runbook/Compare-Impact；**M388** 结构化 Draft Document（OpenAPI 1.0.63） | Workflow/Task 模板中心（M386/M387）；完整校验 30 条；AMOUNT/加权、editableWhen、iOS 条件全量硬阻断；BUSINESS 暂停/预警；多履约方案结构化匹配/优先级/具体度/待确认与受理后 Rematch/Adjust（DEC-007/AD-014 Accepted，未实现） | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296、M303～M315、M321～M350、M356～M363、M366、M378～M388 |
 | 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE + Geely 本地切片 | `PARTIAL` | BYD 入站建单/更新/取消、提审、回调；**M267/M297～M302** 通用 SPI；**M311/M314/M316/M320** 吉利本地 + 三 OEM 并行冒烟 + **M317～M319** 远端查询/人工处置/批量重放；**M321～M347** 冻结 Mapping（含 REFERENCE_OEM SAMPLE CREATE/UPDATE/CANCEL + Admin Mapping DSL UI） | 吉利 Sandbox/OpenAPI 签名联调（BLOCKED_EXTERNAL）、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M311、M314、M316、M317、M318、M319、M320、M321～M347、M273、M297～M302 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 + 网关 + WAIT/TIMER + SUB_PROCESS + 多实例 + 取消/重开/跳转/补偿 + 标准模板 | `PARTIAL` | 上项 + **M281** 维修/移机/巡检标准模板（含家充勘安） | HTTP 命令面、表单/资料完整模板包、设计器 | M17～M19、M61、M69、M268～M271、M275～M281 |
@@ -248,6 +248,8 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 - **M452 Implemented**：Admin 关注项目角标精确 COUNT（OpenAPI **1.0.113**：`*Truncated` 恒 false；工单 totalCount + 审核/整改/SLA count API）。
 - **M453 Implemented**：Admin 责任网点候选与分配产品化（OpenAPI **2.0.0**：Task 派生候选、`dispatch.read` PROJECT Scope、共享硬过滤评估器、命令重校验、禁止自动扩容、删除历史双责任外部路径，并统一师傅档案/登录主体边界）；精准 PostgreSQL、真实 Admin Pilot 链路和完整 L3 均已通过，人工产品评审仍待完成。
 - **M383** 长链路 test 7/8 仍未闭合，不阻塞本切片。
+
+已接受设计基线：DEC-007《项目多履约方案、独立版本与工单绑定》与 AD-014 将履约配置演进为“一项目多方案、方案级版本、受理时结构化匹配绑定”。当前实现（M378〜M453 的 ProjectFulfillmentProfile 按 serviceProductCode）为其子集；结构化匹配、matchPriority、具体度、待确认与 Rematch/Adjust 为 Accepted 目标，尚未实现，待独立里程碑。
 
 建议下一批（按优先级）：
 

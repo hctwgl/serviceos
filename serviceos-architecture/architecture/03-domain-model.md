@@ -15,6 +15,8 @@ classDiagram
   class Project
   class ServiceProduct
   class ConfigurationBundle
+  class FulfillmentPlan
+  class FulfillmentPlanVersion
   class ServiceRequest
   class WorkOrder
   class StageInstance
@@ -50,8 +52,11 @@ classDiagram
   Client "1" --> "many" Brand
   Client "1" --> "many" Project
   Project "many" --> "many" ServiceProduct
-  Project "1" --> "many" ConfigurationBundle
+  Project "1" --> "many" FulfillmentPlan
+  FulfillmentPlan "1" --> "many" FulfillmentPlanVersion
+  FulfillmentPlanVersion "1" --> "zero or one" ConfigurationBundle : snapshots
   ServiceRequest "1" --> "many" WorkOrder
+  FulfillmentPlanVersion "1" <-- "many" WorkOrder : binds
   ConfigurationBundle "1" <-- "many" WorkOrder : locks
   WorkOrder "1" --> "many" StageInstance
   StageInstance "1" --> "many" Task
@@ -96,7 +101,7 @@ classDiagram
 - 工单唯一身份、来源和外部编号；
 - 客户、地址、车辆、设备等业务引用；
 - 当前生命周期和当前阶段投影；
-- 锁定的配置包版本；
+- 受理时绑定的履约方案与方案版本（及其锁定的配置包）；
 - 取消、关闭、恢复等工单级命令约束。
 
 不负责：资料明细、审核历史、预约历史、费用计算明细。它们有独立聚合和生命周期。
@@ -183,9 +188,9 @@ PENDING -> READY -> CLAIMED/RUNNING -> COMPLETED
 
 试算通过 FactSetSnapshot 冻结事实版本，并使用独立 PricingContextSnapshot 与 CalculationRun。SettlementStatement 不直接包含可变“当前费用”，而由 StatementLine 精确引用 ChargeItem 或 Adjustment。
 
-## 3. 配置包
+## 3. 履约方案版本与配置包
 
-创建工单时生成 `ConfigurationBundle` 快照引用，至少包含：
+工单正式受理时匹配唯一履约方案并绑定其生效版本（FulfillmentPlanVersion）；该版本冻结完整履约配置快照，并对应生成 `ConfigurationBundle` 快照引用，至少包含：
 
 - 项目版本；
 - 流程版本；
