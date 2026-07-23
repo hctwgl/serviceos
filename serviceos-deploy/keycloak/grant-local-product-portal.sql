@@ -339,6 +339,9 @@ ON CONFLICT (grant_id) DO NOTHING;
 
 -- 任务执行能力（TENANT scope）：人工任务 claim/start/complete 的授权按 TENANT 维度评估，
 -- 细粒度安全由候选/责任快照与 claimedBy 状态机保证（与师傅整改任务自领取同一模型）。
+-- file.upload/file.download 是通用文件子系统能力，DefaultFileCommandService 按 TENANT 维度
+-- 校验（业务细粒度由 evidence.submit@PROJECT 等调用方保证）；师傅上传资料必须具备，
+-- 否则受限上传会话创建失败关闭。
 INSERT INTO auth_role (
     role_id, tenant_id, role_code, role_name, role_status, created_at
 ) VALUES (
@@ -350,7 +353,9 @@ INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
 VALUES
     ('aa100000-0000-4000-8000-000000000601', 'task.claim', now()),
     ('aa100000-0000-4000-8000-000000000601', 'task.start', now()),
-    ('aa100000-0000-4000-8000-000000000601', 'task.complete', now())
+    ('aa100000-0000-4000-8000-000000000601', 'task.complete', now()),
+    ('aa100000-0000-4000-8000-000000000601', 'file.upload', now()),
+    ('aa100000-0000-4000-8000-000000000601', 'file.download', now())
 ON CONFLICT (role_id, capability_code) DO NOTHING;
 
 INSERT INTO auth_role_grant (
