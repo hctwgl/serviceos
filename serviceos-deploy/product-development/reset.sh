@@ -71,12 +71,15 @@ fi
 echo "启动后端并执行正式 Flyway…"
 (
   cd "${repository_root}"
+  # 三端 Web 各自独立 dev server（5173/5174/5175）通过 Vite /api 代理访问 8080。
+  # 受限文件上传/下载 URL 必须走同源相对路径，否则浏览器直连 8080 的绝对地址会被 CORS 阻断。
   nohup env \
     SERVICEOS_BYD_CPIM_TENANT_ID=tenant-local \
     SERVICEOS_BYD_CPIM_PROJECT_CODE=BYD-OCEAN-SD-PILOT \
     SERVICEOS_OUTBOX_SCHEDULING_ENABLED=true \
     SERVICEOS_TASK_SCHEDULING_ENABLED=true \
     SERVICEOS_SLA_SCHEDULING_ENABLED=true \
+    SERVICEOS_FILE_TRANSFER_BASE_URL=/api/v1/file-transfers \
     ./mvnw --no-transfer-progress -pl serviceos-backend spring-boot:run \
       -Dspring-boot.run.profiles=local >"${backend_log}" 2>&1 &
   echo $! >"${backend_pid_file}"
