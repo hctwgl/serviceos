@@ -29,10 +29,9 @@ run_gate typescript-client bash scripts/agent-verify.sh client-ts
 run_gate swift-client bash scripts/agent-verify.sh client-swift
 run_gate design-tokens bash scripts/agent-verify.sh design-tokens
 run_gate client-identities bash scripts/agent-verify.sh client-identities
-run_gate web-core bash scripts/agent-verify.sh web-core
 run_gate ios-core bash scripts/agent-verify.sh ios-core
 
-# 元数据专项在总门禁中只重跑协议/服务端测试；Web/iOS 请求探针已由上面两个独立 Core 门禁覆盖。
+# 元数据专项在总门禁中只重跑协议/服务端测试；iOS 请求探针已由上面的 iOS Core 门禁覆盖。
 run_gate client-metadata-backend ./mvnw --no-transfer-progress \
   -pl serviceos-backend -Dtest=CorrelationContextFilterTest test
 run_gate client-metadata-contract ./mvnw --no-transfer-progress \

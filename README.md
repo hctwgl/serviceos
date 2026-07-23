@@ -22,7 +22,6 @@ serviceos-contracts/       OpenAPI、事件 Schema 和客户端生成
 serviceos-frontend/        Admin / Network / Technician Web Workspace
 serviceos-technician-ios/  原生 Technician iOS
 serviceos-ios-core/        iOS 共享基础
-serviceos-web-core/        仍在迁移中的 Web 共享基础
 serviceos-deploy/          本地、产品开发与 staging
 serviceos-architecture/    当前产品与架构事实源
 scripts/                   当前构建和验证入口

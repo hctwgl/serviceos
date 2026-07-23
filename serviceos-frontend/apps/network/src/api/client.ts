@@ -1,7 +1,7 @@
 import { accessToken, beginLogin } from '@serviceos/auth-context'
 
 // 师傅端本地 API 客户端：复用 @serviceos/auth-context 的 OIDC 访问令牌，经 Vite /api 代理访问后端。
-// 不依赖已废弃的 @serviceos/web-core；保持与旧端相同的 apiGet/apiGetWithMeta/apiPost 契约，
+// 自包含实现；保持与旧端相同的 apiGet/apiGetWithMeta/apiPost 契约，
 // 使移植的 technicianPortal/me/pages 无需改动。
 const API_BASE =
   (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_API_BASE_URL ?? '/api/v1'

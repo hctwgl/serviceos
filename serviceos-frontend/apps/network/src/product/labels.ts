@@ -1,4 +1,4 @@
-// 师傅端业务展示辅助：状态中文、时间格式、字段名。自包含，不依赖已废弃的 @serviceos/web-core。
+// 师傅端业务展示辅助：状态中文、时间格式、字段名。自包含，无跨端共享依赖。
 // 未知状态不失败关闭，原样以“未知状态（code）”展示，避免移动端因新枚举崩溃。
 
 const STATUS_LABELS: Record<string, string> = {
@@ -167,5 +167,5 @@ export function fieldLabel(key: string): string {
   return FIELD_LABELS[key] ?? key
 }
 
-// 供页面统一从 labels 导入错误文案化函数（实际实现在 api/client，避免依赖已废弃的 web-core）。
+// 供页面统一从 labels 导入错误文案化函数（实际实现在 api/client）。
 export { safeProblemMessage } from '../api/client'
