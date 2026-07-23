@@ -1,5 +1,8 @@
 package com.serviceos.readmodel.application;
 
+import com.serviceos.authorization.api.AuthorizationDecision;
+import com.serviceos.authorization.api.AuthorizationRequest;
+import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.project.api.ProjectClientBrandItem;
 import com.serviceos.project.api.ProjectClientDirectoryItem;
@@ -27,10 +30,16 @@ import java.util.stream.Collectors;
 final class DefaultAdminClientProjectDirectoryQueryService
         implements AdminClientProjectDirectoryQueryService {
     private final ProjectQueryService projects;
+    private final AuthorizationService authorization;
     private final Clock clock;
 
-    DefaultAdminClientProjectDirectoryQueryService(ProjectQueryService projects, Clock clock) {
+    DefaultAdminClientProjectDirectoryQueryService(
+            ProjectQueryService projects,
+            AuthorizationService authorization,
+            Clock clock
+    ) {
         this.projects = projects;
+        this.authorization = authorization;
         this.clock = clock;
     }
 
@@ -56,11 +65,11 @@ final class DefaultAdminClientProjectDirectoryQueryService
 
         List<AdminClientProjectDirectoryView.ClientItem> clients = new ArrayList<>();
         for (ProjectClientDirectoryItem client : clientItems) {
-            List<String> brands = projects.listClientBrands(
+            List<AdminClientProjectDirectoryView.BrandItem> brands = projects.listClientBrands(
                             actor, correlationId, client.clientCode(), "ALL").items().stream()
-                    .filter(item -> "ACTIVE".equals(item.status()))
                     .sorted(java.util.Comparator.comparingInt(ProjectClientBrandItem::sortOrder))
-                    .map(ProjectClientBrandItem::displayName)
+                    .map(item -> new AdminClientProjectDirectoryView.BrandItem(
+                            item.brandCode(), item.displayName(), item.status(), item.sortOrder()))
                     .toList();
             clients.add(new AdminClientProjectDirectoryView.ClientItem(
                     client.clientCode(), client.displayName(), client.status(), brands,
@@ -70,7 +79,20 @@ final class DefaultAdminClientProjectDirectoryQueryService
         List<AdminClientProjectDirectoryView.ProjectItem> projectViews = projectItems.stream()
                 .map(item -> toProjectItem(item, clientNames, regionNames))
                 .toList();
-        return new AdminClientProjectDirectoryView(clients, projectViews, clock.instant());
+        List<String> allowedActions = canMaintainCatalog(actor, correlationId)
+                ? List.of("CREATE_CLIENT", "CREATE_BRAND")
+                : List.of();
+        return new AdminClientProjectDirectoryView(
+                clients, projectViews, allowedActions, clock.instant());
+    }
+
+    private boolean canMaintainCatalog(CurrentPrincipal actor, String correlationId) {
+        AuthorizationDecision decision = authorization.authorize(
+                actor,
+                AuthorizationRequest.tenantCapability(
+                        "project.create", actor.tenantId(), "ProjectClientDirectory", actor.tenantId()),
+                correlationId);
+        return decision.effect() == AuthorizationDecision.Effect.ALLOW;
     }
 
     private static AdminClientProjectDirectoryView.ProjectItem toProjectItem(

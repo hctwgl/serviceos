@@ -7923,15 +7923,24 @@ components:
         networks: { type: array, items: { $ref: '#/components/schemas/AdminServiceNetworkDirectoryItem' } }
         technicians: { type: array, items: { $ref: '#/components/schemas/AdminTechnicianDirectoryItem' } }
         asOf: { type: string, format: date-time }
+    AdminClientBrandItem:
+      type: object
+      additionalProperties: false
+      required: [brandCode, brandName, status, sortOrder]
+      properties:
+        brandCode: { type: string, minLength: 1, maxLength: 128 }
+        brandName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+        sortOrder: { type: integer, minimum: 0, maximum: 999999 }
     AdminClientDirectoryItem:
       type: object
       additionalProperties: false
-      required: [clientCode, clientName, status, brandNames, projectCount]
+      required: [clientCode, clientName, status, brands, projectCount]
       properties:
         clientCode: { type: string, minLength: 1, maxLength: 128 }
         clientName: { type: string, minLength: 1, maxLength: 200 }
         status: { enum: [ACTIVE, DISABLED] }
-        brandNames: { type: array, items: { type: string, minLength: 1, maxLength: 200 } }
+        brands: { type: array, items: { $ref: '#/components/schemas/AdminClientBrandItem' } }
         projectCount: { type: integer, minimum: 0 }
     AdminProjectDirectoryItem:
       type: object
@@ -7958,10 +7967,14 @@ components:
     AdminClientProjectDirectoryView:
       type: object
       additionalProperties: false
-      required: [clients, projects, asOf]
+      required: [clients, projects, allowedActions, asOf]
       properties:
         clients: { type: array, items: { $ref: '#/components/schemas/AdminClientDirectoryItem' } }
         projects: { type: array, items: { $ref: '#/components/schemas/AdminProjectDirectoryItem' } }
+        allowedActions:
+          type: array
+          uniqueItems: true
+          items: { enum: [CREATE_CLIENT, CREATE_BRAND] }
         asOf: { type: string, format: date-time }
     AdminProjectCreationClientOption:
       type: object

@@ -9,23 +9,34 @@ import java.util.UUID;
 public record AdminClientProjectDirectoryView(
         List<ClientItem> clients,
         List<ProjectItem> projects,
+        List<String> allowedActions,
         Instant asOf
 ) {
     public AdminClientProjectDirectoryView {
         clients = clients == null ? List.of() : List.copyOf(clients);
         projects = projects == null ? List.of() : List.copyOf(projects);
+        allowedActions = allowedActions == null ? List.of() : List.copyOf(allowedActions);
     }
 
     public record ClientItem(
             String clientCode,
             String clientName,
             String status,
-            List<String> brandNames,
+            List<BrandItem> brands,
             int projectCount
     ) {
         public ClientItem {
-            brandNames = brandNames == null ? List.of() : List.copyOf(brandNames);
+            brands = brands == null ? List.of() : List.copyOf(brands);
         }
+    }
+
+    /** 客户品牌的稳定业务信息，供目录展示和维护抽屉直接消费。 */
+    public record BrandItem(
+            String brandCode,
+            String brandName,
+            String status,
+            int sortOrder
+    ) {
     }
 
     public record ProjectItem(

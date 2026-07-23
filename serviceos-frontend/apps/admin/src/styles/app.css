@@ -184,6 +184,9 @@ body { overflow: hidden; }
 .project-create-summary { display: grid; gap: 5px; margin-top: 4px; padding: 13px 15px; border-radius: 6px; background: hsl(var(--muted) / 45%); }
 .project-create-summary strong { font-size: 13px; }
 .project-create-summary span { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.6; }
+.client-brand-list .disabled { color: hsl(var(--muted-foreground)); text-decoration: line-through; }
+.client-brand-list .ant-btn { margin-left: auto; padding-inline: 0; }
+.field-error { display: block; margin-top: 6px; color: hsl(var(--destructive)); }
 
 @media (max-width: 1280px) {
   :root { --sos-sidebar-width: 164px; }

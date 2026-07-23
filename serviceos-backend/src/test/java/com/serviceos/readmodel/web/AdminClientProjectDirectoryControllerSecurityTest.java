@@ -49,17 +49,22 @@ class AdminClientProjectDirectoryControllerSecurityTest {
         when(principals.current()).thenReturn(principal);
         when(queries.load(principal, "corr-client-project")).thenReturn(new AdminClientProjectDirectoryView(
                 List.of(new AdminClientProjectDirectoryView.ClientItem(
-                        "BYD", "比亚迪汽车", "ACTIVE", List.of("海洋网"), 1)),
+                        "BYD", "比亚迪汽车", "ACTIVE", List.of(
+                                new AdminClientProjectDirectoryView.BrandItem(
+                                        "OCEAN", "海洋网", "ACTIVE", 10)), 1)),
                 List.of(new AdminClientProjectDirectoryView.ProjectItem(
                         UUID.randomUUID(), "BYD-SD-HOME", "比亚迪山东家充服务项目", "BYD", "比亚迪汽车",
                         LocalDate.parse("2026-01-01"), null, List.of("济南市"), 1, "ACTIVE",
-                        1, 0, "PUBLISHED", true, null)), now));
+                        1, 0, "PUBLISHED", true, null)),
+                List.of("CREATE_CLIENT", "CREATE_BRAND"), now));
 
         mvc.perform(get("/api/v1/admin/client-project-directory")
                         .with(jwt())
                         .header("X-Correlation-Id", "corr-client-project"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.clients[0].clientName").value("比亚迪汽车"))
+                .andExpect(jsonPath("$.clients[0].brands[0].brandName").value("海洋网"))
+                .andExpect(jsonPath("$.allowedActions[0]").value("CREATE_CLIENT"))
                 .andExpect(jsonPath("$.projects[0].regionNames[0]").value("济南市"))
                 .andExpect(jsonPath("$.projects[0].tenantId").doesNotExist())
                 .andExpect(jsonPath("$.projects[0].regionCodes").doesNotExist());

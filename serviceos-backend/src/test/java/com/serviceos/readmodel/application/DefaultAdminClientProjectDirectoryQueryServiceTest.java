@@ -1,6 +1,8 @@
 package com.serviceos.readmodel.application;
 
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.authorization.api.AuthorizationDecision;
+import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.project.api.ProjectClientBrandItem;
 import com.serviceos.project.api.ProjectClientBrandPage;
 import com.serviceos.project.api.ProjectClientDirectoryItem;
@@ -34,6 +36,7 @@ class DefaultAdminClientProjectDirectoryQueryServiceTest {
     @DisplayName("客户项目目录应返回客户品牌、区域名称和履约配置状态")
     void shouldComposeClientAndProjectFacts() {
         ProjectQueryService projects = mock(ProjectQueryService.class);
+        AuthorizationService authorization = mock(AuthorizationService.class);
         CurrentPrincipal actor = new CurrentPrincipal(
                 "admin-1", "tenant-1", CurrentPrincipal.PrincipalType.USER, "admin-web", Set.of());
         ProjectView project = new ProjectView(
@@ -53,16 +56,19 @@ class DefaultAdminClientProjectDirectoryQueryServiceTest {
                 .thenReturn(new ProjectClientBrandPage(List.of(
                         new ProjectClientBrandItem("BYD", "OCEAN", "海洋网", "ACTIVE", 10),
                         new ProjectClientBrandItem("BYD", "DYNASTY", "王朝网", "ACTIVE", 20)), NOW));
+        when(authorization.authorize(any(), any(), any())).thenReturn(AuthorizationDecision.allow());
 
         var service = new DefaultAdminClientProjectDirectoryQueryService(
-                projects, Clock.fixed(NOW, ZoneOffset.UTC));
+                projects, authorization, Clock.fixed(NOW, ZoneOffset.UTC));
         var result = service.load(actor, "corr-projects");
 
         assertThat(result.clients()).singleElement().satisfies(client -> {
             assertThat(client.clientName()).isEqualTo("比亚迪汽车");
-            assertThat(client.brandNames()).containsExactly("海洋网", "王朝网");
+            assertThat(client.brands()).extracting(item -> item.brandName())
+                    .containsExactly("海洋网", "王朝网");
             assertThat(client.projectCount()).isEqualTo(1);
         });
+        assertThat(result.allowedActions()).containsExactly("CREATE_CLIENT", "CREATE_BRAND");
         assertThat(result.projects()).singleElement().satisfies(item -> {
             assertThat(item.projectName()).isEqualTo("比亚迪山东家充服务项目");
             assertThat(item.clientName()).isEqualTo("比亚迪汽车");

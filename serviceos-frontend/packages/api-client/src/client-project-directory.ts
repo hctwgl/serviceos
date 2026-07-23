@@ -4,7 +4,12 @@ export type AdminClientDirectoryItem = {
   clientCode: string
   clientName: string
   status: 'ACTIVE' | 'DISABLED'
-  brandNames: string[]
+  brands: Array<{
+    brandCode: string
+    brandName: string
+    status: 'ACTIVE' | 'DISABLED'
+    sortOrder: number
+  }>
   projectCount: number
 }
 
@@ -29,6 +34,7 @@ export type AdminProjectDirectoryItem = {
 export type AdminClientProjectDirectoryView = {
   clients: AdminClientDirectoryItem[]
   projects: AdminProjectDirectoryItem[]
+  allowedActions: Array<'CREATE_CLIENT' | 'CREATE_BRAND'>
   asOf: string
 }
 
