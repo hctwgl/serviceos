@@ -89,8 +89,8 @@ paths:
       operationId: getAdminResourceDirectory
       summary: Admin 服务网点与师傅页面目录
       description: >-
-        需要 network.read。服务端组合合作组织名称、有效覆盖、师傅服务关系和资质摘要，
-        前端不得按内部标识自行拼接多个领域接口。
+        需要 network.read。服务端组合合作服务商、有效覆盖、师傅服务关系、资质摘要和页面允许动作，
+        前端不得按内部标识自行拼接多个领域接口。写命令仍实时校验对应 network.manage* 权限。
       parameters:
         - $ref: '#/components/parameters/CorrelationId'
       responses:
@@ -7885,6 +7885,15 @@ components:
         items: { type: array, items: { $ref: '#/components/schemas/AdminUserDirectoryItem' } }
         nextCursor: { type: [string, 'null'] }
         asOf: { type: string, format: date-time }
+    AdminPartnerOrganizationDirectoryItem:
+      type: object
+      additionalProperties: false
+      required: [id, partnerCode, partnerName, status]
+      properties:
+        id: { type: string, format: uuid }
+        partnerCode: { type: string, minLength: 1, maxLength: 64 }
+        partnerName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DEACTIVATED] }
     AdminServiceNetworkDirectoryItem:
       type: object
       additionalProperties: false
@@ -7918,10 +7927,15 @@ components:
     AdminResourceDirectoryPage:
       type: object
       additionalProperties: false
-      required: [networks, technicians, asOf]
+      required: [partners, networks, technicians, allowedActions, asOf]
       properties:
+        partners: { type: array, items: { $ref: '#/components/schemas/AdminPartnerOrganizationDirectoryItem' } }
         networks: { type: array, items: { $ref: '#/components/schemas/AdminServiceNetworkDirectoryItem' } }
         technicians: { type: array, items: { $ref: '#/components/schemas/AdminTechnicianDirectoryItem' } }
+        allowedActions:
+          type: array
+          uniqueItems: true
+          items: { enum: [CREATE_PARTNER, CREATE_NETWORK] }
         asOf: { type: string, format: date-time }
     AdminClientBrandItem:
       type: object

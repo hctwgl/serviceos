@@ -1,5 +1,8 @@
 package com.serviceos.readmodel.application;
 
+import com.serviceos.authorization.api.AuthorizationDecision;
+import com.serviceos.authorization.api.AuthorizationRequest;
+import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkQueryService;
 import com.serviceos.network.api.PartnerOrganizationView;
@@ -9,6 +12,7 @@ import com.serviceos.network.api.TechnicianProfileView;
 import com.serviceos.network.api.TechnicianQualificationView;
 import com.serviceos.readmodel.api.AdminResourceDirectoryPage;
 import com.serviceos.readmodel.api.AdminResourceDirectoryQueryService;
+import com.serviceos.readmodel.api.AdminPartnerOrganizationDirectoryItem;
 import com.serviceos.readmodel.api.AdminServiceNetworkDirectoryItem;
 import com.serviceos.readmodel.api.AdminTechnicianDirectoryItem;
 import org.springframework.stereotype.Service;
@@ -32,15 +36,18 @@ import java.util.stream.Collectors;
 class DefaultAdminResourceDirectoryQueryService implements AdminResourceDirectoryQueryService {
     private final NetworkQueryService networks;
     private final ServiceNetworkCoverageQuery coverages;
+    private final AuthorizationService authorization;
     private final Clock clock;
 
     DefaultAdminResourceDirectoryQueryService(
             NetworkQueryService networks,
             ServiceNetworkCoverageQuery coverages,
+            AuthorizationService authorization,
             Clock clock
     ) {
         this.networks = networks;
         this.coverages = coverages;
+        this.authorization = authorization;
         this.clock = clock;
     }
 
@@ -50,7 +57,9 @@ class DefaultAdminResourceDirectoryQueryService implements AdminResourceDirector
         List<ServiceNetworkView> networkItems = networks.listServiceNetworks(actor, correlationId, null).items();
         List<TechnicianProfileView> technicianItems = networks.listTechnicianProfiles(actor, correlationId).items();
 
-        Map<UUID, String> partnerNames = networks.listPartnerOrganizations(actor, correlationId).items().stream()
+        List<PartnerOrganizationView> partnerItems = networks.listPartnerOrganizations(
+                actor, correlationId).items();
+        Map<UUID, String> partnerNames = partnerItems.stream()
                 .collect(Collectors.toMap(PartnerOrganizationView::id, PartnerOrganizationView::name));
         Map<UUID, ServiceNetworkView> networkById = networkItems.stream()
                 .collect(Collectors.toMap(ServiceNetworkView::id, Function.identity()));
@@ -102,7 +111,33 @@ class DefaultAdminResourceDirectoryQueryService implements AdminResourceDirector
                     profile.id(), profile.displayName(), profile.status(), profile.supportedClientKinds(),
                     networkNames, approved, pending, profile.updatedAt()));
         }
-        return new AdminResourceDirectoryPage(networkViews, technicianViews, asOf);
+        List<AdminPartnerOrganizationDirectoryItem> partnerViews = partnerItems.stream()
+                .map(item -> new AdminPartnerOrganizationDirectoryItem(
+                        item.id(), item.code(), item.name(), item.status()))
+                .toList();
+        List<String> allowedActions = new ArrayList<>();
+        if (isAllowed(actor, correlationId, "network.managePartner", "PartnerOrganizationDirectory")) {
+            allowedActions.add("CREATE_PARTNER");
+        }
+        if (isAllowed(actor, correlationId, "network.manageNetwork", "ServiceNetworkDirectory")) {
+            allowedActions.add("CREATE_NETWORK");
+        }
+        return new AdminResourceDirectoryPage(
+                partnerViews, networkViews, technicianViews, allowedActions, asOf);
+    }
+
+    private boolean isAllowed(
+            CurrentPrincipal actor,
+            String correlationId,
+            String capability,
+            String resourceType
+    ) {
+        AuthorizationDecision decision = authorization.authorize(
+                actor,
+                AuthorizationRequest.tenantCapability(
+                        capability, actor.tenantId(), resourceType, actor.tenantId()),
+                correlationId);
+        return decision.effect() == AuthorizationDecision.Effect.ALLOW;
     }
 
     private static String requirePartnerName(Map<UUID, String> partnerNames, ServiceNetworkView network) {

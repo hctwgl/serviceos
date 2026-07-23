@@ -1,5 +1,7 @@
 package com.serviceos.readmodel.application;
 
+import com.serviceos.authorization.api.AuthorizationDecision;
+import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkQueryService;
 import com.serviceos.network.api.NetworkTechnicianMembershipPage;
@@ -39,6 +41,7 @@ class DefaultAdminResourceDirectoryQueryServiceTest {
     void shouldComposeServiceNetworksAndTechnicians() {
         NetworkQueryService networks = mock(NetworkQueryService.class);
         ServiceNetworkCoverageQuery coverages = mock(ServiceNetworkCoverageQuery.class);
+        AuthorizationService authorization = mock(AuthorizationService.class);
         CurrentPrincipal actor = new CurrentPrincipal(
                 "admin-1", "tenant-1", CurrentPrincipal.PrincipalType.USER, "admin-web", Set.of());
         UUID partnerId = UUID.randomUUID();
@@ -72,12 +75,15 @@ class DefaultAdminResourceDirectoryQueryServiceTest {
                         new TechnicianQualificationView(
                                 UUID.randomUUID(), technicianId, "HIGH_VOLTAGE_OPERATION", "PENDING",
                                 NOW, null, "admin-1", NOW, null, null, null, 1)), NOW));
+        when(authorization.authorize(any(), any(), any())).thenReturn(AuthorizationDecision.allow());
 
         var service = new DefaultAdminResourceDirectoryQueryService(
-                networks, coverages, Clock.fixed(NOW, ZoneOffset.UTC));
+                networks, coverages, authorization, Clock.fixed(NOW, ZoneOffset.UTC));
         var result = service.load(actor, "corr-resource");
 
         assertThat(result.asOf()).isEqualTo(NOW);
+        assertThat(result.partners()).singleElement().satisfies(partner ->
+                assertThat(partner.partnerName()).isEqualTo("济南恒通新能源服务有限公司"));
         assertThat(result.networks()).singleElement().satisfies(network -> {
             assertThat(network.networkName()).isEqualTo("济南历下服务中心");
             assertThat(network.partnerOrganizationName()).isEqualTo("济南恒通新能源服务有限公司");
@@ -90,5 +96,6 @@ class DefaultAdminResourceDirectoryQueryServiceTest {
             assertThat(technician.approvedQualificationCodes()).containsExactly("HOME_CHARGING_INSTALLATION");
             assertThat(technician.pendingQualificationCount()).isEqualTo(1);
         });
+        assertThat(result.allowedActions()).containsExactly("CREATE_PARTNER", "CREATE_NETWORK");
     }
 }

@@ -1,5 +1,12 @@
 import { get } from './http'
 
+export type AdminPartnerOrganizationDirectoryItem = {
+  id: string
+  partnerCode: string
+  partnerName: string
+  status: 'ACTIVE' | 'DEACTIVATED'
+}
+
 export type AdminServiceNetworkDirectoryItem = {
   id: string
   networkCode: string
@@ -23,8 +30,10 @@ export type AdminTechnicianDirectoryItem = {
 }
 
 export type AdminResourceDirectoryPage = {
+  partners: AdminPartnerOrganizationDirectoryItem[]
   networks: AdminServiceNetworkDirectoryItem[]
   technicians: AdminTechnicianDirectoryItem[]
+  allowedActions: Array<'CREATE_PARTNER' | 'CREATE_NETWORK'>
   asOf: string
 }
 
