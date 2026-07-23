@@ -32,7 +32,7 @@ const message = ref<string | null>(null)
 const error = ref<string | null>(null)
 
 function itemsForSlot(slotId: string) {
-  return items.value.filter((item) => item.evidenceSlotId === slotId && item.status === 'ACTIVE')
+  return items.value.filter((item) => item.evidenceSlotId === slotId)
 }
 
 function selectFile(slotId: string, event: Event) {
@@ -41,7 +41,6 @@ function selectFile(slotId: string, event: Event) {
 
 const validatedRevisionCount = computed(() =>
   items.value
-    .filter((item) => item.status === 'ACTIVE')
     .flatMap((item) => item.revisions ?? [])
     .filter((revision) => revision.status === 'VALIDATED').length,
 )
@@ -231,7 +230,6 @@ async function resubmit() {
   const current = correction.value
   if (!context || !current || busy.value || current.clientCapabilityUnsupportedDetail) return
   const revisionIds = items.value
-    .filter((item) => item.status === 'ACTIVE')
     .map(
       (item) =>
         item.revisions

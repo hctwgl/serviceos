@@ -256,7 +256,8 @@ const requiredEvidenceReady = computed(() => {
   return evidenceSlots.value.every((slot) => {
     if (!slot.required) return true
     const count = evidenceItems.value
-      .filter((item) => item.evidenceSlotId === slot.slotId && item.status === 'ACTIVE')
+      // Item 生命周期状态为 OPEN 等（非 ACTIVE）；可用性由是否存在 VALIDATED Revision 判定。
+      .filter((item) => item.evidenceSlotId === slot.slotId)
       .filter((item) => (item.revisions ?? []).some((revision) => revision.status === 'VALIDATED'))
       .length
     return count >= Math.max(slot.minCount ?? 0, 1)
@@ -625,7 +626,7 @@ function selectEvidenceFile(slotId: string, event: Event) {
 }
 
 function itemsForSlot(slotId: string) {
-  return evidenceItems.value.filter((item) => item.evidenceSlotId === slotId && item.status === 'ACTIVE')
+  return evidenceItems.value.filter((item) => item.evidenceSlotId === slotId)
 }
 
 async function uploadEvidence(slot: TechnicianEvidenceSlot) {
@@ -742,7 +743,6 @@ async function completeTask() {
   const task = detail.value
   if (!context || !task || taskSubmitting.value) return
   const revisionIds = evidenceItems.value
-    .filter((item) => item.status === 'ACTIVE')
     .map((item) => item.revisions.filter((revision) => revision.status === 'VALIDATED')
       .sort((left, right) => right.revisionNumber - left.revisionNumber)[0]?.evidenceRevisionId)
     .filter((id): id is string => Boolean(id))
@@ -1167,7 +1167,7 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           </li>
         </ul>
         <p class="hint">
-          客户端只选择每个 ACTIVE Item 的最新 VALIDATED Revision；不可变引用、摘要和输入版本均由服务器重新读取并冻结。
+          客户端只选择每个资料 Item 的最新 VALIDATED Revision；不可变引用、摘要和输入版本均由服务器重新读取并冻结。
         </p>
         <button
           type="button"

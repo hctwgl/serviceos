@@ -214,7 +214,8 @@ export type TechnicianEvidenceItem = {
   taskId: string
   evidenceSlotId: string
   itemOrdinal: number
-  status: 'ACTIVE' | 'INVALIDATED'
+  // 资料 Item 生命周期状态（与后端 evd_evidence_item.status 一致）；作废/作旧在 Revision 级（status=INVALIDATED）。
+  status: 'OPEN' | 'SUBMITTED' | 'UNDER_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'LOCKED'
   createdAt: string
   revisions: TechnicianEvidenceRevision[]
 }
