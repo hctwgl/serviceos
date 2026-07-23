@@ -131,7 +131,10 @@ final class DefaultTechnicianFormService implements TechnicianFormService {
         TaskFulfillmentContext task = tasks.find(principal.tenantId(), taskId)
                 .orElseThrow(DefaultTechnicianFormService::taskNotFound);
         List<String> assigneeIds = List.of(principalId.toString(), profile.id().toString());
-        boolean currentResponsible = assigneeIds.contains(task.responsiblePrincipalId());
+        // 任务完成/未指派时无 ACTIVE 责任分派，responsiblePrincipalId 为 null；
+        // 不可变 List.contains(null) 会抛 NPE（500），显式判空后按“非当前责任人”处理。
+        boolean currentResponsible = task.responsiblePrincipalId() != null
+                && assigneeIds.contains(task.responsiblePrincipalId());
         boolean sameNetwork = assignments.filterTaskIdsForNetwork(
                 principal.tenantId(), networkId.toString(), List.of(taskId)).contains(taskId);
         if (!currentResponsible || !sameNetwork) {
