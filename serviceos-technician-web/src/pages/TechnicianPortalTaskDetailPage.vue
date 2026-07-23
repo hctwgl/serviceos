@@ -4,6 +4,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
   getTechnicianTaskDetail,
+  claimMainTask,
+  startMainTask,
   checkInTechnicianVisit,
   interruptTechnicianVisit,
   listTechnicianTaskForms,
@@ -53,6 +55,8 @@ const evidenceUploadingSlotId = ref<string | null>(null)
 const evidenceMessage = ref<string | null>(null)
 const taskSubmitting = ref(false)
 const taskSubmissionMessage = ref<string | null>(null)
+const taskClaimStarting = ref(false)
+const taskClaimMessage = ref<string | null>(null)
 
 const supportedFormTypes = new Set(['STRING', 'TEXT', 'INTEGER', 'DECIMAL', 'BOOLEAN', 'DATE', 'DATETIME'])
 const activeForm = computed(() => taskForms.value[0] ?? null)
@@ -688,6 +692,51 @@ async function loadEvidence(taskId: string) {
   }
 }
 
+/**
+ * READY → CLAIMED → RUNNING：先 claim（If-Match=当前 resourceVersion），
+ * 再用 claim 回执里的新版本 start；start 的乐观锁版本不能用旧的 resourceVersion。
+ */
+async function claimAndStart() {
+  const task = detail.value
+  if (!task || taskClaimStarting.value) return
+  taskClaimStarting.value = true
+  taskClaimMessage.value = '正在接单…'
+  let claimed = false
+  try {
+    const claimReceipt = await claimMainTask(task.taskId, task.resourceVersion)
+    claimed = true
+    taskClaimMessage.value = '接单成功，正在开工…'
+    await startMainTask(task.taskId, claimReceipt.data.version)
+    taskClaimMessage.value = '已开工，任务进入执行中'
+    await load()
+  } catch (err) {
+    taskClaimMessage.value = userFacingError(err, '接单开工失败，请刷新任务状态后重试')
+    if (claimed) {
+      // claim 已生效但 start 失败：刷新后按 CLAIMED 展示“开始任务”重试入口
+      await load()
+    }
+  } finally {
+    taskClaimStarting.value = false
+  }
+}
+
+/** CLAIMED → RUNNING：If-Match 用当前详情 resourceVersion。 */
+async function startTask() {
+  const task = detail.value
+  if (!task || taskClaimStarting.value) return
+  taskClaimStarting.value = true
+  taskClaimMessage.value = '正在开工…'
+  try {
+    await startMainTask(task.taskId, task.resourceVersion)
+    taskClaimMessage.value = '已开工，任务进入执行中'
+    await load()
+  } catch (err) {
+    taskClaimMessage.value = userFacingError(err, '开工失败，请刷新任务状态后重试')
+  } finally {
+    taskClaimStarting.value = false
+  }
+}
+
 async function completeTask() {
   const context = props.technicianContextId
   const task = detail.value
@@ -1077,6 +1126,35 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           <h3>提交前检查</h3>
           <span>Snapshot → 服务端复核 → Complete</span>
         </div>
+        <div
+          v-if="detail.taskStatus === 'READY' || detail.taskStatus === 'CLAIMED'"
+          class="task-claim"
+          data-testid="technician-task-claim-start"
+        >
+          <h4>{{ detail.taskStatus === 'READY' ? '接单开工' : '开始任务' }}</h4>
+          <p class="hint">
+            {{
+              detail.taskStatus === 'READY'
+                ? '任务尚未接单：接单并开工后才进入可执行状态，才能填写表单、上传资料与完成任务。'
+                : '任务已由你接单；开工后才进入可执行状态。'
+            }}
+          </p>
+          <button
+            type="button"
+            :disabled="taskClaimStarting || detail.executionGuarded"
+            data-testid="technician-task-claim-start-button"
+            @click="detail.taskStatus === 'READY' ? claimAndStart() : startTask()"
+          >
+            {{
+              taskClaimStarting
+                ? (detail.taskStatus === 'READY' ? '接单开工处理中…' : '开工处理中…')
+                : (detail.taskStatus === 'READY' ? '接单开工' : '开始任务')
+            }}
+          </button>
+          <p v-if="taskClaimMessage" role="status" data-testid="technician-task-claim-start-message">
+            {{ taskClaimMessage }}
+          </p>
+        </div>
         <ul class="presubmit-checks" data-testid="technician-presubmit-checks">
           <li
             v-for="check in preSubmitChecks"
@@ -1305,6 +1383,13 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
 }
 .visit-actions {
   margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.task-claim {
+  margin: 0 0 12px;
   padding: 1rem;
   border: 1px solid #cbd5e1;
   border-radius: 8px;

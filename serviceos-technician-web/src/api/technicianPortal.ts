@@ -417,6 +417,34 @@ export function completeTechnicianTask(
   )
 }
 
+/** 平台人工任务命令回执：claim 后的权威新版本号只从 version 字段读取。 */
+export type HumanTaskCommandReceipt = {
+  taskId: string
+  status: string
+  actorId: string
+  version: number
+  occurredAt: string
+}
+
+/**
+ * 平台人工任务领取：主体由 JWT 决定，后端强制 claimedBy == 当前主体；
+ * 不走 /technician/me 前缀，无请求体，乐观锁版本走 If-Match。
+ */
+export function claimMainTask(taskId: string, version: number) {
+  return apiPost<HumanTaskCommandReceipt>(
+    `/tasks/${encodeURIComponent(taskId)}:claim`,
+    { idempotencyKey: crypto.randomUUID(), ifMatch: `"${version}"` },
+  )
+}
+
+/** 平台人工任务开工：If-Match 必须使用 claim 之后的新版本（receipt.version 或详情 resourceVersion）。 */
+export function startMainTask(taskId: string, version: number) {
+  return apiPost<HumanTaskCommandReceipt>(
+    `/tasks/${encodeURIComponent(taskId)}:start`,
+    { idempotencyKey: crypto.randomUUID(), ifMatch: `"${version}"` },
+  )
+}
+
 export function listTechnicianCorrections(technicianContextId: string) {
   return apiGet<TechnicianCorrection[]>(
     '/technician/me/corrections', {}, technicianHeaders(technicianContextId),
