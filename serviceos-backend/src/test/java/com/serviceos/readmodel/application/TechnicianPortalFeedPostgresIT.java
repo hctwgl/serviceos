@@ -344,6 +344,23 @@ class TechnicianPortalFeedPostgresIT {
     }
 
     @Test
+    void taskDetailStillReturnsAppointmentAfterCheckInAdvancesItToInProgress() {
+        // 回归：签到把预约从 CONFIRMED 推进为 IN_PROGRESS 后，任务详情仍必须返回该预约。
+        // 否则完成任务的前置检查「已有预约安排」在签到后永远无法满足，形成必然死锁。
+        jdbc.sql("UPDATE apt_appointment SET status='IN_PROGRESS' WHERE appointment_id=:id")
+                .param("id", APPOINTMENT_A).update();
+
+        TechnicianPortalTaskDetail detail = portal.taskDetail(
+                actor(TECH_PRINCIPAL), "corr-inprogress",
+                "TECHNICIAN|NETWORK|" + NETWORK_A, "TECHNICIAN_WEB", TASK_A);
+
+        assertThat(detail.appointments()).singleElement().satisfies(appointment -> {
+            assertThat(appointment.appointmentId()).isEqualTo(APPOINTMENT_A);
+            assertThat(appointment.taskId()).isEqualTo(TASK_A);
+        });
+    }
+
+    @Test
     void taskDetailOmitsFormSubmissionsWithoutIndependentFormReadCapability() {
         jdbc.sql("""
                 DELETE FROM auth_role_grant
