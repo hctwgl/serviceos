@@ -2,7 +2,10 @@ package com.serviceos.configuration.application;
 
 import com.serviceos.configuration.api.ProjectFulfillmentDocument;
 import com.serviceos.configuration.api.ProjectFulfillmentMatchRule;
+import com.serviceos.configuration.api.ProjectFulfillmentNodeDraft;
+import com.serviceos.configuration.api.ProjectFulfillmentPhaseDraft;
 import com.serviceos.configuration.api.ProjectFulfillmentStageDraft;
+import com.serviceos.configuration.api.ProjectFulfillmentTransitionDraft;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.springframework.stereotype.Component;
@@ -56,12 +59,56 @@ final class ProjectFulfillmentDocumentMapper {
         List<String> clientKinds = raw.get("supportedClientKinds") instanceof List<?> list
                 ? list.stream().map(String::valueOf).toList()
                 : List.of();
+        List<ProjectFulfillmentPhaseDraft> phases = objectMapList(raw.get("phases")).stream()
+                .map(phase -> new ProjectFulfillmentPhaseDraft(
+                        stringVal(phase.get("phaseId"), null),
+                        stringVal(phase.get("phaseName"), "未命名阶段"),
+                        intVal(phase.get("sequence"), 0),
+                        stringOrNull(phase.get("description")),
+                        stringVal(phase.get("displayColor"), "#2563eb")))
+                .toList();
+        List<ProjectFulfillmentNodeDraft> nodes = objectMapList(raw.get("nodes")).stream()
+                .map(node -> new ProjectFulfillmentNodeDraft(
+                        stringVal(node.get("nodeId"), null),
+                        stringVal(node.get("nodeType"), null),
+                        stringVal(node.get("nodeName"), "未命名节点"),
+                        stringOrNull(node.get("phaseId")),
+                        stringOrNull(node.get("description")),
+                        doubleVal(node.get("positionX"), 0),
+                        doubleVal(node.get("positionY"), 0),
+                        stringOrNull(node.get("responsibilityRole")),
+                        stringOrNull(node.get("executionSubjectRule")),
+                        boolVal(node.get("reassignable")),
+                        objectMap(node.get("task")),
+                        objectMap(node.get("form")),
+                        objectMapList(node.get("evidence")),
+                        objectMap(node.get("sla")),
+                        stringList(node.get("completionResults")),
+                        objectMap(node.get("systemAction")),
+                        objectMap(node.get("eventWait")),
+                        objectMap(node.get("condition")),
+                        stringOrNull(node.get("exceptionStrategy")),
+                        stringList(node.get("notificationRules"))))
+                .toList();
+        List<ProjectFulfillmentTransitionDraft> transitions = objectMapList(raw.get("transitions")).stream()
+                .map(transition -> new ProjectFulfillmentTransitionDraft(
+                        stringVal(transition.get("transitionId"), null),
+                        stringVal(transition.get("fromNodeId"), null),
+                        stringVal(transition.get("toNodeId"), null),
+                        stringOrNull(transition.get("resultCode")),
+                        stringOrNull(transition.get("branchName")),
+                        boolVal(transition.get("defaultBranch")),
+                        objectMap(transition.get("condition"))))
+                .toList();
         return new ProjectFulfillmentDocument(
                 stringVal(raw.get("schemaVersion"), "1.0.0"),
                 stringOrNull(raw.get("orderTypeName")),
                 matchRule(raw.get("matchRule")),
                 clientKinds,
-                stages);
+                stages,
+                phases,
+                nodes,
+                transitions);
     }
 
     String toJson(ProjectFulfillmentDocument document) {
@@ -105,6 +152,9 @@ final class ProjectFulfillmentDocumentMapper {
             sequence++;
         }
         raw.put("stages", stages);
+        raw.put("phases", document.phases());
+        raw.put("nodes", document.nodes());
+        raw.put("transitions", document.transitions());
         try {
             return objectMapper.writeValueAsString(raw);
         } catch (Exception ex) {
@@ -151,6 +201,14 @@ final class ProjectFulfillmentDocumentMapper {
         return result;
     }
 
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> objectMap(Object value) {
+        if (!(value instanceof Map<?, ?> map)) {
+            return Map.of();
+        }
+        return (Map<String, Object>) map;
+    }
+
     private static String stringVal(Object value, String fallback) {
         return value == null || value.toString().isBlank() ? fallback : value.toString();
     }
@@ -168,6 +226,20 @@ final class ProjectFulfillmentDocumentMapper {
         }
         try {
             return Integer.parseInt(value.toString());
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private static double doubleVal(Object value, double fallback) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return Double.parseDouble(value.toString());
         } catch (NumberFormatException ex) {
             return fallback;
         }

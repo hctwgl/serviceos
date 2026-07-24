@@ -12,7 +12,10 @@ public record ProjectFulfillmentDocument(
         String orderTypeName,
         ProjectFulfillmentMatchRule matchRule,
         List<String> supportedClientKinds,
-        List<ProjectFulfillmentStageDraft> stages
+        List<ProjectFulfillmentStageDraft> stages,
+        List<ProjectFulfillmentPhaseDraft> phases,
+        List<ProjectFulfillmentNodeDraft> nodes,
+        List<ProjectFulfillmentTransitionDraft> transitions
 ) {
     public ProjectFulfillmentDocument {
         if (schemaVersion == null || schemaVersion.isBlank()) {
@@ -23,6 +26,9 @@ public record ProjectFulfillmentDocument(
                 : matchRule;
         supportedClientKinds = List.copyOf(supportedClientKinds == null ? List.of() : supportedClientKinds);
         stages = List.copyOf(stages == null ? List.of() : stages);
+        phases = List.copyOf(phases == null ? List.of() : phases);
+        nodes = List.copyOf(nodes == null ? List.of() : nodes);
+        transitions = List.copyOf(transitions == null ? List.of() : transitions);
     }
 
     public ProjectFulfillmentDocument(
@@ -32,6 +38,18 @@ public record ProjectFulfillmentDocument(
             List<ProjectFulfillmentStageDraft> stages
     ) {
         this(schemaVersion, orderTypeName, ProjectFulfillmentMatchRule.unrestricted(),
-                supportedClientKinds, stages);
+                supportedClientKinds, stages, List.of(), List.of(), List.of());
+    }
+
+    /** 兼容现有 Profile 构造；新设计器应显式传入 Phase、Node 与 Transition。 */
+    public ProjectFulfillmentDocument(
+            String schemaVersion,
+            String orderTypeName,
+            ProjectFulfillmentMatchRule matchRule,
+            List<String> supportedClientKinds,
+            List<ProjectFulfillmentStageDraft> stages
+    ) {
+        this(schemaVersion, orderTypeName, matchRule, supportedClientKinds, stages,
+                List.of(), List.of(), List.of());
     }
 }

@@ -1,5 +1,6 @@
 import type { ProjectFulfillmentDocument } from '@serviceos/api-client'
 import {
+  compileProjectFulfillmentPreview,
   updateProjectFulfillmentDraft,
   validateProjectFulfillmentDraft,
 } from '@serviceos/api-client'
@@ -33,6 +34,21 @@ export function useUpdateProjectFulfillmentDraftCommand(
       })
       await queryClient.invalidateQueries({
         queryKey: ['project-fulfillment-profiles', projectId()],
+      })
+    },
+  })
+}
+
+export function useCompileProjectFulfillmentPreviewCommand(
+  projectId: () => string,
+  profileId: () => string,
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => compileProjectFulfillmentPreview(projectId(), profileId()),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['project-fulfillment-draft', projectId(), profileId()],
       })
     },
   })

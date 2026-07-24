@@ -20,6 +20,8 @@ import com.serviceos.workorder.api.WorkOrderPage;
 import com.serviceos.workorder.api.WorkOrderQuery;
 import com.serviceos.workorder.api.WorkOrderQueryService;
 import com.serviceos.workorder.api.WorkOrderView;
+import com.serviceos.workflow.api.WorkflowExecutionProjection;
+import com.serviceos.workflow.api.WorkflowExecutionQueryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -182,6 +184,8 @@ class DefaultAdminWorkOrderQueryServiceTest {
         TaskAllowedActionQueryService taskActions = mock(TaskAllowedActionQueryService.class);
         AuthorizationService authorization = mock(AuthorizationService.class);
         AdminWorkbenchQueryService workbench = mock(AdminWorkbenchQueryService.class);
+        WorkflowExecutionQueryService workflowExecutions =
+                mock(WorkflowExecutionQueryService.class);
         CurrentPrincipal principal = new CurrentPrincipal(
                 "admin", "tenant", CurrentPrincipal.PrincipalType.USER, "admin-web", Set.of());
         UUID projectId = UUID.randomUUID();
@@ -192,6 +196,8 @@ class DefaultAdminWorkOrderQueryServiceTest {
                 List.of("370000"), List.of(), "ACTIVE", 1, NOW, 1, 0);
         when(projects.get(eq(principal), any(), eq(projectId)))
                 .thenReturn(new ProjectDetail(project, NOW));
+        when(workflowExecutions.get(eq(principal), any(), eq(workOrderId)))
+                .thenReturn(new WorkflowExecutionProjection(null, List.of(), NOW));
         WorkOrderView workOrder = new WorkOrderView(
                 workOrderId, "tenant", projectId, "BYD", "BYD",
                 "HOME_CHARGING_SURVEY_INSTALL", "BYD202607220001", "ACTIVE",
@@ -206,6 +212,7 @@ class DefaultAdminWorkOrderQueryServiceTest {
                 workOrders, workspaces, projects, taskActions, principal, projectId, workOrderId,
                 workbench, workOrder, new DefaultAdminWorkOrderQueryService(
                         workOrders, workspaces, projects, taskActions, authorization, workbench,
+                        workflowExecutions,
                         Clock.fixed(NOW, ZoneOffset.UTC)));
     }
 

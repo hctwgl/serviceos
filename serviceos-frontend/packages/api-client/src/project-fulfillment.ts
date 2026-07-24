@@ -76,7 +76,60 @@ export type ProjectFulfillmentDocument = {
   orderTypeName: string | null
   schemaVersion: string
   stages: ProjectFulfillmentStageDraft[]
+  phases: ProjectFulfillmentPhaseDraft[]
+  nodes: ProjectFulfillmentNodeDraft[]
+  transitions: ProjectFulfillmentTransitionDraft[]
   supportedClientKinds?: Array<'ADMIN_WEB' | 'NETWORK_WEB' | 'TECHNICIAN_IOS' | 'TECHNICIAN_WEB'>
+}
+
+export type ProjectFulfillmentPhaseDraft = {
+  description: string | null
+  displayColor: string
+  phaseId: string
+  phaseName: string
+  sequence: number
+}
+
+export type ProjectFulfillmentNodeType =
+  | 'CONDITION'
+  | 'END'
+  | 'EVENT_WAIT'
+  | 'HUMAN_TASK'
+  | 'REVIEW'
+  | 'START'
+  | 'SYSTEM_ACTION'
+
+export type ProjectFulfillmentNodeDraft = {
+  completionResults: string[]
+  condition: Record<string, unknown>
+  description: string | null
+  eventWait: Record<string, unknown>
+  evidence: Array<Record<string, unknown>>
+  exceptionStrategy: string | null
+  executionSubjectRule: string | null
+  form: Record<string, unknown>
+  nodeId: string
+  nodeName: string
+  nodeType: ProjectFulfillmentNodeType
+  notificationRules: string[]
+  phaseId: string | null
+  positionX: number
+  positionY: number
+  reassignable: boolean
+  responsibilityRole: string | null
+  sla: Record<string, unknown>
+  systemAction: Record<string, unknown>
+  task: Record<string, unknown>
+}
+
+export type ProjectFulfillmentTransitionDraft = {
+  branchName: string | null
+  condition: Record<string, unknown>
+  defaultBranch: boolean
+  fromNodeId: string
+  resultCode: string | null
+  toNodeId: string
+  transitionId: string
 }
 
 export type ProjectFulfillmentDraft = {
@@ -87,17 +140,24 @@ export type ProjectFulfillmentDraft = {
   profileName: string
   revisionId: string
   serviceProductCode: string
+  simulatedAt: string | null
+  simulationDocumentDigest: string | null
+  simulationJson: string | null
   sourceBundleId: string | null
   updatedAt: string
   workflowAssetVersionId: string | null
 }
 
 export type ProjectFulfillmentValidationIssue = {
+  configSection: string | null
   errorCode: string
   fieldPath: string | null
+  nodeId: string | null
+  phaseId: string | null
   severity: 'ERROR' | 'INFO' | 'WARNING'
   stageCode: string | null
   suggestion: string | null
+  transitionId: string | null
   userMessage: string
 }
 

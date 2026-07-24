@@ -66,7 +66,9 @@ const projectPersonnel = computed(() => workspace.data.value?.workspace.projectP
 const progressStages = computed<ProjectStageBarItem[]>(() => (
   (workspace.data.value?.workspace.workflowStages ?? []).map((stage) => ({
     code: stage.stageCode,
-    label: safeStageLabel(stage.stageCode),
+    label: stage.stageCode === workspace.data.value?.workspace.header.currentStageCode
+      ? (workspace.data.value?.stageName ?? safeStageLabel(stage.stageCode))
+      : safeStageLabel(stage.stageCode),
     status: stage.status === 'COMPLETED' || stage.status === 'SKIPPED'
       ? 'completed'
       : stage.status === 'ACTIVE'
@@ -129,7 +131,7 @@ function taskTitle(task: WorkOrderWorkspaceTask | null): string {
   try {
     return task ? taskLabel(task.taskType) : (workspace.data.value?.taskName ?? '暂无进行中的任务')
   } catch {
-    return '当前任务名称待确认'
+    return workspace.data.value?.taskName ?? '当前任务名称待确认'
   }
 }
 
@@ -137,7 +139,9 @@ function safeTaskLabel(code: string | null): string {
   try {
     return taskLabel(code)
   } catch {
-    return '当前任务名称待确认'
+    return code === currentTask.value?.taskType
+      ? (workspace.data.value?.taskName ?? '当前任务名称待确认')
+      : '当前任务名称待确认'
   }
 }
 

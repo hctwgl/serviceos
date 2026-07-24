@@ -3,6 +3,7 @@ package com.serviceos.configuration.application;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationAssetVersionReference;
 import com.serviceos.configuration.api.ConfigurationBundleReference;
+import com.serviceos.configuration.api.ConfigurationResolutionException;
 import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
@@ -83,12 +84,19 @@ public final class ProductDevelopmentConfigurationFoundationService {
                         inboundIntegration.versionId(), outboundIntegration.versionId(),
                         dispatch.versionId(), surveyForm.versionId(), surveyEvidence.versionId(),
                         installEvidence.versionId()));
-        ConfigurationBundleReference current = configurations.resolve(
-                new ResolveConfigurationBundleQuery(
-                        tenantId, requiredProjectCode(projectCode), "BYD_OCEAN",
-                        "HOME_CHARGING_SURVEY_INSTALL", "370000", clock.instant()));
-        ConfigurationBundleReference bundle = configurations.publishBundleSuccessor(
-                new PublishConfigurationBundleSuccessorCommand(current.bundleId(), successor));
+        ConfigurationBundleReference bundle;
+        try {
+            ConfigurationBundleReference current = configurations.resolve(
+                    new ResolveConfigurationBundleQuery(
+                            tenantId, requiredProjectCode(projectCode), "BYD_OCEAN",
+                            "HOME_CHARGING_SURVEY_INSTALL", "370000", clock.instant()));
+            bundle = configurations.publishBundleSuccessor(
+                    new PublishConfigurationBundleSuccessorCommand(current.bundleId(), successor));
+        } catch (ConfigurationResolutionException noCurrentBundle) {
+            // 全新本地库没有可作为 predecessor 的配置包；首个版本走正式首发用例。
+            // 这里只捕获明确的“无匹配配置”领域异常，其他发布/校验错误继续失败关闭。
+            bundle = configurations.publishBundle(successor);
+        }
         return new FoundationResult(workflow.versionId(), bundle.bundleId());
     }
 

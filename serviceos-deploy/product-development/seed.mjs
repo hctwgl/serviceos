@@ -327,6 +327,11 @@ const blocking = validation.filter((item) => item.severity === 'ERROR')
 if (blocking.length) {
   throw new Error(`履约配置校验失败：${JSON.stringify(blocking)}`)
 }
+// 发布门禁要求模拟结果与当前草稿内容摘要一致；本地场景也走正式模拟 API，
+// 不通过 SQL 或测试专用开关伪造 Testing 证据。
+await request(`/projects/${project.id}/fulfillment-profiles/${profile.profileId}:compile-preview`, {
+  method: 'POST', idempotencyKey: key('fulfillment-simulate'),
+})
 // 校验会更新草稿校验事实，发布必须读取服务端最新并发版本，不能沿用创建时版本。
 const validatedProfile = (await request(
   `/projects/${project.id}/fulfillment-profiles/${profile.profileId}`,

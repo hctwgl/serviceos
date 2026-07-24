@@ -84,8 +84,8 @@ class NetworkPortalQualificationListPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("151");
-        assertThat(flyway.info().applied()).hasSize(153);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("153");
+        assertThat(flyway.info().applied()).hasSize(155);
 
         seedPrincipal(PRINCIPAL, "Portal Member A");
         seedPrincipal(OTHER_PRINCIPAL, "Portal Member B");

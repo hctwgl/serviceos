@@ -20,6 +20,8 @@ import com.serviceos.workorder.api.WorkOrderPage;
 import com.serviceos.workorder.api.WorkOrderQuery;
 import com.serviceos.workorder.api.WorkOrderQueryService;
 import com.serviceos.workorder.api.WorkOrderView;
+import com.serviceos.workflow.api.WorkflowExecutionQueryService;
+import com.serviceos.workflow.api.WorkflowInstanceView;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -42,6 +44,7 @@ final class DefaultAdminWorkOrderQueryService implements AdminWorkOrderQueryServ
     private final TaskAllowedActionQueryService taskAllowedActions;
     private final AuthorizationService authorization;
     private final AdminWorkbenchQueryService workbench;
+    private final WorkflowExecutionQueryService workflowExecutions;
     private final Clock clock;
 
     DefaultAdminWorkOrderQueryService(
@@ -51,6 +54,7 @@ final class DefaultAdminWorkOrderQueryService implements AdminWorkOrderQueryServ
             TaskAllowedActionQueryService taskAllowedActions,
             AuthorizationService authorization,
             AdminWorkbenchQueryService workbench,
+            WorkflowExecutionQueryService workflowExecutions,
             Clock clock
     ) {
         this.workOrders = workOrders;
@@ -59,6 +63,7 @@ final class DefaultAdminWorkOrderQueryService implements AdminWorkOrderQueryServ
         this.taskAllowedActions = taskAllowedActions;
         this.authorization = authorization;
         this.workbench = workbench;
+        this.workflowExecutions = workflowExecutions;
         this.clock = clock;
     }
 
@@ -107,11 +112,18 @@ final class DefaultAdminWorkOrderQueryService implements AdminWorkOrderQueryServ
         String clientName = AdminProductLabels.client(workspace.header().clientCode());
         String serviceName = AdminProductLabels.service(workspace.header().serviceProductCode());
         String statusName = AdminProductLabels.status(workspace.header().status());
-        String stageName = AdminProductLabels.stage(
-                workspace.header().status(), workspace.header().currentStageCode());
+        WorkflowInstanceView workflow = workflowExecutions
+                .get(principal, correlationId, workOrderId)
+                .workflow();
+        String stageName = workflow == null || workflow.currentPhaseName() == null
+                ? AdminProductLabels.stage(
+                        workspace.header().status(), workspace.header().currentStageCode())
+                : workflow.currentPhaseName();
         String taskName = workspace.currentTaskSummary() == null
                 ? AdminProductLabels.currentTask(workspace.header().status(), stageName)
-                : AdminProductLabels.task(workspace.currentTaskSummary().taskType());
+                : workflow == null || workflow.currentNodeName() == null
+                        ? AdminProductLabels.task(workspace.currentTaskSummary().taskType())
+                        : workflow.currentNodeName();
         List<String> missing = missingLabels(
                 project.name(), clientName, serviceName, statusName, stageName, taskName);
 

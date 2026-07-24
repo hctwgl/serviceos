@@ -9,6 +9,7 @@
     "workflowKey": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "maxLength": 160},
     "semanticVersion": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"},
     "name": {"type": "string", "minLength": 1, "maxLength": 200},
+    "executionMode": {"type": "string", "enum": ["LEGACY", "SERIAL_V1"], "default": "LEGACY"},
     "startNodeId": {"type": "string", "minLength": 1, "maxLength": 100},
     "terminalNodeIds": {
       "type": "array",
@@ -47,9 +48,12 @@
           "enum": ["START", "END", "USER_TASK", "SERVICE_TASK", "REVIEW_TASK", "WAIT_EVENT", "TIMER", "EXCLUSIVE_GATEWAY", "PARALLEL_GATEWAY", "SUB_PROCESS", "MANUAL_INTERVENTION"]
         },
         "name": {"type": "string", "minLength": 1, "maxLength": 200},
+        "responsibilityRole": {"type": ["string", "null"], "maxLength": 200},
         "taskType": {"type": ["string", "null"], "maxLength": 100},
         "stageCode": {"type": ["string", "null"], "pattern": "^[A-Z0-9][A-Z0-9_-]*$", "maxLength": 100},
         "assigneePolicyRef": {"type": ["string", "null"], "maxLength": 120},
+        "dispatchPolicyRef": {"type": ["string", "null"], "maxLength": 120},
+        "ruleRef": {"type": ["string", "null"], "maxLength": 120},
         "formRef": {"type": ["string", "null"], "maxLength": 120},
         "evidenceRef": {"type": ["string", "null"], "maxLength": 120},
         "slaRef": {"type": ["string", "null"], "maxLength": 120},

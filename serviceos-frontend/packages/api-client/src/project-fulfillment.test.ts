@@ -19,9 +19,12 @@ afterEach(() => {
 describe('项目履约草稿接口', () => {
   it('保存业务草稿时保留已绑定的运行期 Workflow 与 Bundle', async () => {
     const document: ProjectFulfillmentDocument = {
+      nodes: [],
       orderTypeName: '家充安装工单',
+      phases: [],
       schemaVersion: '1.0.0',
       stages: [],
+      transitions: [],
     }
     const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
       aggregateVersion: 8,

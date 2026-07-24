@@ -6,6 +6,11 @@ import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.configuration.api.CreateProjectFulfillmentProfileCommand;
+import com.serviceos.configuration.api.ConfigurationAssetType;
+import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
+import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
+import com.serviceos.configuration.api.PublishConfigurationBundleSuccessorCommand;
 import com.serviceos.configuration.api.ProjectFulfillmentCompareImpact;
 import com.serviceos.configuration.api.ProjectFulfillmentDraftView;
 import com.serviceos.configuration.api.ProjectFulfillmentDocument;
@@ -28,6 +33,7 @@ import com.serviceos.identity.api.PrincipalPersonaQuery;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
+import com.serviceos.shared.Sha256;
 import com.serviceos.shared.infrastructure.PostgresJdbcParameters;
 import com.serviceos.workorder.api.WorkOrderQuery;
 import com.serviceos.workorder.api.WorkOrderQueryService;
@@ -47,6 +53,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -76,10 +83,12 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
     private final AuditAppender audit;
     private final ProjectFulfillmentDraftValidator validator;
     private final ProjectFulfillmentManifestCompiler compiler;
+    private final ProjectFulfillmentWorkflowCompiler workflowCompiler;
     private final ProjectFulfillmentRunbookAssembler runbookAssembler;
     private final ProjectFulfillmentCompareAnalyzer compareAnalyzer;
     private final ProjectFulfillmentDocumentMapper documentMapper;
     private final ProjectFulfillmentResolver fulfillmentResolver;
+    private final ConfigurationService configurations;
     private final WorkOrderQueryService workOrders;
     private final PrincipalPersonaQuery personas;
     private final ObjectMapper objectMapper;
@@ -91,10 +100,12 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
             AuditAppender audit,
             ProjectFulfillmentDraftValidator validator,
             ProjectFulfillmentManifestCompiler compiler,
+            ProjectFulfillmentWorkflowCompiler workflowCompiler,
             ProjectFulfillmentRunbookAssembler runbookAssembler,
             ProjectFulfillmentCompareAnalyzer compareAnalyzer,
             ProjectFulfillmentDocumentMapper documentMapper,
             ProjectFulfillmentResolver fulfillmentResolver,
+            ConfigurationService configurations,
             WorkOrderQueryService workOrders,
             PrincipalPersonaQuery personas,
             ObjectMapper objectMapper,
@@ -105,10 +116,12 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         this.audit = audit;
         this.validator = validator;
         this.compiler = compiler;
+        this.workflowCompiler = workflowCompiler;
         this.runbookAssembler = runbookAssembler;
         this.compareAnalyzer = compareAnalyzer;
         this.documentMapper = documentMapper;
         this.fulfillmentResolver = fulfillmentResolver;
+        this.configurations = configurations;
         this.workOrders = workOrders;
         this.personas = personas;
         this.objectMapper = objectMapper;
@@ -406,7 +419,8 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         }
         return jdbc.sql("""
                 SELECT revision_id, document_json, workflow_asset_version_id, source_bundle_id,
-                       validation_json
+                       validation_json, simulation_json::text AS simulation_json,
+                       simulation_document_digest, simulated_at
                   FROM cfg_project_fulfillment_revision
                  WHERE tenant_id = :tenantId AND revision_id = :revisionId AND revision_status = 'DRAFT'
                 """)
@@ -425,6 +439,11 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                             rs.getObject("workflow_asset_version_id", UUID.class),
                             rs.getObject("source_bundle_id", UUID.class),
                             rs.getString("validation_json"),
+                            rs.getString("simulation_json"),
+                            rs.getString("simulation_document_digest"),
+                            rs.getObject("simulated_at", OffsetDateTime.class) == null
+                                    ? null
+                                    : rs.getObject("simulated_at", OffsetDateTime.class).toInstant(),
                             profile.aggregateVersion(),
                             profile.updatedAt());
                 })
@@ -463,7 +482,10 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                        workflow_asset_version_id = COALESCE(
                            :workflowVersionId, workflow_asset_version_id),
                        source_bundle_id = COALESCE(:bundleId, source_bundle_id),
-                       validation_json = NULL
+                       validation_json = NULL,
+                       simulation_json = NULL,
+                       simulation_document_digest = NULL,
+                       simulated_at = NULL
                  WHERE tenant_id = :tenantId
                    AND revision_id = :revisionId
                    AND revision_status = 'DRAFT'
@@ -519,10 +541,13 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 metadata.correlationId());
         DraftRow draft = loadDraft(principal.tenantId(), profile.draftRevisionId());
         Map<String, Object> document = parseDocument(draft.documentJson());
-        Map<String, Object> workflowDefinition = loadPublishedWorkflowDefinition(
-                principal.tenantId(), draft.workflowAssetVersionId());
-        boolean bundleOk = draft.sourceBundleId() != null
-                && bundleExists(principal.tenantId(), projectId, draft.sourceBundleId());
+        ProjectFulfillmentDocument structuredDocument = documentMapper.fromJson(draft.documentJson());
+        Map<String, Object> workflowDefinition = structuredDocument.nodes().isEmpty()
+                ? loadPublishedWorkflowDefinition(principal.tenantId(), draft.workflowAssetVersionId())
+                : Map.of("designerGraph", true);
+        boolean bundleOk = !structuredDocument.nodes().isEmpty()
+                || (draft.sourceBundleId() != null
+                && bundleExists(principal.tenantId(), projectId, draft.sourceBundleId()));
         List<ProjectFulfillmentValidationIssue> issues = validator.validate(
                 profileId, document, workflowDefinition, bundleOk);
         try {
@@ -551,7 +576,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ProjectFulfillmentManifestView compilePreview(
             CurrentPrincipal principal, CommandMetadata metadata, UUID projectId, UUID profileId
     ) {
@@ -576,6 +601,22 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 draft.workflowAssetVersionId(),
                 clock.instant(),
                 document);
+        Instant simulatedAt = clock.instant();
+        jdbc.sql("""
+                UPDATE cfg_project_fulfillment_revision
+                   SET simulation_json = CAST(:simulation AS jsonb),
+                       simulation_document_digest = :documentDigest,
+                       simulated_at = :simulatedAt
+                 WHERE tenant_id = :tenantId
+                   AND revision_id = :revisionId
+                   AND revision_status = 'DRAFT'
+                """)
+                .param("simulation", compiled.json())
+                .param("documentDigest", Sha256.digest(draft.documentJson()))
+                .param("simulatedAt", PostgresJdbcParameters.timestamptz(simulatedAt))
+                .param("tenantId", principal.tenantId())
+                .param("revisionId", draft.revisionId())
+                .update();
         return new ProjectFulfillmentManifestView(
                 compiled.json(),
                 compiled.contentDigest(),
@@ -651,17 +692,27 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         }
         DraftRow draft = loadDraft(principal.tenantId(), profile.draftRevisionId());
         Map<String, Object> document = parseDocument(draft.documentJson());
-        Map<String, Object> workflowDefinition = loadPublishedWorkflowDefinition(
-                principal.tenantId(), draft.workflowAssetVersionId());
-        boolean bundleOk = draft.sourceBundleId() != null
-                && bundleExists(principal.tenantId(), projectId, draft.sourceBundleId());
+        ProjectFulfillmentDocument structuredDocument = documentMapper.fromJson(draft.documentJson());
+        Map<String, Object> workflowDefinition = structuredDocument.nodes().isEmpty()
+                ? loadPublishedWorkflowDefinition(principal.tenantId(), draft.workflowAssetVersionId())
+                : Map.of("designerGraph", true);
+        boolean bundleOk = !structuredDocument.nodes().isEmpty()
+                || (draft.sourceBundleId() != null
+                && bundleExists(principal.tenantId(), projectId, draft.sourceBundleId()));
         List<ProjectFulfillmentValidationIssue> issues = validator.validate(
                 profileId, document, workflowDefinition, bundleOk);
         if (issues.stream().anyMatch(i -> "ERROR".equals(i.severity()))) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
                     "履约配置存在阻断错误，无法发布：" + issues.getFirst().userMessage());
         }
-        if (draft.sourceBundleId() == null || draft.workflowAssetVersionId() == null) {
+        if (!structuredDocument.nodes().isEmpty()
+                && !Sha256.digest(draft.documentJson()).equals(draft.simulationDocumentDigest())) {
+            throw new BusinessProblem(
+                    ProblemCode.VALIDATION_FAILED,
+                    "发布前必须对当前草稿完成一次成功模拟；草稿修改后需重新模拟");
+        }
+        if (structuredDocument.nodes().isEmpty()
+                && (draft.sourceBundleId() == null || draft.workflowAssetVersionId() == null)) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "发布前必须绑定 Workflow 与 Bundle");
         }
         Instant from = effectiveFrom == null ? clock.instant() : effectiveFrom;
@@ -675,11 +726,18 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 from);
         int nextVersion = nextPublishedVersion(principal.tenantId(), profileId);
         UUID publishedRevisionId = UUID.randomUUID();
-        BundleRef bundle = loadBundle(principal.tenantId(), draft.sourceBundleId());
+        RuntimeBinding runtimeBinding = structuredDocument.nodes().isEmpty()
+                ? new RuntimeBinding(
+                draft.workflowAssetVersionId(),
+                draft.sourceBundleId(),
+                loadBundle(principal.tenantId(), draft.sourceBundleId()).bundleVersion())
+                : publishDesignerRuntime(
+                principal.tenantId(), profile, structuredDocument, nextVersion, from, draft.sourceBundleId());
+        BundleRef bundle = loadBundle(principal.tenantId(), runtimeBinding.bundleId());
         var compiled = compiler.compile(
                 profileId, publishedRevisionId, projectId, profile.serviceProductCode(),
                 profile.profileName(), String.valueOf(nextVersion), bundle.bundleId(),
-                bundle.bundleVersion(), draft.workflowAssetVersionId(), from, document);
+                bundle.bundleVersion(), runtimeBinding.workflowAssetVersionId(), from, document);
         Instant now = clock.instant();
         UUID supersedes = profile.activeRevisionId();
         if (supersedes != null) {
@@ -717,8 +775,8 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                     .param("profileId", profileId)
                     .param("versionNo", nextVersion)
                     .param("document", draft.documentJson())
-                    .param("bundleId", draft.sourceBundleId())
-                    .param("workflowVersionId", draft.workflowAssetVersionId())
+                    .param("bundleId", runtimeBinding.bundleId())
+                    .param("workflowVersionId", runtimeBinding.workflowAssetVersionId())
                     .param("manifest", compiled.json())
                     .param("validation", objectMapper.writeValueAsString(issues))
                     .param("digest", compiled.contentDigest())
@@ -741,12 +799,15 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                    SET document_json = CAST(:document AS jsonb),
                        workflow_asset_version_id = :workflowVersionId,
                        source_bundle_id = :bundleId,
-                       validation_json = NULL
+                       validation_json = NULL,
+                       simulation_json = NULL,
+                       simulation_document_digest = NULL,
+                       simulated_at = NULL
                  WHERE revision_id = :draftId AND tenant_id = :tenantId AND revision_status = 'DRAFT'
                 """)
                 .param("document", draft.documentJson())
-                .param("workflowVersionId", draft.workflowAssetVersionId())
-                .param("bundleId", draft.sourceBundleId())
+                .param("workflowVersionId", runtimeBinding.workflowAssetVersionId())
+                .param("bundleId", runtimeBinding.bundleId())
                 .param("draftId", profile.draftRevisionId())
                 .param("tenantId", principal.tenantId())
                 .update();
@@ -944,23 +1005,537 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "不支持的起始模板：" + template);
         }
         Map<String, Object> doc = new LinkedHashMap<>();
-        doc.put("schemaVersion", "1.0.0");
+        doc.put("schemaVersion", "2.0.0");
         doc.put("orderTypeName", "勘测安装");
         doc.put("supportedClientKinds", List.of("ADMIN_WEB", "NETWORK_WEB", "TECHNICIAN_WEB"));
+        doc.put("stages", List.of());
         if ("BLANK".equals(template)) {
-            doc.put("stages", List.of());
+            doc.put("phases", List.of());
+            doc.put("nodes", List.of());
+            doc.put("transitions", List.of());
         } else {
-            doc.put("stages", List.of(
-                    stage("INTAKE", "接单受理", 1, "PLATFORM", "ASSIGN_COORDINATORS"),
-                    stage("SURVEY", "现场勘测", 2, "TECHNICIAN", "FIELD_SURVEY"),
-                    stage("INSTALL", "上门安装", 3, "TECHNICIAN", "FIELD_INSTALL"),
-                    stage("REVIEW", "资料审核", 4, "PLATFORM", "REVIEW"),
-                    stage("HANDOFF", "车企确认", 5, "SYSTEM", null, true)));
+            doc.put("phases", List.of(
+                    phase("CUSTOMER_CONFIRM", "客户确认", 1, "#16a34a"),
+                    phase("SITE_SURVEY", "现场勘测", 2, "#2563eb"),
+                    phase("INSTALLATION", "施工安装", 3, "#f59e0b"),
+                    phase("ACCEPTANCE", "验收交付", 4, "#7c3aed")));
+            doc.put("nodes", sampleDesignerNodes());
+            doc.put("transitions", sampleDesignerTransitions());
         }
         try {
             return new InitialDraft(objectMapper.writeValueAsString(doc), null, null);
         } catch (Exception ex) {
             throw new IllegalStateException(ex);
+        }
+    }
+
+    private static Map<String, Object> phase(
+            String id,
+            String name,
+            int sequence,
+            String color
+    ) {
+        return Map.of(
+                "phaseId", id,
+                "phaseName", name,
+                "sequence", sequence,
+                "description", name + "阶段",
+                "displayColor", color);
+    }
+
+    private static List<Map<String, Object>> sampleDesignerNodes() {
+        List<Map<String, Object>> nodes = new ArrayList<>();
+        nodes.add(designerNode("START", "START", "开始", null, 420, 40, null));
+        nodes.add(designerNode("CONTACT_CUSTOMER", "HUMAN_TASK", "联系客户",
+                "CUSTOMER_CONFIRM", 420, 160, "项目客服"));
+        nodes.add(designerNode("SCHEDULE_SURVEY", "HUMAN_TASK", "预约勘测",
+                "CUSTOMER_CONFIRM", 420, 280, "项目客服"));
+        Map<String, Object> survey = designerNode("SITE_SURVEY", "HUMAN_TASK", "现场勘测",
+                "SITE_SURVEY", 420, 420, "现场工程师");
+        survey.put("form", Map.of(
+                "formKey", "site-survey-form",
+                "formName", "现场勘测表",
+                "fields", List.of(Map.of(
+                        "fieldKey", "installable",
+                        "label", "是否具备安装条件",
+                        "type", "SELECT",
+                        "required", true))));
+        survey.put("evidence", List.of(Map.of(
+                "evidenceKey", "survey-photos",
+                "name", "勘测现场照片",
+                "type", "PHOTO",
+                "required", true,
+                "minCount", 3)));
+        survey.put("sla", Map.of(
+                "name", "现场勘测 24 小时",
+                "targetMinutes", 1440,
+                "warningMinutes", 1200,
+                "timeoutMinutes", 1440));
+        nodes.add(survey);
+        Map<String, Object> surveyReview = designerNode("SURVEY_REVIEW", "REVIEW", "勘测审核",
+                "SITE_SURVEY", 420, 560, "项目运营");
+        surveyReview.put("completionResults", List.of("PASS", "REJECT"));
+        nodes.add(surveyReview);
+        nodes.add(designerNode("SURVEY_SUPPLEMENT", "HUMAN_TASK", "补充勘测资料",
+                "SITE_SURVEY", 700, 680, "现场工程师"));
+        nodes.add(designerNode("INSTALL", "HUMAN_TASK", "安装施工",
+                "INSTALLATION", 420, 720, "安装工程师"));
+        Map<String, Object> installReview = designerNode(
+                "INSTALL_REVIEW", "REVIEW", "安装资料审核",
+                "INSTALLATION", 420, 860, "项目运营");
+        installReview.put("completionResults", List.of("PASS", "REJECT"));
+        nodes.add(installReview);
+        Map<String, Object> submit = designerNode(
+                "SUBMIT_OEM", "SYSTEM_ACTION", "提交车企",
+                "ACCEPTANCE", 420, 1000, null);
+        submit.put("systemAction", Map.of(
+                "actionType", "BYD_REVIEW_SUBMIT",
+                "target", "比亚迪 CPIM",
+                "inputMapping", Map.of("workOrderId", "{workOrderId}"),
+                "outputMapping", Map.of("deliveryId", "deliveryId"),
+                "idempotencyStrategy", "WORK_ORDER_AND_NODE_EXECUTION",
+                "retryPolicy", Map.of(
+                        "maxAttempts", 3,
+                        "initialDelaySeconds", 30,
+                        "multiplier", 2,
+                        "maxDelaySeconds", 300),
+                "successResult", "SUCCESS",
+                "failureResult", "FAILED",
+                "failurePolicy", "RETRY_THEN_MANUAL",
+                "manualRecoveryBoundary", "项目运营确认外部状态后重试或终止"));
+        submit.put("completionResults", List.of("SUCCESS", "FAILED"));
+        nodes.add(submit);
+        Map<String, Object> wait = designerNode(
+                "WAIT_OEM_RECEIPT", "EVENT_WAIT", "等待车企审核回执",
+                "ACCEPTANCE", 420, 1140, null);
+        wait.put("eventWait", Map.of(
+                "eventType", "byd.review.callback",
+                "correlationKeyTemplate", "work-order:{workOrderId}",
+                "maxWaitSeconds", 259200,
+                "timeoutStrategy", "ROUTE_TIMEOUT",
+                "reminderTask", false,
+                "outputMapping", Map.of("reviewResult", "result")));
+        wait.put("completionResults", List.of("SUCCESS", "TIMEOUT"));
+        nodes.add(wait);
+        nodes.add(designerNode("END_SUCCESS", "END", "结束", null, 420, 1280, null));
+        nodes.add(designerNode("END_EXCEPTION", "END", "异常结束", null, 700, 1140, null));
+        return List.copyOf(nodes);
+    }
+
+    private static Map<String, Object> designerNode(
+            String id,
+            String type,
+            String name,
+            String phaseId,
+            double x,
+            double y,
+            String role
+    ) {
+        Map<String, Object> node = new LinkedHashMap<>();
+        node.put("nodeId", id);
+        node.put("nodeType", type);
+        node.put("nodeName", name);
+        node.put("phaseId", phaseId);
+        node.put("description", name + "业务节点");
+        node.put("positionX", x);
+        node.put("positionY", y);
+        node.put("responsibilityRole", role);
+        node.put("executionSubjectRule", role == null ? null : "按项目责任范围匹配");
+        node.put("reassignable", "HUMAN_TASK".equals(type));
+        node.put("task", Set.of("HUMAN_TASK", "REVIEW").contains(type)
+                ? Map.of("taskType", id, "taskName", name + "任务")
+                : Map.of());
+        node.put("form", Map.of());
+        node.put("evidence", List.of());
+        node.put("sla", Map.of());
+        node.put("completionResults", Set.of("HUMAN_TASK", "REVIEW").contains(type)
+                ? List.of("COMPLETED") : List.of());
+        node.put("systemAction", Map.of());
+        node.put("eventWait", Map.of());
+        node.put("condition", Map.of());
+        node.put("exceptionStrategy", null);
+        node.put("notificationRules", List.of());
+        return node;
+    }
+
+    private static List<Map<String, Object>> sampleDesignerTransitions() {
+        return List.of(
+                transition("T01", "START", "CONTACT_CUSTOMER", null, false),
+                transition("T02", "CONTACT_CUSTOMER", "SCHEDULE_SURVEY", null, false),
+                transition("T03", "SCHEDULE_SURVEY", "SITE_SURVEY", null, false),
+                transition("T04", "SITE_SURVEY", "SURVEY_REVIEW", null, false),
+                transition("T05", "SURVEY_REVIEW", "INSTALL", "PASS", false),
+                transition("T06", "SURVEY_REVIEW", "SURVEY_SUPPLEMENT", "REJECT", false),
+                transition("T07", "SURVEY_SUPPLEMENT", "SURVEY_REVIEW", null, false),
+                transition("T08", "INSTALL", "INSTALL_REVIEW", null, false),
+                transition("T09", "INSTALL_REVIEW", "SUBMIT_OEM", null, false),
+                transition("T10", "SUBMIT_OEM", "WAIT_OEM_RECEIPT", "SUCCESS", false),
+                transition("T11", "SUBMIT_OEM", "END_EXCEPTION", "FAILED", false),
+                transition("T12", "WAIT_OEM_RECEIPT", "END_SUCCESS", "SUCCESS", false),
+                transition("T13", "WAIT_OEM_RECEIPT", "END_EXCEPTION", "TIMEOUT", false));
+    }
+
+    private static Map<String, Object> transition(
+            String id,
+            String from,
+            String to,
+            String resultCode,
+            boolean defaultBranch
+    ) {
+        Map<String, Object> transition = new LinkedHashMap<>();
+        transition.put("transitionId", id);
+        transition.put("fromNodeId", from);
+        transition.put("toNodeId", to);
+        transition.put("resultCode", resultCode);
+        transition.put("branchName", resultCode);
+        transition.put("defaultBranch", defaultBranch);
+        transition.put("condition", Map.of());
+        return transition;
+    }
+
+    /**
+     * 将当前产品草稿编译并发布到既有不可变配置中心。
+     *
+     * <p>事务边界：Workflow 资产、Bundle、Revision 和 Profile 指针加入同一数据库事务。
+     * 首次发布创建 Bundle；后续版本使用 expectedCurrentBundleId 原子关闭旧开放区间，
+     * 因而历史工单仍按旧 bundleId + digest 执行。</p>
+     */
+    private RuntimeBinding publishDesignerRuntime(
+            String tenantId,
+            ProfileRow profile,
+            ProjectFulfillmentDocument document,
+            int versionNo,
+            Instant effectiveFrom,
+            UUID currentBundleId
+    ) {
+        String semanticVersion = versionNo + ".0.0";
+        ProjectFulfillmentWorkflowCompiler.RuntimeAssetBindings baseBindings =
+                loadDesignerRuntimeBindings(tenantId, currentBundleId);
+        MaterializedDesignerAssets designerAssets = materializeDesignerAssets(
+                tenantId, profile, document, semanticVersion, baseBindings);
+        var workflow = workflowCompiler.compile(
+                profile.profileCode(), profile.profileName(), semanticVersion, document,
+                designerAssets.bindings());
+        String assetKey = "fulfillment-" + profile.profileId() + "-workflow";
+        var asset = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                tenantId,
+                ConfigurationAssetType.WORKFLOW,
+                assetKey,
+                semanticVersion,
+                "1.0.0",
+                workflow.definitionJson(),
+                workflow.contentDigest()));
+
+        String brandCode = document.matchRule().brandCodes().isEmpty()
+                ? "ALL"
+                : document.matchRule().brandCodes().getFirst();
+        String provinceCode = document.matchRule().provinceCodes().isEmpty()
+                ? null
+                : document.matchRule().provinceCodes().getFirst();
+        List<UUID> bundleAssetVersionIds = new ArrayList<>();
+        if (currentBundleId != null) {
+            bundleAssetVersionIds.addAll(jdbc.sql("""
+                            SELECT i.asset_version_id
+                              FROM cfg_configuration_bundle_item i
+                              JOIN cfg_configuration_asset_version v
+                                ON v.tenant_id = i.tenant_id
+                               AND v.version_id = i.asset_version_id
+                             WHERE i.tenant_id = :tenantId
+                               AND i.bundle_id = :bundleId
+                               AND i.asset_type <> 'WORKFLOW'
+                               AND NOT (v.asset_key = ANY(CAST(:replacedKeys AS text[])))
+                             ORDER BY i.asset_type, i.asset_version_id
+                            """)
+                    .param("tenantId", tenantId)
+                    .param("bundleId", currentBundleId)
+                    .param("replacedKeys", designerAssets.replacedAssetKeys().toArray(String[]::new))
+                    .query(UUID.class)
+                    .list());
+        }
+        bundleAssetVersionIds.addAll(designerAssets.assetVersionIds());
+        bundleAssetVersionIds.add(asset.versionId());
+        var command = new PublishConfigurationBundleCommand(
+                tenantId,
+                profile.projectId(),
+                "fulfillment-" + profile.profileId(),
+                semanticVersion,
+                brandCode,
+                profile.serviceProductCode(),
+                provinceCode,
+                effectiveFrom,
+                null,
+                List.copyOf(bundleAssetVersionIds));
+        var bundle = currentBundleId == null
+                ? configurations.publishBundle(command)
+                : configurations.publishBundleSuccessor(
+                new PublishConfigurationBundleSuccessorCommand(currentBundleId, command));
+        return new RuntimeBinding(asset.versionId(), bundle.bundleId(), bundle.bundleVersion());
+    }
+
+    /**
+     * 节点草稿只保存业务配置快照；发布时把它绑定到当前 Bundle 内的不可变资产键。
+     * 绑定只读取负责人明确选择的来源 Bundle，不查询“最新资产”，否则历史工单会漂移。
+     */
+    private ProjectFulfillmentWorkflowCompiler.RuntimeAssetBindings loadDesignerRuntimeBindings(
+            String tenantId,
+            UUID bundleId
+    ) {
+        if (bundleId == null) {
+            return ProjectFulfillmentWorkflowCompiler.RuntimeAssetBindings.empty();
+        }
+        List<RuntimeAssetRow> assets = jdbc.sql("""
+                        SELECT v.asset_type, v.asset_key, v.definition::text AS definition_json
+                          FROM cfg_configuration_bundle_item i
+                          JOIN cfg_configuration_asset_version v
+                            ON v.tenant_id = i.tenant_id
+                           AND v.version_id = i.asset_version_id
+                         WHERE i.tenant_id = :tenantId
+                           AND i.bundle_id = :bundleId
+                         ORDER BY v.asset_type, v.asset_key
+                        """)
+                .param("tenantId", tenantId)
+                .param("bundleId", bundleId)
+                .query((rs, rowNum) -> new RuntimeAssetRow(
+                        rs.getString("asset_type"),
+                        rs.getString("asset_key"),
+                        rs.getString("definition_json")))
+                .list();
+        return new ProjectFulfillmentWorkflowCompiler.RuntimeAssetBindings(
+                firstAssetKey(assets, "ASSIGNEE", null),
+                firstAssetKey(assets, "DISPATCH", null),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                firstAssetKey(assets, "INTEGRATION", "OUTBOUND"));
+    }
+
+    /**
+     * 把节点内从零创建的表单、证据和 SLA 草稿发布为当前版本独立资产。
+     * 公共模板只提供初值；Workflow 最终只引用本次发布的不可变 assetKey。
+     */
+    private MaterializedDesignerAssets materializeDesignerAssets(
+            String tenantId,
+            ProfileRow profile,
+            ProjectFulfillmentDocument document,
+            String semanticVersion,
+            ProjectFulfillmentWorkflowCompiler.RuntimeAssetBindings base
+    ) {
+        Map<String, String> formRefs = new LinkedHashMap<>();
+        Map<String, String> evidenceRefs = new LinkedHashMap<>();
+        Map<String, String> slaRefs = new LinkedHashMap<>();
+        List<UUID> versionIds = new ArrayList<>();
+        List<String> replacedKeys = new ArrayList<>();
+        for (var node : document.nodes()) {
+            if (!node.form().isEmpty()) {
+                String key = nodeAssetKey(profile.profileId(), node.nodeId(), "form");
+                versionIds.add(publishDesignerAsset(
+                        tenantId, ConfigurationAssetType.FORM, key, semanticVersion,
+                        designerFormDefinition(key, semanticVersion, node)).versionId());
+                formRefs.put(node.nodeId(), key);
+                replacedKeys.add(key);
+            }
+            if (!node.evidence().isEmpty()) {
+                String key = nodeAssetKey(profile.profileId(), node.nodeId(), "evidence");
+                versionIds.add(publishDesignerAsset(
+                        tenantId, ConfigurationAssetType.EVIDENCE, key, semanticVersion,
+                        designerEvidenceDefinition(key, semanticVersion, node)).versionId());
+                evidenceRefs.put(node.nodeId(), key);
+                replacedKeys.add(key);
+            }
+            if (!node.sla().isEmpty()) {
+                String key = nodeAssetKey(profile.profileId(), node.nodeId(), "sla");
+                versionIds.add(publishDesignerAsset(
+                        tenantId, ConfigurationAssetType.SLA, key, semanticVersion,
+                        designerSlaDefinition(key, semanticVersion, node)).versionId());
+                slaRefs.put(node.nodeId(), key);
+                replacedKeys.add(key);
+            }
+        }
+        return new MaterializedDesignerAssets(
+                new ProjectFulfillmentWorkflowCompiler.RuntimeAssetBindings(
+                        base.assigneePolicyRef(),
+                        base.dispatchPolicyRef(),
+                        formRefs,
+                        evidenceRefs,
+                        slaRefs,
+                        base.integrationRef()),
+                List.copyOf(versionIds),
+                List.copyOf(replacedKeys));
+    }
+
+    private com.serviceos.configuration.api.ConfigurationAssetVersionReference publishDesignerAsset(
+            String tenantId,
+            ConfigurationAssetType assetType,
+            String assetKey,
+            String semanticVersion,
+            Map<String, Object> definition
+    ) {
+        try {
+            String json = objectMapper.writeValueAsString(definition);
+            return configurations.publishAsset(new PublishConfigurationAssetCommand(
+                    tenantId, assetType, assetKey, semanticVersion, "1.0.0",
+                    json, Sha256.digest(json)));
+        } catch (Exception exception) {
+            throw new IllegalStateException("节点资产发布失败: " + assetKey, exception);
+        }
+    }
+
+    private Map<String, Object> designerFormDefinition(
+            String key,
+            String semanticVersion,
+            com.serviceos.configuration.api.ProjectFulfillmentNodeDraft node
+    ) {
+        Object rawFields = node.form().get("fields");
+        List<?> sourceFields = rawFields instanceof List<?> list ? list : List.of();
+        List<Map<String, Object>> fields = new ArrayList<>();
+        for (int index = 0; index < sourceFields.size(); index++) {
+            Object raw = sourceFields.get(index);
+            Map<?, ?> field = raw instanceof Map<?, ?> map ? map : Map.of();
+            String fieldKey = textOr(field.get("fieldKey"), "field" + (index + 1));
+            fields.add(Map.of(
+                    "fieldKey", fieldKey,
+                    "label", textOr(field.get("label"), "字段 " + (index + 1)),
+                    "dataType", designerFormDataType(field.get("type")),
+                    "binding", "task.input." + normalizeAssetSegment(node.nodeId())
+                            + "." + fieldKey,
+                    "required", Boolean.TRUE.equals(field.get("required"))));
+        }
+        if (fields.isEmpty()) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    node.nodeName() + " 的表单已创建但没有字段");
+        }
+        return Map.of(
+                "formKey", key,
+                "version", semanticVersion,
+                "title", textOr(node.form().get("formName"), node.nodeName() + "表单"),
+                "stage", designerAssetStage(node.phaseId()),
+                "sections", List.of(Map.of(
+                        "sectionKey", "main",
+                        "title", node.nodeName(),
+                        "fields", fields)),
+                "validationRules", List.of());
+    }
+
+    private Map<String, Object> designerEvidenceDefinition(
+            String key,
+            String semanticVersion,
+            com.serviceos.configuration.api.ProjectFulfillmentNodeDraft node
+    ) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (int index = 0; index < node.evidence().size(); index++) {
+            Map<String, Object> item = node.evidence().get(index);
+            int minimum = intOr(item.get("minCount"), Boolean.TRUE.equals(item.get("required")) ? 1 : 0);
+            int maximum = Math.max(1, intOr(item.get("maxCount"), Math.max(minimum, 3)));
+            items.add(Map.of(
+                    "evidenceKey", textOr(item.get("evidenceKey"), "evidence" + (index + 1)),
+                    "name", textOr(item.get("name"), "资料 " + (index + 1)),
+                    "description", textOr(item.get("description"), node.nodeName() + "履约资料"),
+                    "mediaType", designerEvidenceType(item.get("type")),
+                    "required", Boolean.TRUE.equals(item.get("required")),
+                    "capture", Map.of(
+                            "allowCamera", true,
+                            "allowGallery", true,
+                            "minCount", minimum,
+                            "maxCount", maximum,
+                            "maxSizeBytes", 5_242_880),
+                    "reviewPolicy", Map.of("reviewRequired", true)));
+        }
+        return Map.of(
+                "templateKey", key,
+                "version", semanticVersion,
+                "title", node.nodeName() + "资料要求",
+                "stage", designerAssetStage(node.phaseId()),
+                "items", items);
+    }
+
+    private Map<String, Object> designerSlaDefinition(
+            String key,
+            String semanticVersion,
+            com.serviceos.configuration.api.ProjectFulfillmentNodeDraft node
+    ) {
+        String taskType = textOr(node.task().get("taskType"), node.nodeId());
+        long targetSeconds = Math.max(
+                60L,
+                (long) intOr(node.sla().get("targetMinutes"), 60) * 60L);
+        return Map.of(
+                "policyKey", key,
+                "version", semanticVersion,
+                "subjectType", "TASK",
+                "taskTypes", List.of(taskType),
+                "startEvent", "TASK_CREATED",
+                "stopEvent", "TASK_COMPLETED",
+                "clockMode", "ELAPSED",
+                "targetDurationSeconds", targetSeconds);
+    }
+
+    private static String nodeAssetKey(UUID profileId, String nodeId, String suffix) {
+        return "fulfillment." + profileId + "."
+                + normalizeAssetSegment(nodeId) + "." + suffix;
+    }
+
+    private static String normalizeAssetSegment(String value) {
+        return value.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9._-]", "-")
+                .replaceAll("-+", "-");
+    }
+
+    private static String designerAssetStage(String phaseId) {
+        if (phaseId == null || phaseId.isBlank()) {
+            return "OTHER";
+        }
+        return phaseId.toUpperCase(java.util.Locale.ROOT)
+                .replaceAll("[^A-Z0-9_-]", "_");
+    }
+
+    private static String designerFormDataType(Object value) {
+        String type = value == null ? "STRING" : value.toString().toUpperCase(java.util.Locale.ROOT);
+        return switch (type) {
+            // 设计器一期尚未采集稳定的枚举编码与选项集合，若直接发布为 ENUM，
+            // Technician Web 会按能力契约拒绝打开该任务。这里发布为 STRING，
+            // 等设计器能够完整冻结枚举选项后再升级类型，避免生成不可执行的配置。
+            case "SELECT" -> "STRING";
+            case "TEXTAREA" -> "TEXT";
+            case "NUMBER" -> "DECIMAL";
+            case "CHECKBOX" -> "BOOLEAN";
+            case "STRING", "TEXT", "INTEGER", "DECIMAL", "BOOLEAN", "DATE", "DATETIME",
+                    "ENUM", "MULTI_ENUM", "ADDRESS", "GEOPOINT", "SIGNATURE", "FILE_REF",
+                    "OBJECT", "OBJECT_LIST" -> type;
+            default -> "STRING";
+        };
+    }
+
+    private static String designerEvidenceType(Object value) {
+        String type = value == null ? "PHOTO" : value.toString().toUpperCase(java.util.Locale.ROOT);
+        return Set.of("PHOTO", "VIDEO", "DOCUMENT", "SIGNATURE", "GENERATED_REPORT").contains(type)
+                ? type : "DOCUMENT";
+    }
+
+    private static String textOr(Object value, String fallback) {
+        return value == null || value.toString().isBlank() ? fallback : value.toString().trim();
+    }
+
+    private static int intOr(Object value, int fallback) {
+        return value instanceof Number number ? number.intValue() : fallback;
+    }
+
+    private String firstAssetKey(
+            List<RuntimeAssetRow> assets,
+            String assetType,
+            String direction
+    ) {
+        return assets.stream()
+                .filter(asset -> assetType.equals(asset.assetType()))
+                .filter(asset -> direction == null || direction.equals(assetDirection(asset)))
+                .map(RuntimeAssetRow::assetKey)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String assetDirection(RuntimeAssetRow asset) {
+        try {
+            return objectMapper.readTree(asset.definitionJson()).path("direction").asText(null);
+        } catch (Exception exception) {
+            throw new IllegalStateException("配置资产方向无法解析: " + asset.assetKey(), exception);
         }
     }
 
@@ -1055,7 +1630,8 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         }
         return jdbc.sql("""
                 SELECT revision_id, document_json::text AS document_json,
-                       workflow_asset_version_id, source_bundle_id
+                       workflow_asset_version_id, source_bundle_id,
+                       simulation_document_digest
                   FROM cfg_project_fulfillment_revision
                  WHERE tenant_id = :tenantId AND revision_id = :id AND revision_status = 'DRAFT'
                 """)
@@ -1065,7 +1641,8 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                         rs.getObject("revision_id", UUID.class),
                         rs.getString("document_json"),
                         rs.getObject("workflow_asset_version_id", UUID.class),
-                        rs.getObject("source_bundle_id", UUID.class)))
+                        rs.getObject("source_bundle_id", UUID.class),
+                        rs.getString("simulation_document_digest")))
                 .optional()
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "履约配置草稿不存在"));
     }
@@ -1341,7 +1918,29 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
             UUID revisionId,
             String documentJson,
             UUID workflowAssetVersionId,
-            UUID sourceBundleId
+            UUID sourceBundleId,
+            String simulationDocumentDigest
+    ) {
+    }
+
+    private record RuntimeBinding(
+            UUID workflowAssetVersionId,
+            UUID bundleId,
+            String bundleVersion
+    ) {
+    }
+
+    private record RuntimeAssetRow(
+            String assetType,
+            String assetKey,
+            String definitionJson
+    ) {
+    }
+
+    private record MaterializedDesignerAssets(
+            ProjectFulfillmentWorkflowCompiler.RuntimeAssetBindings bindings,
+            List<UUID> assetVersionIds,
+            List<String> replacedAssetKeys
     ) {
     }
 

@@ -49,7 +49,7 @@ final class WorkflowDefinitionParser {
         JsonNode first = requireSingleUnconditionalTarget(graph, graph.startNodeId(), "START");
         TaskNode task = requireTaskNode(first, "the first executable node");
         return new BootstrapDefinition(
-                graph.workflowKey(), graph.semanticVersion(), task.nodeId(),
+                graph.workflowKey(), graph.semanticVersion(), graph.executionMode(), task.nodeId(),
                 task.stageCode(), task.taskType(), task.taskKind(), task.formRef(), task.slaRef(),
                 task.assigneePolicyRef(), task.dispatchPolicyRef(), task.ruleRef());
     }
@@ -150,7 +150,8 @@ final class WorkflowDefinitionParser {
                     targetNodeId,
                     requiredText(target, "stageCode"),
                     ReviewGateWait.WAIT_EVENT_TYPE,
-                    ReviewGateWait.CORRELATION_KEY_TEMPLATE);
+                    ReviewGateWait.CORRELATION_KEY_TEMPLATE,
+                    0);
         }
         if (TASK_NODE_TYPES.contains(targetType)) {
             TaskNode next = requireTaskNode(target, "next executable node");
@@ -168,7 +169,8 @@ final class WorkflowDefinitionParser {
                     targetNodeId,
                     requiredText(target, "stageCode"),
                     requiredText(target, "waitEventType"),
-                    requiredText(target, "correlationKeyTemplate"));
+                    requiredText(target, "correlationKeyTemplate"),
+                    optionalPositiveInt(target, "durationSeconds"));
         }
         if ("TIMER".equals(targetType)) {
             JsonNode duration = target.get("durationSeconds");
@@ -375,6 +377,13 @@ final class WorkflowDefinitionParser {
             throw new IllegalArgumentException("workflow semanticVersion does not match frozen asset version");
         }
         String startNodeId = requiredText(root, "startNodeId");
+        String executionMode = optionalText(root, "executionMode");
+        if (executionMode == null) {
+            executionMode = "LEGACY";
+        }
+        if (!Set.of("LEGACY", "SERIAL_V1").contains(executionMode)) {
+            throw new IllegalArgumentException("unsupported workflow executionMode: " + executionMode);
+        }
         JsonNode nodesNode = root.get("nodes");
         JsonNode transitionsNode = root.get("transitions");
         if (nodesNode == null || !nodesNode.isArray() || transitionsNode == null || !transitionsNode.isArray()) {
@@ -400,7 +409,9 @@ final class WorkflowDefinitionParser {
                     ? transition.path("priority").asInt(100) : 100;
             transitions.add(new Transition(from, to, condition, priority));
         }
-        return new Graph(workflowKey, semanticVersion, startNodeId, Map.copyOf(nodes), List.copyOf(transitions));
+        return new Graph(
+                workflowKey, semanticVersion, executionMode,
+                startNodeId, Map.copyOf(nodes), List.copyOf(transitions));
     }
 
     private static ExpressionDefinition readCondition(JsonNode condition) {
@@ -486,9 +497,21 @@ final class WorkflowDefinitionParser {
         return value.asText().trim();
     }
 
+    private static int optionalPositiveInt(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) {
+            return 0;
+        }
+        if (!value.isIntegralNumber() || value.asInt() < 1) {
+            throw new IllegalArgumentException("workflow " + field + " must be a positive integer");
+        }
+        return value.asInt();
+    }
+
     record BootstrapDefinition(
             String workflowKey,
             String workflowVersion,
+            String executionMode,
             String firstNodeId,
             String firstStageCode,
             String firstTaskType,
@@ -559,12 +582,13 @@ final class WorkflowDefinitionParser {
                 String nodeId,
                 String stageCode,
                 String waitEventType,
-                String correlationKeyTemplate
+                String correlationKeyTemplate,
+                int timeoutSeconds
         ) {
             return new ProgressionDefinition(
                     nodeId, stageCode, null, null, null, null, null, null, null,
                     false, true, waitEventType, correlationKeyTemplate,
-                    false, 0, false, null, false, List.of(), false, null, 0, 1);
+                    false, timeoutSeconds, false, null, false, List.of(), false, null, 0, 1);
         }
 
         static ProgressionDefinition timer(String nodeId, String stageCode, int durationSeconds) {
@@ -607,6 +631,7 @@ final class WorkflowDefinitionParser {
     private record Graph(
             String workflowKey,
             String semanticVersion,
+            String executionMode,
             String startNodeId,
             Map<String, JsonNode> nodes,
             List<Transition> transitions
