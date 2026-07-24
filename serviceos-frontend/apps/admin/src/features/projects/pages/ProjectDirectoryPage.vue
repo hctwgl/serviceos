@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { CreateProjectInput } from '@serviceos/api-client'
 import { computed, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { Button, Drawer, Form, Input, SearchOutlined, Select } from '@serviceos/design-system'
 import PageError from '../../../components/PageError.vue'
+import ProjectMetricCard from '../../../components/serviceos/ProjectMetricCard.vue'
 import StatusPill from '../../../components/StatusPill.vue'
 import { presentConfigurationStatus, presentProjectPeriod, presentProjectStatus } from '../presenters/client-project-directory'
 import { useCreateProjectCommand } from '../commands/use-create-project-command'
@@ -13,6 +14,10 @@ import { useProjectCreationOptionsQuery } from '../queries/use-project-creation-
 const router = useRouter()
 const directory = useClientProjectDirectoryQuery()
 const keyword = ref('')
+const clientFilter = ref<string>()
+const regionFilter = ref<string>()
+const statusFilter = ref<string>()
+const configurationFilter = ref<string>()
 const createOpen = ref(false)
 const regionKeyword = ref('')
 const creationOptions = useProjectCreationOptionsQuery(createOpen, regionKeyword)
@@ -29,11 +34,41 @@ const createForm = reactive<Omit<CreateProjectInput, 'endsOn'> & { endsOn: strin
 const projects = computed(() => {
   const normalized = keyword.value.trim().toLowerCase()
   const items = directory.data.value?.projects ?? []
-  if (!normalized) return items
-  return items.filter((item) => `${item.projectName} ${item.clientName ?? ''} ${item.regionNames.join(' ')}`.toLowerCase().includes(normalized))
+  return items.filter((item) => {
+    const matchesKeyword = !normalized || `${item.projectName} ${item.clientName ?? ''} ${item.regionNames.join(' ')}`.toLowerCase().includes(normalized)
+    const matchesClient = !clientFilter.value || item.clientCode === clientFilter.value
+    const matchesRegion = !regionFilter.value || item.regionNames.includes(regionFilter.value)
+    const matchesStatus = !statusFilter.value || item.status === statusFilter.value
+    const matchesConfiguration = !configurationFilter.value || item.configurationStatus === configurationFilter.value
+    return matchesKeyword && matchesClient && matchesRegion && matchesStatus && matchesConfiguration
+  })
 })
 const activeCount = computed(() => directory.data.value?.projects.filter((item) => item.status === 'ACTIVE').length ?? 0)
-const draftCount = computed(() => directory.data.value?.projects.filter((item) => item.configurationStatus === 'DRAFT' || item.configurationStatus === 'UNPUBLISHED_CHANGES').length ?? 0)
+const pendingCount = computed(() => directory.data.value?.projects.filter((item) => item.status === 'DRAFT').length ?? 0)
+const completedCount = computed(() => directory.data.value?.projects.filter((item) => item.status === 'CLOSED').length ?? 0)
+const riskCount = computed(() => directory.data.value?.projects.filter((item) => item.status === 'SUSPENDED' || item.configurationStatus === 'DRAFT' || item.configurationStatus === 'UNPUBLISHED_CHANGES').length ?? 0)
+
+const clientFilterOptions = computed(() => (directory.data.value?.clients ?? []).map((client) => ({
+  value: client.clientCode,
+  label: client.clientName,
+})))
+const regionFilterOptions = computed(() => [...new Set((directory.data.value?.projects ?? []).flatMap((item) => item.regionNames))].map((region) => ({
+  value: region,
+  label: region,
+})))
+const statusFilterOptions = [
+  { value: 'ACTIVE', label: '运行中' },
+  { value: 'DRAFT', label: '待启动' },
+  { value: 'SUSPENDED', label: '已暂停' },
+  { value: 'CLOSED', label: '已完成' },
+]
+const configurationFilterOptions = [
+  { value: 'PUBLISHED', label: '已发布' },
+  { value: 'DRAFT', label: '草稿待发布' },
+  { value: 'UNPUBLISHED_CHANGES', label: '有未发布变更' },
+  { value: 'NOT_CONFIGURED', label: '待首次配置' },
+  { value: 'NO_PERMISSION', label: '无权查看' },
+]
 
 const clientOptions = computed(() => (creationOptions.data.value?.clients ?? []).map((item) => ({
   value: item.code,
@@ -61,6 +96,31 @@ function regionLevelLabel(level: string) {
   if (level === 'PROVINCE') return '省级'
   if (level === 'CITY') return '市级'
   return '区县'
+}
+
+function resetFilters() {
+  keyword.value = ''
+  clientFilter.value = undefined
+  regionFilter.value = undefined
+  statusFilter.value = undefined
+  configurationFilter.value = undefined
+}
+
+function fulfillmentPlanLabel(item: typeof projects.value[number]) {
+  if (item.currentFulfillmentPlanName) return item.currentFulfillmentPlanName
+  if (item.configurationStatus === 'NO_PERMISSION') return '无权查看方案'
+  if (item.configurationStatus === 'NOT_CONFIGURED') return '尚未建立方案'
+  if (item.configurationStatus === 'DRAFT') return '待发布方案'
+  return '当前方案待确认'
+}
+
+function versionLabel(item: typeof projects.value[number]) {
+  return item.currentFulfillmentVersion ? `V${item.currentFulfillmentVersion}` : '—'
+}
+
+function updatedAtLabel(item: typeof projects.value[number]) {
+  if (!item.updatedAt) return item.configurationStatus === 'NOT_CONFIGURED' ? '—' : '待确认'
+  return item.updatedAt.slice(0, 16).replace('T', ' ')
 }
 
 function openCreate() {
@@ -97,24 +157,54 @@ async function submitCreate() {
 </script>
 
 <template>
-  <div class="resource-page">
-    <div class="page-heading inline">
-      <div><p class="breadcrumb">客户与项目 / 项目管理</p><h1>项目管理</h1><p>查看项目服务周期、区域范围、参与网点及履约配置准备情况。</p></div>
+  <div class="sos-project-directory-page">
+    <header class="sos-directory-heading">
+      <div>
+        <p class="breadcrumb">客户与项目 / 项目管理</p>
+        <h1>项目管理</h1>
+        <p>管理客户项目、服务范围和履约配置。</p>
+      </div>
       <div class="heading-actions"><Button type="primary" @click="openCreate">新建项目</Button></div>
-    </div>
+    </header>
     <PageError v-if="directory.isError.value" :detail="directory.error.value?.message ?? '项目目录加载失败'" />
     <template v-else>
-      <section class="resource-summary-grid project-summary"><div><span>全部项目</span><strong>{{ directory.data.value?.projects.length ?? 0 }}</strong></div><div><span>运行中</span><strong>{{ activeCount }}</strong></div><div><span>存在草稿</span><strong>{{ draftCount }}</strong></div><div><span>合作客户</span><strong>{{ directory.data.value?.clients.filter((item) => item.status === 'ACTIVE').length ?? 0 }}</strong></div></section>
-      <section class="directory-panel">
-        <div class="resource-filter"><Input v-model:value="keyword" placeholder="搜索项目、客户或服务区域" allow-clear><template #prefix><SearchOutlined /></template></Input></div>
+      <section class="sos-project-metric-grid" aria-label="项目概览指标">
+        <ProjectMetricCard label="运行中项目" :value="String(activeCount)" hint="当前正在承接服务" tone="success" />
+        <ProjectMetricCard label="待启动项目" :value="String(pendingCount)" hint="等待配置或启动" tone="blue" />
+        <ProjectMetricCard label="已完成项目" :value="String(completedCount)" hint="服务周期已结束" />
+        <ProjectMetricCard label="风险项目" :value="String(riskCount)" hint="暂停或存在未发布配置" tone="danger" />
+      </section>
+      <section class="sos-project-directory-surface">
+        <div class="sos-project-filter-bar">
+          <Input v-model:value="keyword" placeholder="搜索项目名称" allow-clear><template #prefix><SearchOutlined /></template></Input>
+          <Select v-model:value="clientFilter" :options="clientFilterOptions" allow-clear placeholder="客户品牌" />
+          <Select v-model:value="regionFilter" :options="regionFilterOptions" allow-clear placeholder="服务区域" />
+          <Select v-model:value="statusFilter" :options="statusFilterOptions" allow-clear placeholder="项目状态" />
+          <Select v-model:value="configurationFilter" :options="configurationFilterOptions" allow-clear placeholder="履约方案状态" />
+          <Button type="link" @click="resetFilters">重置</Button>
+        </div>
         <div class="data-table-wrap">
-          <table class="business-table project-table">
-            <thead><tr><th>项目</th><th>客户</th><th>服务周期</th><th>服务区域</th><th>参与网点</th><th>履约配置</th><th>项目状态</th></tr></thead>
-            <tbody><tr v-for="item in projects" :key="item.id" :class="{ 'data-incomplete-row': !item.dataComplete }"><td><RouterLink class="table-link" :to="`/projects/${item.id}`"><strong>{{ item.projectName }}</strong></RouterLink><small>{{ item.projectCode }}</small><em v-if="!item.dataComplete">{{ item.dataProblem }}</em></td><td>{{ item.clientName ?? '数据不完整' }}</td><td>{{ presentProjectPeriod(item.startsOn, item.endsOn) }}</td><td>{{ item.regionNames.join('、') || '数据不完整' }}</td><td>{{ item.networkCount }} 个</td><td><StatusPill :tone="presentConfigurationStatus(item.configurationStatus).tone" :label="presentConfigurationStatus(item.configurationStatus).label" /></td><td><StatusPill :tone="presentProjectStatus(item.status).tone" :label="presentProjectStatus(item.status).label" /></td></tr></tbody>
+          <table class="business-table sos-project-table">
+            <thead><tr><th>项目名称</th><th>客户品牌</th><th>服务区域</th><th>服务周期</th><th>项目状态</th><th>当前履约方案</th><th>当前版本</th><th>配置状态</th><th>更新时间</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr v-for="item in projects" :key="item.id" :class="{ 'data-incomplete-row': !item.dataComplete }">
+                <td><RouterLink class="table-link" :to="`/projects/${item.id}`"><strong>{{ item.projectName }}</strong></RouterLink><small>{{ item.projectCode }}</small><em v-if="!item.dataComplete">{{ item.dataProblem }}</em></td>
+                <td>{{ item.clientName ?? '数据不完整' }}</td>
+                <td>{{ item.regionNames.join('、') || '数据不完整' }}</td>
+                <td>{{ presentProjectPeriod(item.startsOn, item.endsOn) }}</td>
+                <td><StatusPill :tone="presentProjectStatus(item.status).tone" :label="presentProjectStatus(item.status).label" /></td>
+                <td><strong class="sos-project-plan-name">{{ fulfillmentPlanLabel(item) }}</strong></td>
+                <td><span class="sos-version-chip">{{ versionLabel(item) }}</span></td>
+                <td><StatusPill :tone="presentConfigurationStatus(item.configurationStatus).tone" :label="presentConfigurationStatus(item.configurationStatus).label" /></td>
+                <td><span class="sos-table-muted">{{ updatedAtLabel(item) }}</span></td>
+                <td><RouterLink class="table-link sos-table-action" :to="`/projects/${item.id}`">进入详情 <span aria-hidden="true">→</span></RouterLink></td>
+              </tr>
+            </tbody>
           </table>
           <div v-if="directory.isLoading.value" class="table-loading">正在加载项目…</div>
-          <div v-else-if="!projects.length" class="empty-state"><h3>暂无符合条件的项目</h3><p>请调整搜索条件。</p></div>
+          <div v-else-if="!projects.length" class="empty-state"><h3>暂无符合条件的项目</h3><p>请调整搜索条件，或重置筛选查看全部项目。</p></div>
         </div>
+        <footer class="sos-project-table-footer"><span>共 {{ projects.length }} 个项目</span><span>目录更新时间：{{ directory.data.value?.asOf.slice(0, 16).replace('T', ' ') ?? '—' }}</span></footer>
       </section>
     </template>
 

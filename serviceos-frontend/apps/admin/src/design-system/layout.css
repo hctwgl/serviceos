@@ -1,0 +1,67 @@
+html {
+  min-block-size: 100%;
+  overflow-x: clip;
+  overflow-y: auto;
+}
+
+body {
+  min-block-size: 100%;
+  min-inline-size: 320px;
+  overflow: visible;
+}
+
+#app {
+  inline-size: 100%;
+  min-block-size: 100vh;
+  min-inline-size: 0;
+  overflow-x: clip;
+}
+
+/* Vben owns fixed header/sidebar placement. Admin only supplies the flex sizing contract. */
+.serviceos-vben-layout {
+  inline-size: 100%;
+  min-block-size: 100vh;
+  min-inline-size: 0;
+  overflow-x: clip;
+}
+
+.serviceos-vben-layout > aside,
+.serviceos-vben-layout > div {
+  min-inline-size: 0;
+}
+
+.serviceos-vben-layout > div.flex-1 {
+  min-block-size: 100%;
+  overflow: visible;
+}
+
+.serviceos-vben-layout > div.flex-1 > #__vben_main_content {
+  block-size: auto;
+  min-block-size: calc(100vh - var(--sos-shell-header-height));
+  min-inline-size: 0;
+  overflow: visible;
+}
+
+.serviceos-vben-layout > div.flex-1 > #__vben_main_content > div {
+  block-size: auto;
+  min-block-size: 100%;
+  min-inline-size: 0;
+}
+
+.serviceos-vben-layout main > div,
+.serviceos-vben-layout main > div > div {
+  min-inline-size: 0;
+}
+
+/* Do not let a page-wide flex/grid child create horizontal scroll on the Shell. */
+.serviceos-vben-layout .flex-1,
+.serviceos-vben-layout [class*='grid'] {
+  min-inline-size: 0;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --sos-shell-content-padding-x: 12px;
+    --sos-shell-content-padding-y: 14px;
+  }
+}

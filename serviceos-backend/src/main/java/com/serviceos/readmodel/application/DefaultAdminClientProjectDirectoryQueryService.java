@@ -3,6 +3,8 @@ package com.serviceos.readmodel.application;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
+import com.serviceos.configuration.api.ProjectFulfillmentProfileSummary;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.project.api.ProjectClientBrandItem;
 import com.serviceos.project.api.ProjectClientDirectoryItem;
@@ -11,6 +13,8 @@ import com.serviceos.project.api.ProjectQueryService;
 import com.serviceos.project.api.ProjectView;
 import com.serviceos.readmodel.api.AdminClientProjectDirectoryQueryService;
 import com.serviceos.readmodel.api.AdminClientProjectDirectoryView;
+import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.ProblemCode;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -30,15 +34,18 @@ import java.util.stream.Collectors;
 final class DefaultAdminClientProjectDirectoryQueryService
         implements AdminClientProjectDirectoryQueryService {
     private final ProjectQueryService projects;
+    private final ProjectFulfillmentProfileService fulfillmentProfiles;
     private final AuthorizationService authorization;
     private final Clock clock;
 
     DefaultAdminClientProjectDirectoryQueryService(
             ProjectQueryService projects,
+            ProjectFulfillmentProfileService fulfillmentProfiles,
             AuthorizationService authorization,
             Clock clock
     ) {
         this.projects = projects;
+        this.fulfillmentProfiles = fulfillmentProfiles;
         this.authorization = authorization;
         this.clock = clock;
     }
@@ -76,8 +83,23 @@ final class DefaultAdminClientProjectDirectoryQueryService
                     Math.toIntExact(projectCounts.getOrDefault(client.clientCode(), 0L))));
         }
 
+        Map<java.util.UUID, ProjectFulfillmentProfileSummary> currentProfiles = new LinkedHashMap<>();
+        for (ProjectView project : projectItems) {
+            try {
+                fulfillmentProfiles.list(actor, correlationId, project.id()).stream()
+                        .filter(profile -> "ACTIVE".equals(profile.status()))
+                        .findFirst()
+                        .ifPresent(profile -> currentProfiles.put(project.id(), profile));
+            } catch (BusinessProblem problem) {
+                if (problem.code() != ProblemCode.ACCESS_DENIED) {
+                    throw problem;
+                }
+                // 履约能力是目录的软门禁；无权时由 configurationStatus 和 null 字段诚实表达。
+            }
+        }
+
         List<AdminClientProjectDirectoryView.ProjectItem> projectViews = projectItems.stream()
-                .map(item -> toProjectItem(item, clientNames, regionNames))
+                .map(item -> toProjectItem(item, clientNames, regionNames, currentProfiles.get(item.id())))
                 .toList();
         List<String> allowedActions = canMaintainCatalog(actor, correlationId)
                 ? List.of("CREATE_CLIENT", "CREATE_BRAND")
@@ -98,7 +120,8 @@ final class DefaultAdminClientProjectDirectoryQueryService
     private static AdminClientProjectDirectoryView.ProjectItem toProjectItem(
             ProjectView project,
             Map<String, String> clientNames,
-            Map<String, String> regionNames
+            Map<String, String> regionNames,
+            ProjectFulfillmentProfileSummary currentProfile
     ) {
         String clientName = clientNames.get(project.clientId());
         List<String> missingRegions = project.regionCodes().stream()
@@ -118,7 +141,10 @@ final class DefaultAdminClientProjectDirectoryQueryService
                 project.startsOn(), project.endsOn(),
                 project.regionCodes().stream().map(regionNames::get).filter(java.util.Objects::nonNull).toList(),
                 project.networkIds().size(), project.status(), project.publishedSchemeCount(),
-                project.draftSchemeCount(), configurationStatus, missing.isEmpty(),
+                project.draftSchemeCount(), currentProfile == null ? null : currentProfile.profileName(),
+                currentProfile == null ? null : currentProfile.activeVersion(),
+                currentProfile == null ? null : currentProfile.updatedAt(),
+                configurationStatus, missing.isEmpty(),
                 missing.isEmpty() ? null : "缺少页面展示字段：" + String.join("、", missing));
     }
 

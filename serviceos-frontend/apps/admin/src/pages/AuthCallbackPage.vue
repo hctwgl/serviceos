@@ -9,7 +9,7 @@ const error = ref('')
 
 onMounted(async () => {
   try {
-    const returnTo = await completeLogin(window.location.search)
+    const returnTo = await completeLogin(globalThis.location.search)
     await router.replace(returnTo)
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '登录失败'
