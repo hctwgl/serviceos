@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { CreateProjectInput } from '@serviceos/api-client'
-import { computed, reactive, ref } from 'vue'
+import type { AdminProjectDirectoryItem, CreateProjectInput } from '@serviceos/api-client'
+import type { VxeTableGridOptions } from '@vben/plugins/vxe-table'
+import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { useVbenVxeGrid } from '@vben/plugins/vxe-table'
 import { Button, Drawer, Form, Input, SearchOutlined, Select } from '@serviceos/design-system'
 import PageError from '../../../components/PageError.vue'
-import ProjectMetricCard from '../../../components/serviceos/ProjectMetricCard.vue'
 import StatusPill from '../../../components/StatusPill.vue'
 import { presentConfigurationStatus, presentProjectPeriod, presentProjectStatus } from '../presenters/client-project-directory'
 import { useCreateProjectCommand } from '../commands/use-create-project-command'
@@ -43,10 +44,33 @@ const projects = computed(() => {
     return matchesKeyword && matchesClient && matchesRegion && matchesStatus && matchesConfiguration
   })
 })
-const activeCount = computed(() => directory.data.value?.projects.filter((item) => item.status === 'ACTIVE').length ?? 0)
-const pendingCount = computed(() => directory.data.value?.projects.filter((item) => item.status === 'DRAFT').length ?? 0)
-const completedCount = computed(() => directory.data.value?.projects.filter((item) => item.status === 'CLOSED').length ?? 0)
-const riskCount = computed(() => directory.data.value?.projects.filter((item) => item.status === 'SUSPENDED' || item.configurationStatus === 'DRAFT' || item.configurationStatus === 'UNPUBLISHED_CHANGES').length ?? 0)
+const currentPage = ref(1)
+const pageSize = ref(20)
+const pagedProjects = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return projects.value.slice(start, start + pageSize.value)
+})
+
+const projectGridOptions: VxeTableGridOptions<AdminProjectDirectoryItem> = {
+  columns: [
+    { field: 'projectName', minWidth: 175, slots: { default: 'projectName' }, title: '项目名称' },
+    { field: 'clientName', minWidth: 85, title: '客户品牌' },
+    { field: 'regionNames', minWidth: 120, slots: { default: 'regions' }, title: '服务区域' },
+    { field: 'startsOn', minWidth: 135, slots: { default: 'period' }, title: '服务周期' },
+    { field: 'status', minWidth: 85, slots: { default: 'status' }, title: '项目状态' },
+    { field: 'currentFulfillmentPlanName', minWidth: 145, slots: { default: 'plan' }, title: '当前履约方案' },
+    { field: 'currentFulfillmentVersion', minWidth: 75, slots: { default: 'version' }, title: '当前版本' },
+    { field: 'configurationStatus', minWidth: 105, slots: { default: 'configuration' }, title: '配置状态' },
+    { field: 'updatedAt', minWidth: 115, slots: { default: 'updatedAt' }, title: '更新时间' },
+    { field: 'operation', fixed: 'right', minWidth: 90, slots: { default: 'operation' }, title: '操作' },
+  ],
+  pagerConfig: {},
+  rowConfig: { keyField: 'id' },
+}
+const [ProjectGrid] = useVbenVxeGrid<AdminProjectDirectoryItem>({
+  gridOptions: projectGridOptions,
+  showSearchForm: false,
+})
 
 const clientFilterOptions = computed(() => (directory.data.value?.clients ?? []).map((client) => ({
   value: client.clientCode,
@@ -106,6 +130,11 @@ function resetFilters() {
   configurationFilter.value = undefined
 }
 
+function handlePageChange({ currentPage: nextPage, pageSize: nextSize }: { currentPage: number; pageSize: number }) {
+  currentPage.value = nextSize === pageSize.value ? nextPage : 1
+  pageSize.value = nextSize
+}
+
 function fulfillmentPlanLabel(item: typeof projects.value[number]) {
   if (item.currentFulfillmentPlanName) return item.currentFulfillmentPlanName
   if (item.configurationStatus === 'NO_PERMISSION') return '无权查看方案'
@@ -122,6 +151,11 @@ function updatedAtLabel(item: typeof projects.value[number]) {
   if (!item.updatedAt) return item.configurationStatus === 'NOT_CONFIGURED' ? '—' : '待确认'
   return item.updatedAt.slice(0, 16).replace('T', ' ')
 }
+
+watch(projects, () => {
+  const lastPage = Math.max(1, Math.ceil(projects.value.length / pageSize.value))
+  currentPage.value = Math.min(currentPage.value, lastPage)
+})
 
 function openCreate() {
   Object.assign(createForm, {
@@ -159,21 +193,11 @@ async function submitCreate() {
 <template>
   <div class="sos-project-directory-page">
     <header class="sos-directory-heading">
-      <div>
-        <p class="breadcrumb">客户与项目 / 项目管理</p>
-        <h1>项目管理</h1>
-        <p>管理客户项目、服务范围和履约配置。</p>
-      </div>
+      <h1>项目管理</h1>
       <div class="heading-actions"><Button type="primary" @click="openCreate">新建项目</Button></div>
     </header>
     <PageError v-if="directory.isError.value" :detail="directory.error.value?.message ?? '项目目录加载失败'" />
     <template v-else>
-      <section class="sos-project-metric-grid" aria-label="项目概览指标">
-        <ProjectMetricCard label="运行中项目" :value="String(activeCount)" hint="当前正在承接服务" tone="success" />
-        <ProjectMetricCard label="待启动项目" :value="String(pendingCount)" hint="等待配置或启动" tone="blue" />
-        <ProjectMetricCard label="已完成项目" :value="String(completedCount)" hint="服务周期已结束" />
-        <ProjectMetricCard label="风险项目" :value="String(riskCount)" hint="暂停或存在未发布配置" tone="danger" />
-      </section>
       <section class="sos-project-directory-surface">
         <div class="sos-project-filter-bar">
           <Input v-model:value="keyword" placeholder="搜索项目名称" allow-clear><template #prefix><SearchOutlined /></template></Input>
@@ -183,28 +207,45 @@ async function submitCreate() {
           <Select v-model:value="configurationFilter" :options="configurationFilterOptions" allow-clear placeholder="履约方案状态" />
           <Button type="link" @click="resetFilters">重置</Button>
         </div>
-        <div class="data-table-wrap">
-          <table class="business-table sos-project-table">
-            <thead><tr><th>项目名称</th><th>客户品牌</th><th>服务区域</th><th>服务周期</th><th>项目状态</th><th>当前履约方案</th><th>当前版本</th><th>配置状态</th><th>更新时间</th><th>操作</th></tr></thead>
-            <tbody>
-              <tr v-for="item in projects" :key="item.id" :class="{ 'data-incomplete-row': !item.dataComplete }">
-                <td><RouterLink class="table-link" :to="`/projects/${item.id}`"><strong>{{ item.projectName }}</strong></RouterLink><small>{{ item.projectCode }}</small><em v-if="!item.dataComplete">{{ item.dataProblem }}</em></td>
-                <td>{{ item.clientName ?? '数据不完整' }}</td>
-                <td>{{ item.regionNames.join('、') || '数据不完整' }}</td>
-                <td>{{ presentProjectPeriod(item.startsOn, item.endsOn) }}</td>
-                <td><StatusPill :tone="presentProjectStatus(item.status).tone" :label="presentProjectStatus(item.status).label" /></td>
-                <td><strong class="sos-project-plan-name">{{ fulfillmentPlanLabel(item) }}</strong></td>
-                <td><span class="sos-version-chip">{{ versionLabel(item) }}</span></td>
-                <td><StatusPill :tone="presentConfigurationStatus(item.configurationStatus).tone" :label="presentConfigurationStatus(item.configurationStatus).label" /></td>
-                <td><span class="sos-table-muted">{{ updatedAtLabel(item) }}</span></td>
-                <td><RouterLink class="table-link sos-table-action" :to="`/projects/${item.id}`">进入详情 <span aria-hidden="true">→</span></RouterLink></td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="directory.isLoading.value" class="table-loading">正在加载项目…</div>
-          <div v-else-if="!projects.length" class="empty-state"><h3>暂无符合条件的项目</h3><p>请调整搜索条件，或重置筛选查看全部项目。</p></div>
-        </div>
-        <footer class="sos-project-table-footer"><span>共 {{ projects.length }} 个项目</span><span>目录更新时间：{{ directory.data.value?.asOf.slice(0, 16).replace('T', ' ') ?? '—' }}</span></footer>
+        <ProjectGrid
+          class="sos-project-vxe-grid"
+          :grid-events="{ pageChange: handlePageChange }"
+          :grid-options="{
+            ...projectGridOptions,
+            loading: directory.isLoading.value,
+            pagerConfig: {
+              currentPage,
+              pageSize,
+              total: projects.length,
+            },
+          }"
+          :table-data="pagedProjects"
+        >
+          <template #projectName="{ row }">
+            <div class="sos-project-name-cell">
+              <RouterLink class="table-link" :to="`/projects/${row.id}`"><strong>{{ row.projectName }}</strong></RouterLink>
+              <small>{{ row.projectCode }}</small>
+              <em v-if="!row.dataComplete">{{ row.dataProblem }}</em>
+            </div>
+          </template>
+          <template #regions="{ row }">{{ row.regionNames.join('、') || '数据不完整' }}</template>
+          <template #period="{ row }">{{ presentProjectPeriod(row.startsOn, row.endsOn) }}</template>
+          <template #status="{ row }">
+            <StatusPill :tone="presentProjectStatus(row.status).tone" :label="presentProjectStatus(row.status).label" />
+          </template>
+          <template #plan="{ row }"><strong class="sos-project-plan-name">{{ fulfillmentPlanLabel(row) }}</strong></template>
+          <template #version="{ row }"><span class="sos-version-chip">{{ versionLabel(row) }}</span></template>
+          <template #configuration="{ row }">
+            <StatusPill :tone="presentConfigurationStatus(row.configurationStatus).tone" :label="presentConfigurationStatus(row.configurationStatus).label" />
+          </template>
+          <template #updatedAt="{ row }"><span class="sos-table-muted">{{ updatedAtLabel(row) }}</span></template>
+          <template #operation="{ row }">
+            <RouterLink class="table-link sos-table-action" :to="`/projects/${row.id}`">进入详情 <span aria-hidden="true">→</span></RouterLink>
+          </template>
+          <template #empty>
+            <div class="sos-project-grid-empty">暂无符合条件的项目</div>
+          </template>
+        </ProjectGrid>
       </section>
     </template>
 

@@ -22,6 +22,7 @@
     "@vben/layouts": "workspace:*",
     "@vben/locales": "workspace:*",
     "@vben/preferences": "workspace:*",
+    "@vben/plugins": "workspace:*",
     "@vben/stores": "workspace:*",
     "@vben/styles": "workspace:*",
     "@vben/types": "workspace:*",

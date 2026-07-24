@@ -498,6 +498,9 @@ importers:
       '@vben/locales':
         specifier: workspace:*
         version: link:../../vben/packages/locales
+      '@vben/plugins':
+        specifier: workspace:*
+        version: link:../../vben/packages/effects/plugins
       '@vben/preferences':
         specifier: workspace:*
         version: link:../../vben/packages/preferences

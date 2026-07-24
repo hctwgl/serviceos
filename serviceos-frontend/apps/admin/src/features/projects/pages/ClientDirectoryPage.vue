@@ -83,7 +83,7 @@ async function submitBrand() {
 <template>
   <div class="resource-page">
     <div class="page-heading inline">
-      <div><p class="breadcrumb">客户与项目 / 客户品牌</p><h1>客户品牌</h1><p>管理租户内合作车企及其品牌目录，项目通过稳定客户编码建立业务归属。</p></div>
+      <h1>客户品牌</h1>
       <div class="heading-actions"><Button v-if="canCreateClient" type="primary" @click="openCreateClient">新增合作客户</Button></div>
     </div>
     <PageError v-if="directory.isError.value" :detail="directory.error.value?.message ?? '客户品牌目录加载失败'" />

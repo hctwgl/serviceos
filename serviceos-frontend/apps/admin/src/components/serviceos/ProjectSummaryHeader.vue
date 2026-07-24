@@ -2,7 +2,6 @@
 import StatusPill from '../StatusPill.vue'
 
 withDefaults(defineProps<{
-  breadcrumb?: string
   projectName: string
   projectCode: string
   clientName: string
@@ -12,7 +11,6 @@ withDefaults(defineProps<{
   fulfillmentName: string
   version?: string | null
 }>(), {
-  breadcrumb: '客户与项目 / 项目管理 / 项目运营工作区',
   version: null,
 })
 </script>
@@ -20,7 +18,6 @@ withDefaults(defineProps<{
 <template>
   <header class="sos-project-summary-header">
     <div class="sos-project-summary-header__title">
-      <p class="breadcrumb">{{ breadcrumb }}</p>
       <div class="sos-project-summary-header__name">
         <h1>{{ projectName }}</h1>
         <StatusPill :tone="statusTone" :label="statusLabel" />

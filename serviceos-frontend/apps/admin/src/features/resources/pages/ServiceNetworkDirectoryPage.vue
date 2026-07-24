@@ -87,7 +87,7 @@ async function submitNetwork() {
 <template>
   <div class="resource-page">
     <div class="page-heading inline">
-      <div><p class="breadcrumb">组织与资源 / 服务网点</p><h1>服务网点</h1><p>查看项目可用的合作网点、服务区域和在册师傅。网点不会进入企业内部组织层级。</p></div>
+      <h1>服务网点</h1>
       <div class="heading-actions"><Button v-if="canCreatePartner" @click="openCreatePartner">新增合作服务商</Button><Button v-if="canCreateNetwork" type="primary" @click="openCreateNetwork()">新建服务网点</Button></div>
     </div>
     <PageError v-if="directory.isError.value" :detail="directory.error.value?.message ?? '服务网点目录加载失败'" />

@@ -19,7 +19,7 @@ const items = computed(() => {
 
 <template>
   <div class="resource-page">
-    <div class="page-heading inline"><div><p class="breadcrumb">组织与资源 / 师傅档案</p><h1>师傅档案</h1><p>统一查看师傅的在册网点、现场作业端和总部审核资质，档案启用不等于自动满足派单条件。</p></div></div>
+    <div class="page-heading inline"><h1>师傅档案</h1></div>
     <PageError v-if="directory.isError.value" :detail="directory.error.value?.message ?? '师傅档案加载失败'" />
     <section v-else class="directory-panel">
       <div class="resource-filter"><Input v-model:value="keyword" placeholder="搜索师傅姓名或服务网点" allow-clear><template #prefix><SearchOutlined /></template></Input></div>

@@ -29,7 +29,6 @@ html, body, #app { width: 100%; min-height: 100%; }
 .page-heading.inline { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .page-heading h1 { margin: 3px 0 4px; font-size: 23px; line-height: 1.35; color: var(--sos-text-heading); }
 .page-heading p { margin: 0; color: var(--sos-text-secondary); font-size: 13px; }
-.page-heading .breadcrumb { color: var(--sos-text-secondary); font-size: 12px; font-weight: 600; }
 .heading-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 9px; padding-top: 8px; }
 
 .directory-panel { margin-top: 14px; border: 1px solid var(--sos-border); border-radius: var(--sos-radius); background: var(--sos-surface); }
@@ -208,7 +207,6 @@ html, body, #app { width: 100%; min-height: 100%; }
 .project-operations-header__title, .fulfillment-blueprint-header > div:first-child, .workorder-ops-header__title { min-width: 0; }
 .project-operations-header h1, .fulfillment-blueprint-header h1, .workorder-ops-header h1 { margin: 3px 0 4px; color: var(--sos-text-heading); font-size: 23px; line-height: 1.3; letter-spacing: -.3px; }
 .project-operations-header p, .fulfillment-blueprint-header p, .workorder-ops-header p { margin: 0; color: var(--sos-text-secondary); font-size: 13px; line-height: 1.6; }
-.breadcrumb { color: var(--sos-text-secondary) !important; font-size: 12px !important; font-weight: 600; }
 .project-operations-header__actions, .fulfillment-blueprint-header .heading-actions, .workorder-ops-header__meta { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 9px; padding-top: 8px; }
 .secondary-link-button { display: inline-flex; align-items: center; height: 34px; padding: 0 13px; border: 1px solid var(--sos-border); border-radius: 5px; background: var(--sos-surface); color: var(--sos-text-strong); font-size: 13px; font-weight: 600; }
 .secondary-link-button:hover { border-color: var(--sos-brand-border); color: var(--sos-brand); }
@@ -446,52 +444,6 @@ html, body, #app { width: 100%; min-height: 100%; }
   letter-spacing: -.35px;
 }
 
-.sos-directory-heading p:last-child {
-  margin: 0;
-  color: var(--sos-text-secondary);
-  font-size: 13px;
-}
-
-.sos-project-metric-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.sos-project-metric-card {
-  position: relative;
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-  min-height: 108px;
-  padding: 16px 17px;
-  border: 1px solid var(--sos-border);
-  border-radius: 8px;
-  background: var(--sos-surface);
-  box-shadow: 0 1px 3px rgb(15 23 42 / 4%);
-}
-
-.sos-project-metric-card::before {
-  position: absolute;
-  inset: 16px auto 16px 0;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--sos-border);
-  content: '';
-}
-
-.sos-project-metric-card--blue::before { background: var(--sos-brand); }
-.sos-project-metric-card--success::before { background: var(--sos-success); }
-.sos-project-metric-card--warning::before { background: var(--sos-warning); }
-.sos-project-metric-card--danger::before { background: var(--sos-danger); }
-.sos-project-metric-card > span { color: var(--sos-text-secondary); font-size: 12px; }
-.sos-project-metric-card > strong { overflow: hidden; color: var(--sos-text-heading); font-size: 25px; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
-.sos-project-metric-card--blue > strong { color: var(--sos-brand); }
-.sos-project-metric-card--success > strong { color: var(--sos-success-strong); }
-.sos-project-metric-card--warning > strong { color: var(--sos-warning-strong); }
-.sos-project-metric-card--danger > strong { color: var(--sos-danger-strong); }
-.sos-project-metric-card > small { overflow: hidden; color: var(--sos-text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-
 .sos-project-directory-surface {
   min-width: 0;
   overflow: hidden;
@@ -515,22 +467,17 @@ html, body, #app { width: 100%; min-height: 100%; }
 .sos-project-filter-bar > .ant-input-affix-wrapper { min-width: 0; width: 100%; }
 .sos-project-filter-bar > .ant-btn-link { padding-inline: 4px; }
 
-.sos-project-table { min-width: 1230px; }
-.sos-project-table th { padding: 0 12px; }
-.sos-project-table td { padding: 11px 12px; }
-.sos-project-table td:first-child { min-width: 205px; }
-.sos-project-table td:nth-child(2) { min-width: 110px; }
-.sos-project-table td:nth-child(3) { min-width: 130px; }
-.sos-project-table td:nth-child(4) { min-width: 150px; color: var(--sos-text-secondary); font-size: 12px; }
-.sos-project-table td:nth-child(6) { min-width: 168px; }
-.sos-project-table td:nth-child(9) { min-width: 126px; }
-.sos-project-table td:nth-child(10) { min-width: 92px; }
+.sos-project-vxe-grid { padding: 0 14px 12px; }
+.sos-project-vxe-grid .vxe-grid--pager-wrapper { border-top: 1px solid var(--sos-border); }
+.sos-project-name-cell { display: grid; gap: 2px; min-width: 0; }
+.sos-project-name-cell small { color: var(--sos-text-muted); font-size: 10px; }
+.sos-project-name-cell em { overflow: hidden; color: var(--sos-danger-strong); font-size: 10px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.sos-project-grid-empty { padding: 28px; color: var(--sos-text-muted); text-align: center; }
 .sos-project-plan-name { display: block; max-width: 180px; overflow: hidden; color: var(--sos-text-strong); font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .sos-version-chip { display: inline-flex; align-items: center; min-height: 22px; padding: 0 7px; border: 1px solid var(--sos-success-border); border-radius: 4px; background: var(--sos-success-soft); color: var(--sos-success-strong); font-size: 11px; font-weight: 700; }
 .sos-table-muted { color: var(--sos-text-muted); font-size: 11px; }
 .sos-table-action { white-space: nowrap; }
 .sos-table-action span { margin-left: 3px; font-size: 14px; }
-.sos-project-table-footer { display: flex; justify-content: space-between; gap: 14px; padding: 12px 15px; border-top: 1px solid var(--sos-border); color: var(--sos-text-muted); font-size: 11px; }
 
 .sos-project-summary-header {
   display: grid;
@@ -557,8 +504,6 @@ html, body, #app { width: 100%; min-height: 100%; }
 .sos-project-context-strip span { color: var(--sos-text-muted); font-size: 11px; }
 .sos-project-context-strip strong { overflow: hidden; color: var(--sos-text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 
-.project-ops-metric-row .sos-project-metric-card { min-height: 94px; padding: 13px 14px; }
-.project-ops-metric-row .sos-project-metric-card > strong { font-size: 21px; }
 .sos-business-timeline { display: grid; gap: 14px; min-width: 0; padding: 16px; border: 1px solid var(--sos-border); border-radius: 7px; background: var(--sos-surface); }
 .sos-business-timeline__list { display: grid; gap: 0; margin: 0; padding: 2px 0; list-style: none; }
 .sos-business-timeline__list li { display: grid; grid-template-columns: 66px 16px minmax(0, 1fr); gap: 10px; min-width: 0; min-height: 58px; }
@@ -718,7 +663,6 @@ html, body, #app { width: 100%; min-height: 100%; }
 .sos-inline-action { padding: 0; border: 0; background: transparent; color: var(--sos-brand); font-size: 10px; font-weight: 650; cursor: pointer; }
 .sos-inline-action:hover { color: var(--sos-brand-hover); text-decoration: underline; }
 .blueprint-version-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.blueprint-version-summary .sos-project-metric-card { min-height: 92px; }
 .blueprint-revision-note { display: grid; gap: 4px; padding: 12px 13px; border: 1px solid var(--sos-brand-border); border-radius: 6px; background: var(--sos-brand-panel); color: var(--sos-brand-panel-text); }
 .blueprint-revision-note strong { font-size: 12px; }
 .blueprint-revision-note span { font-size: 11px; line-height: 1.55; }
@@ -742,7 +686,6 @@ html, body, #app { width: 100%; min-height: 100%; }
 }
 
 @media (max-width: 1080px) {
-  .sos-project-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sos-project-filter-bar { grid-template-columns: minmax(200px, 1.5fr) repeat(2, minmax(125px, 1fr)) auto; }
   .sos-project-filter-bar > .ant-select:nth-of-type(3) { grid-column: 2; }
   .sos-project-filter-bar > .ant-select:nth-of-type(4) { grid-column: 3; }
@@ -763,8 +706,7 @@ html, body, #app { width: 100%; min-height: 100%; }
   .sos-project-filter-bar { grid-template-columns: 1fr 1fr; }
   .sos-project-filter-bar > :first-child { grid-column: 1 / -1; }
   .sos-project-filter-bar > .ant-select:nth-of-type(3), .sos-project-filter-bar > .ant-select:nth-of-type(4), .sos-project-filter-bar > .ant-btn-link { grid-column: auto; }
-  .sos-project-table-footer { align-items: flex-start; flex-direction: column; }
-  .sos-project-summary-header__facts, .sos-project-metric-grid, .blueprint-version-summary, .blueprint-evidence-grid { grid-template-columns: 1fr; }
+  .sos-project-summary-header__facts, .blueprint-version-summary, .blueprint-evidence-grid { grid-template-columns: 1fr; }
   .sos-project-summary-header__facts > div + div, .sos-project-summary-header__facts > div:nth-child(3), .sos-project-summary-header__facts > div:nth-child(4) { border-left: 0; border-top: 1px solid var(--sos-border); }
   .sos-project-context-strip { align-items: flex-start; flex-direction: column; gap: 5px; padding: 10px 12px; }
   .project-ops-metric-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }

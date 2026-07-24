@@ -42,7 +42,6 @@ import {
   useProjectFulfillmentProfilesQuery,
   useProjectFulfillmentDraftQuery,
 } from '../queries/use-project-fulfillment-query'
-import { useProjectWorkspaceQuery } from '../queries/use-project-workspace-query'
 
 type BlueprintSection =
   | 'base'
@@ -61,7 +60,6 @@ type BlueprintSection =
 const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => String(route.params.id ?? ''))
-const project = useProjectWorkspaceQuery(projectId)
 const profiles = useProjectFulfillmentProfilesQuery(projectId)
 const selectedProfileId = ref<string>()
 const selectedProfile = useProjectFulfillmentProfileQuery(projectId, selectedProfileId)
@@ -383,12 +381,10 @@ async function createProfile() {
   <div class="fulfillment-blueprint-page">
     <header class="fulfillment-blueprint-header">
       <div>
-        <p class="breadcrumb">客户与项目 / {{ project.data.value?.projectName ?? '项目' }} / 履约方案设计</p>
         <div class="fulfillment-blueprint-header__title-line">
           <h1>{{ selectedSummary?.profileName ?? '履约方案设计' }}</h1>
           <VersionBadge v-if="selectedProfile.data.value" :status="selectedProfile.data.value.status" :version="selectedProfile.data.value.activeVersion" />
         </div>
-        <p>流程、责任、任务、表单、证据和 SLA 作为一个方案版本设计与发布。</p>
       </div>
       <div class="heading-actions">
         <RouterLink class="secondary-link-button" :to="`/projects/${projectId}`">返回项目概览</RouterLink>

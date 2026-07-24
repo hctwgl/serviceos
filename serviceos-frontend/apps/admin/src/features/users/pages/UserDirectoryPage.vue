@@ -198,11 +198,7 @@ function closeDetail() {
   <div class="user-directory-page">
     <div class="page-heading inline">
       <div>
-        <p class="breadcrumb">
-          系统管理 / 用户管理
-        </p>
         <h1>用户管理</h1>
-        <p>管理平台用户主体、组织归属和角色授权。登录身份由 Keycloak 或企业身份提供方维护。</p>
       </div>
       <div class="heading-actions">
         <Button

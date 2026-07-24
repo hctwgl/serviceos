@@ -175,7 +175,6 @@ function copyOrderCode() {
       <template v-else>
         <section class="workorder-ops-header">
           <div class="workorder-ops-header__title">
-            <p class="breadcrumb">工单运营 / 工单工作区</p>
             <div class="workorder-code-line"><h1>{{ workspace.data.value.workspace.header.externalOrderCode }}</h1><button type="button" class="icon-link" aria-label="复制工单编号" @click="copyOrderCode"><CopyOutlined /></button><StatusPill tone="green" :label="workspace.data.value.statusName ?? '状态待确认'" /></div>
             <p>{{ workspace.data.value.clientName ?? '客户品牌待确认' }} · {{ workspace.data.value.projectName ?? '项目待确认' }} · {{ workspace.data.value.serviceName ?? '服务产品待确认' }}</p>
           </div>
