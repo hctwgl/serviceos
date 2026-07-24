@@ -1,19 +1,13 @@
 <script setup lang="ts">
 import type {
-  WorkOrderWorkspaceEvidenceItemSummary,
-  WorkOrderWorkspaceEvidenceSlotSummary,
   WorkOrderWorkspaceFormsEvidenceSectionData,
 } from '@serviceos/api-client'
 import { authorizeEvidenceRevisionDownload } from '@serviceos/api-client'
 import { useMutation } from '@tanstack/vue-query'
-import { Button, Empty, message } from '@serviceos/design-system'
+import { Empty, message } from '@serviceos/design-system'
 import { computed } from 'vue'
-import {
-  evidenceItemStatusLabel,
-  evidenceMediaTypeLabel,
-  evidenceRevisionStatusLabel,
-  formatDateTime,
-} from '../presenters/work-order'
+import { formatDateTime } from '../presenters/work-order'
+import EvidenceGallery from './serviceos/EvidenceGallery.vue'
 import StatusPill from './StatusPill.vue'
 
 /** 工单工作区「表单资料」区块：表单提交列表 + 资料槽位分组 + 受控预览。 */
@@ -22,16 +16,6 @@ const props = defineProps<{ data: WorkOrderWorkspaceFormsEvidenceSectionData | n
 const submissions = computed(() => props.data?.formSubmissions ?? [])
 const slots = computed(() => props.data?.evidenceSlots ?? [])
 const items = computed(() => props.data?.evidenceItems ?? [])
-
-const itemsBySlot = computed(() => {
-  const grouped = new Map<string, WorkOrderWorkspaceEvidenceItemSummary[]>()
-  for (const item of items.value) {
-    const list = grouped.get(item.evidenceSlotId) ?? []
-    list.push(item)
-    grouped.set(item.evidenceSlotId, list)
-  }
-  return grouped
-})
 
 const isEmpty = computed(
   () => !submissions.value.length && !slots.value.length && !items.value.length,
@@ -60,38 +44,6 @@ function submissionValues(submission: Record<string, unknown>) {
     : []
 }
 
-function slotStatusTone(slot: WorkOrderWorkspaceEvidenceSlotSummary) {
-  return slot.status.includes('FULFILLED') || slot.status.includes('SATISFIED') ? 'green' : 'gray'
-}
-
-function itemStatusTone(item: WorkOrderWorkspaceEvidenceItemSummary) {
-  if (item.status === 'ACCEPTED') return 'green'
-  if (item.status === 'REJECTED') return 'red'
-  if (item.status === 'UNDER_REVIEW' || item.status === 'SUBMITTED') return 'blue'
-  if (item.status === 'OPEN' && item.latestRevisionStatus === 'VALIDATED') return 'green'
-  if (item.status === 'OPEN' && item.latestRevisionStatus === 'VALIDATION_FAILED') return 'red'
-  if (
-    item.status === 'OPEN'
-    && (item.latestRevisionStatus === 'STORED' || item.latestRevisionStatus === 'VALIDATING')
-  ) return 'blue'
-  return 'gray'
-}
-
-/**
- * EvidenceItem 的 OPEN 表示仍可追加修订，不等于“尚未上传”。
- * 已存在修订时优先表达用户关心的上传/校验结果，避免把校验通过的资料误写成待提交。
- */
-function itemStatusLabel(item: WorkOrderWorkspaceEvidenceItemSummary) {
-  if (item.status !== 'OPEN' || !item.latestRevisionStatus) {
-    return evidenceItemStatusLabel(item.status)
-  }
-  if (item.latestRevisionStatus === 'VALIDATED') return '已上传'
-  if (item.latestRevisionStatus === 'VALIDATION_FAILED') return '校验未通过'
-  if (item.latestRevisionStatus === 'QUARANTINED') return '已隔离'
-  if (item.latestRevisionStatus === 'INVALIDATED') return '已作废'
-  return '处理中'
-}
-
 // 预览走受控授权：申请短时下载授权后新窗口打开，不内嵌永久 URL。
 const preview = useMutation({
   mutationFn: (revisionId: string) => authorizeEvidenceRevisionDownload(revisionId),
@@ -102,6 +54,10 @@ const preview = useMutation({
   onError: (error) =>
     message.error(error instanceof Error ? error.message : '资料预览授权失败，请稍后重试'),
 })
+
+const previewingRevisionId = computed(() => (
+  preview.isPending.value ? (preview.variables.value as string | undefined) ?? null : null
+))
 </script>
 
 <template>
@@ -157,73 +113,12 @@ const preview = useMutation({
         </article>
       </section>
 
-      <section class="fe-block">
-        <h3>资料槽位</h3>
-        <Empty
-          v-if="!slots.length"
-          description="暂无资料槽位"
-        />
-        <article
-          v-for="slot in slots"
-          :key="slot.slotId"
-          class="fe-card"
-        >
-          <header>
-            <strong>{{ slot.requirementName }}</strong>
-            <span class="fe-tags">
-              <em
-                v-if="slot.required"
-                class="fe-required"
-              >必传</em>
-              <span class="fe-media">{{ evidenceMediaTypeLabel(slot.mediaType) }}</span>
-              <StatusPill
-                :tone="slotStatusTone(slot)"
-                :label="slot.status"
-              />
-            </span>
-          </header>
-          <p class="fe-slot-meta">
-            要求 {{ slot.minCount }}～{{ slot.maxCount ?? '不限' }} 份 · {{ slot.templateKey }}
-          </p>
-          <ul
-            v-if="itemsBySlot.get(slot.slotId)?.length"
-            class="fe-item-list"
-          >
-            <li
-              v-for="item in itemsBySlot.get(slot.slotId)"
-              :key="item.evidenceItemId"
-            >
-              <div class="fe-item-main">
-                <strong>资料 {{ item.itemOrdinal }}</strong>
-                <StatusPill
-                  :tone="itemStatusTone(item)"
-                  :label="itemStatusLabel(item)"
-                />
-                <span class="fe-item-meta">
-                  {{ item.latestRevisionNumber ? `第 ${item.latestRevisionNumber} 版` : '暂无版本' }}
-                  <template v-if="item.latestRevisionStatus">
-                    · {{ evidenceRevisionStatusLabel(item.latestRevisionStatus) }}
-                  </template>
-                </span>
-              </div>
-              <Button
-                v-if="item.latestRevisionId"
-                size="small"
-                :loading="preview.isPending.value && preview.variables.value === item.latestRevisionId"
-                @click="preview.mutate(item.latestRevisionId!)"
-              >
-                预览资料
-              </Button>
-            </li>
-          </ul>
-          <p
-            v-else
-            class="fe-slot-empty"
-          >
-            该槽位暂未提交资料
-          </p>
-        </article>
-      </section>
+      <EvidenceGallery
+        :slots="slots"
+        :items="items"
+        :previewing-revision-id="previewingRevisionId"
+        @preview="preview.mutate"
+      />
     </template>
   </div>
 </template>
