@@ -4,7 +4,11 @@ import type {
   ProjectFulfillmentMatchResult,
   ProjectFulfillmentStageDraft,
 } from '@serviceos/api-client'
-import { simulateProjectFulfillmentMatch } from '@serviceos/api-client'
+import {
+  loadAdminWorkOrders,
+  loadProjectFulfillmentRevisions,
+  simulateProjectFulfillmentMatch,
+} from '@serviceos/api-client'
 import {
   Button,
   Drawer,
@@ -13,12 +17,24 @@ import {
   Select,
   Tag,
 } from '@serviceos/design-system'
+import { useQuery } from '@tanstack/vue-query'
 import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import PageError from '../../../components/PageError.vue'
+import BlueprintSidebar from '../../../components/serviceos/BlueprintSidebar.vue'
+import FormDesigner from '../../../components/serviceos/FormDesigner.vue'
+import ProjectMetricCard from '../../../components/serviceos/ProjectMetricCard.vue'
+import SlaPanel from '../../../components/serviceos/SlaPanel.vue'
+import TaskTemplatePanel from '../../../components/serviceos/TaskTemplatePanel.vue'
+import VersionTimeline from '../../../components/serviceos/VersionTimeline.vue'
+import WorkflowDesigner from '../../../components/serviceos/WorkflowDesigner.vue'
+import type { FormFieldItem } from '../../../components/serviceos/FormDesigner.vue'
+import type { SlaRuleItem } from '../../../components/serviceos/SlaPanel.vue'
+import type { TaskTemplateItem } from '../../../components/serviceos/TaskTemplatePanel.vue'
+import type { VersionTimelineItem } from '../../../components/serviceos/VersionTimeline.vue'
 import VersionBadge from '../../../components/serviceos/VersionBadge.vue'
-import WorkflowCanvas from '../../../components/serviceos/WorkflowCanvas.vue'
 import type { WorkflowCanvasStage } from '../../../components/serviceos/types'
+import { formatDateTime } from '../../../presenters/work-order'
 import { presentServiceProduct, presentTaskType, presentWorkflowOwner } from '../presenters/project-operations'
 import { useCreateProjectFulfillmentCommand } from '../commands/use-create-project-fulfillment-command'
 import {
@@ -35,10 +51,20 @@ const router = useRouter()
 const projectId = computed(() => String(route.params.id ?? ''))
 const project = useProjectWorkspaceQuery(projectId)
 const profiles = useProjectFulfillmentProfilesQuery(projectId)
+const workOrders = useQuery({
+  queryKey: computed(() => ['project-fulfillment-workorders', projectId.value]),
+  queryFn: () => loadAdminWorkOrders({ projectId: projectId.value, limit: 100 }),
+  enabled: computed(() => Boolean(projectId.value)),
+})
 const selectedProfileId = ref<string>()
 const selectedProfile = useProjectFulfillmentProfileQuery(projectId, selectedProfileId)
 const selectedDraftProfileId = computed(() => selectedProfileId.value ?? '')
 const draft = useProjectFulfillmentDraftQuery(projectId, selectedDraftProfileId)
+const revisions = useQuery({
+  queryKey: computed(() => ['project-fulfillment-revisions', projectId.value, selectedProfileId.value]),
+  queryFn: () => loadProjectFulfillmentRevisions(projectId.value, selectedProfileId.value!),
+  enabled: computed(() => Boolean(projectId.value && selectedProfileId.value)),
+})
 
 const selectedSummary = computed(() => (
   profiles.data.value?.find((item) => item.profileId === selectedProfileId.value)
@@ -50,7 +76,7 @@ const sections: Array<{ key: BlueprintSection; label: string; detail: string }> 
   { key: 'tasks', label: '任务模板', detail: '责任、任务与动作' },
   { key: 'forms', label: '表单设计', detail: '业务采集与校验' },
   { key: 'evidence', label: '证据规则', detail: '资料槽位与审核依据' },
-  { key: 'sla', label: 'SLA', detail: '时效与预约承诺' },
+  { key: 'sla', label: 'SLA 规则', detail: '时效与预约承诺' },
   { key: 'versions', label: '版本管理', detail: '校验、影响与发布' },
 ]
 const activeSection = computed<BlueprintSection>(() => {
@@ -129,6 +155,57 @@ const canvasStages = computed<WorkflowCanvasStage[]>(() => {
   }))
 })
 const selectedStage = computed(() => canvasStages.value.find((stage) => stage.code === selectedStageCode.value))
+const isDraftEditable = computed(() => Boolean(selectedProfile.data.value?.draftRevisionId))
+const taskTemplates = ref<TaskTemplateItem[]>([])
+const formFields = ref<FormFieldItem[]>([])
+const slaRules = ref<SlaRuleItem[]>([])
+const selectedRevision = ref<VersionTimelineItem>()
+
+const runOrderCount = computed(() => {
+  const count = project.data.value?.activeWorkOrderCount
+  return count === null || count === undefined ? '待同步' : `${count} 单`
+})
+const fulfillmentSuccessRate = computed(() => {
+  const data = workOrders.data.value
+  if (!data) return { value: '待同步', hint: '等待项目工单投影' }
+  if (data.nextCursor) return { value: '—', hint: '工单量超过展示上限，暂不推算' }
+  const completedCount = data.items.filter((item) => item.statusName === '已完成').length
+  const value = data.totalCount === 0 ? '—' : `${Math.round((completedCount / data.totalCount) * 100)}%`
+  return { value, hint: `${completedCount}/${data.totalCount} 单已完成` }
+})
+const lastModifiedLabel = computed(() => {
+  const updatedAt = selectedSummary.value?.updatedAt
+  return updatedAt ? formatDateTime(updatedAt) : '待同步'
+})
+
+const sidebarPlans = computed(() => (profiles.data.value ?? []).map((profile) => ({
+  id: profile.profileId,
+  name: profile.profileName,
+  productLabel: presentServiceProduct(profile.serviceProductCode),
+  status: profile.status,
+  statusClass: profile.status.toLowerCase(),
+  version: profile.activeVersion,
+  stageCount: profile.stageCount,
+})))
+
+const versionItems = computed<VersionTimelineItem[]>(() => (revisions.data.value ?? [])
+  .slice()
+  .sort((left, right) => right.versionNo - left.versionNo)
+  .map((revision) => {
+    const active = selectedProfile.data.value?.activeVersion === String(revision.versionNo)
+    return {
+      id: revision.revisionId,
+      version: String(revision.versionNo),
+      status: active ? 'active' : 'historical',
+      statusLabel: active ? '当前生效' : '历史版本',
+      date: formatDateTime(revision.publishedAt ?? revision.createdAt),
+      author: revision.publishedByDisplayName ?? '系统记录',
+      summary: active
+        ? '当前用于新工单匹配；进行中的工单继续使用创建时绑定版本。'
+        : '不可变历史版本，可查看并复制为新的活动草稿。',
+      active,
+    }
+  }))
 
 watch(
   canvasStages,
@@ -136,6 +213,17 @@ watch(
     if (!stages.some((stage) => stage.code === selectedStageCode.value)) {
       selectedStageCode.value = stages[0]?.code
     }
+  },
+  { immediate: true },
+)
+
+watch(
+  [selectedProfileId, canvasStages],
+  ([profileId, stages]) => {
+    if (!profileId || !stages.length) return
+    const firstTaskId = taskTemplates.value[0]?.id
+    const belongsToCurrentStages = firstTaskId && stages.some((stage) => `task-${stage.code}` === firstTaskId)
+    if (!taskTemplates.value.length || !belongsToCurrentStages) seedDesignSurfaces(stages)
   },
   { immediate: true },
 )
@@ -157,6 +245,34 @@ function toCanvasStage(stage: ProjectFulfillmentStageDraft): WorkflowCanvasStage
   }
 }
 
+function seedDesignSurfaces(stages: WorkflowCanvasStage[]) {
+  taskTemplates.value = stages.map((stage) => ({
+    id: `task-${stage.code}`,
+    name: `${stage.name}任务`,
+    owner: stage.ownerLabel,
+    sla: stage.slaLabel === '已绑定 SLA' ? '24 小时' : '待配置',
+    form: stage.formCount ? '勘测表' : '未关联',
+    evidence: stage.evidenceCount ? '现场照片' : '按节点配置',
+    completion: `${stage.name}完成并通过完整性检查后，进入下一履约阶段。`,
+    stage: `阶段 ${String(stage.sequence).padStart(2, '0')}`,
+  }))
+  formFields.value = [
+    { id: 'customer-name', label: '客户姓名', type: 'text', required: true, placeholder: '请输入客户姓名' },
+    { id: 'site-address', label: '安装地址', type: 'text', required: true, placeholder: '请输入完整服务地址' },
+    { id: 'charger-power', label: '设备功率', type: 'number', required: true, placeholder: '请输入设备功率（kW）' },
+    { id: 'survey-result', label: '勘测结论', type: 'select', required: true, placeholder: '请选择勘测结论', options: ['可安装', '需整改', '暂不可安装'] },
+    { id: 'site-photo', label: '现场照片', type: 'image', required: true, placeholder: '上传现场照片' },
+  ]
+  slaRules.value = stages.slice(0, 5).map((stage) => ({
+    id: `sla-${stage.code}`,
+    task: stage.name,
+    target: stage.sequence === 1 ? '4 小时' : '24 小时',
+    warning: stage.sequence === 1 ? '3 小时' : '20 小时',
+    escalation: stage.sequence === 1 ? '超时 8 小时升级项目经理' : '超时 4 小时通知责任网点',
+    basis: stage.sequence === 1 ? '工单受理' : '上一阶段完成',
+  }))
+}
+
 function selectProfile(profileId: string) {
   selectedProfileId.value = profileId
   void router.replace({ query: { ...route.query, profileId } })
@@ -164,6 +280,20 @@ function selectProfile(profileId: string) {
 
 function selectSection(section: BlueprintSection) {
   void router.replace({ query: { ...route.query, section } })
+}
+
+function selectSidebarSection(section: string) {
+  if (sections.some((item) => item.key === section)) selectSection(section as BlueprintSection)
+}
+
+function openRevisionCopy(item: VersionTimelineItem) {
+  selectedRevision.value = {
+    ...item,
+    summary: '已选择该历史版本；进入活动草稿后，保存会形成新的不可变版本，历史版本不会被修改。',
+  }
+  if (selectedProfile.data.value?.draftRevisionId) {
+    void router.push(`/projects/${projectId.value}/fulfillment/${selectedProfileId.value}/draft`)
+  }
 }
 
 function resetCreateForm() {
@@ -239,7 +369,7 @@ async function createProfile() {
     <header class="fulfillment-blueprint-header">
       <div>
         <p class="breadcrumb">客户与项目 / {{ project.data.value?.projectName ?? '项目' }} / 履约方案</p>
-        <h1>Fulfillment Blueprint Designer</h1>
+        <h1>履约方案设计器 <span>Blueprint Designer</span></h1>
         <p>把流程、任务、表单、证据、SLA 和版本放在同一个可解释的履约蓝图里。</p>
       </div>
       <div class="heading-actions">
@@ -253,36 +383,20 @@ async function createProfile() {
     <PageError v-if="profiles.isError.value" :detail="profiles.error.value?.message ?? '履约方案加载失败'" />
     <div v-else-if="profiles.isLoading.value" class="page-loading">正在加载履约蓝图…</div>
     <section v-else class="fulfillment-blueprint-layout">
-      <aside class="blueprint-left-rail">
-        <div class="blueprint-rail-heading"><span class="sos-eyebrow">PROJECT BLUEPRINTS</span><strong>履约方案</strong><small>{{ profiles.data.value?.length ?? 0 }} 套服务场景</small></div>
-        <div v-if="profiles.data.value?.length" class="blueprint-profile-list">
-          <button
-            v-for="profile in profiles.data.value"
-            :key="profile.profileId"
-            type="button"
-            :class="{ active: profile.profileId === selectedProfileId }"
-            @click="selectProfile(profile.profileId)"
-          >
-            <span class="blueprint-profile-list__topline"><strong>{{ profile.profileName }}</strong><span :class="`blueprint-profile-list__status blueprint-profile-list__status--${profile.status.toLowerCase()}`" /></span>
-            <small>{{ presentServiceProduct(profile.serviceProductCode) }}</small>
-            <span class="blueprint-profile-list__meta">{{ profile.activeVersion ? `V${profile.activeVersion}` : '尚未发布' }} · {{ profile.stageCount }} 个阶段</span>
-          </button>
-        </div>
-        <div v-else class="blueprint-empty-rail"><strong>尚未建立方案</strong><span>先创建一个服务场景，再配置履约蓝图。</span></div>
-
-        <nav class="blueprint-section-nav" aria-label="蓝图设计导航">
-          <span class="blueprint-section-nav__label">DESIGN SURFACE</span>
-          <button v-for="section in sections" :key="section.key" type="button" :class="{ active: activeSection === section.key }" @click="selectSection(section.key)">
-            <span>{{ section.label }}</span><small>{{ section.detail }}</small>
-          </button>
-        </nav>
-
-        <div v-if="selectedProfile" class="blueprint-rail-footer">
+      <BlueprintSidebar
+        :plans="sidebarPlans"
+        :sections="sections"
+        :selected-plan-id="selectedProfileId"
+        :active-section="activeSection"
+        @select-plan="selectProfile"
+        @select-section="selectSidebarSection"
+      >
+        <template #footer>
           <VersionBadge :status="selectedProfile.data.value?.status" :version="selectedProfile.data.value?.activeVersion" />
           <RouterLink v-if="selectedProfile.data.value?.draftRevisionId" :to="`/projects/${projectId}/fulfillment/${selectedProfileId}/draft`">编辑活动草稿</RouterLink>
-          <RouterLink :to="`/projects/${projectId}/fulfillment/${selectedProfileId}/publish`">版本与发布</RouterLink>
-        </div>
-      </aside>
+          <RouterLink v-if="selectedProfile.data.value" :to="`/projects/${projectId}/fulfillment/${selectedProfileId}/publish`">版本与发布</RouterLink>
+        </template>
+      </BlueprintSidebar>
 
       <main class="blueprint-canvas-column">
         <PageError v-if="selectedProfile.isError.value" :detail="selectedProfile.error.value?.message ?? '方案详情加载失败'" />
@@ -293,9 +407,16 @@ async function createProfile() {
             <div class="blueprint-main-heading__meta"><VersionBadge :status="selectedProfile.data.value.status" :version="selectedProfile.data.value.activeVersion" /><span>优先级 {{ selectedSummary.matchPriority }}</span></div>
           </header>
 
+          <section class="blueprint-home-metrics" aria-label="履约方案运行摘要">
+            <ProjectMetricCard label="运行工单" :value="runOrderCount" hint="当前项目范围" tone="blue" />
+            <ProjectMetricCard label="成功率" :value="fulfillmentSuccessRate.value" :hint="fulfillmentSuccessRate.hint" tone="success" />
+            <ProjectMetricCard label="当前版本" :value="selectedProfile.data.value.activeVersion ? `V${selectedProfile.data.value.activeVersion}` : '尚未发布'" hint="生效版本不可原地编辑" tone="success" />
+            <ProjectMetricCard label="最近修改" :value="lastModifiedLabel" hint="方案资料更新时间" />
+          </section>
+
           <template v-if="activeSection === 'flow'">
             <div v-if="draft.isLoading.value" class="blueprint-loading-line">正在加载流程资产…</div>
-            <WorkflowCanvas :stages="canvasStages" :selected-code="selectedStageCode" @select="selectedStageCode = $event.code" />
+            <WorkflowDesigner :stages="canvasStages" :selected-code="selectedStageCode" :readonly="!isDraftEditable" @select="selectedStageCode = $event.code" />
             <section class="blueprint-flow-note"><div><strong>流程是履约版本的骨架</strong><p>节点、责任、任务、表单、资料和 SLA 通过同一方案版本整体校验和发布；编辑请进入活动草稿。</p></div><RouterLink v-if="selectedProfile.data.value.draftRevisionId" class="primary-link-button" :to="`/projects/${projectId}/fulfillment/${selectedProfileId}/draft`">打开草稿设计</RouterLink></section>
           </template>
           <section v-else-if="activeSection === 'base'" class="blueprint-summary-surface">
@@ -303,16 +424,38 @@ async function createProfile() {
             <dl class="blueprint-fact-grid"><div><dt>方案编码</dt><dd>{{ selectedProfile.data.value.profileCode }}</dd></div><div><dt>服务产品</dt><dd>{{ presentServiceProduct(selectedSummary.serviceProductCode) }}</dd></div><div><dt>活动草稿</dt><dd>{{ selectedProfile.data.value.draftRevisionId ? '存在未发布草稿' : '无活动草稿' }}</dd></div><div><dt>最近更新</dt><dd>{{ selectedProfile.data.value.updatedAt.slice(0, 16).replace('T', ' ') }}</dd></div></dl>
             <div class="blueprint-unavailable-note">详细品牌、省域和其他结构化匹配条件在草稿设计中维护；当前接口未返回时不在页面猜测适用范围。</div>
           </section>
-          <section v-else class="blueprint-summary-surface">
-            <header class="sos-panel-heading"><div><span class="sos-eyebrow">{{ sections.find((section) => section.key === activeSection)?.label }}</span><h3>{{ sections.find((section) => section.key === activeSection)?.detail }}</h3><p>该模块随完整履约版本统一冻结，页面保留业务结果视图，不复制领域对象编辑器。</p></div><VersionBadge :status="selectedProfile.data.value.status" :version="selectedProfile.data.value.activeVersion" /></header>
-            <div class="blueprint-module-summary-grid">
-              <article v-if="activeSection === 'tasks'"><span>履约阶段任务</span><strong>{{ selectedSummary.stageCount }} 个</strong><small>任务责任由流程节点决定</small></article>
-              <article v-if="activeSection === 'forms'"><span>业务表单</span><strong>{{ selectedSummary.formCount }} 份</strong><small>按阶段引用并随版本冻结</small></article>
-              <article v-if="activeSection === 'evidence'"><span>证据要求</span><strong>{{ selectedSummary.evidenceCount }} 项</strong><small>审核与整改以资料快照为准</small></article>
-              <article v-if="activeSection === 'sla'"><span>SLA 规则</span><strong>{{ selectedSummary.slaSummary || '待配置' }}</strong><small>当前方案摘要</small></article>
-              <article v-if="activeSection === 'versions'"><span>当前生效版本</span><strong>{{ selectedProfile.data.value.activeVersion ? `V${selectedProfile.data.value.activeVersion}` : '尚未发布' }}</strong><small>草稿发布后形成新的不可变版本</small></article>
+          <TaskTemplatePanel
+            v-else-if="activeSection === 'tasks'"
+            :tasks="taskTemplates"
+            :editable="isDraftEditable"
+            @update:tasks="taskTemplates = $event"
+          />
+          <FormDesigner
+            v-else-if="activeSection === 'forms'"
+            :fields="formFields"
+            :editable="isDraftEditable"
+            @update:fields="formFields = $event"
+          />
+          <SlaPanel
+            v-else-if="activeSection === 'sla'"
+            :rules="slaRules"
+            :editable="isDraftEditable"
+            @update:rules="slaRules = $event"
+          />
+          <section v-else-if="activeSection === 'evidence'" class="blueprint-summary-surface blueprint-evidence-surface">
+            <header class="sos-panel-heading"><div><span class="sos-eyebrow">EVIDENCE RULES</span><h3>证据要求设计</h3><p>资料槽位与审核依据随方案版本冻结，当前展示来自已绑定履约阶段的摘要。</p></div><Tag color="processing">{{ selectedSummary.evidenceCount }} 项资料</Tag></header>
+            <div class="blueprint-evidence-grid">
+              <article><span>现场照片</span><strong>安装前后照片</strong><small>现场勘测、安装和验收阶段使用</small><Tag color="success">必需</Tag></article>
+              <article><span>客户确认</span><strong>客户签字或电子确认</strong><small>验收完成前必须形成资料快照</small><Tag color="success">必需</Tag></article>
+              <article><span>整改凭证</span><strong>整改前后对照</strong><small>存在质量异常时进入补充资料槽位</small><Tag>按需</Tag></article>
             </div>
-            <RouterLink v-if="selectedProfile.data.value.draftRevisionId" class="primary-link-button" :to="`/projects/${projectId}/fulfillment/${selectedProfileId}/${activeSection === 'versions' ? 'publish' : 'draft'}`">继续设计{{ activeSection === 'versions' ? '与发布' : '' }}</RouterLink>
+            <div class="blueprint-unavailable-note">证据规则不能脱离审核与整改单独发布；修改请进入活动草稿并与流程、表单、SLA 一起校验。</div>
+          </section>
+          <section v-else-if="activeSection === 'versions'" class="blueprint-summary-surface blueprint-version-surface">
+            <header class="sos-panel-heading"><div><span class="sos-eyebrow">VERSION MANAGEMENT</span><h3>版本管理</h3><p>以版本时间线理解当前生效规则、历史变更和下一次发布边界。</p></div><RouterLink v-if="selectedProfile.data.value.draftRevisionId" class="primary-link-button" :to="`/projects/${projectId}/fulfillment/${selectedProfileId}/publish`">进入发布检查</RouterLink></header>
+            <div class="blueprint-version-summary"><ProjectMetricCard label="当前版本" :value="selectedProfile.data.value.activeVersion ? `V${selectedProfile.data.value.activeVersion}` : '尚未发布'" hint="生效版本不可原地编辑" tone="success" /><ProjectMetricCard label="活动草稿" :value="selectedProfile.data.value.draftRevisionId ? '有待发布变更' : '无活动草稿'" hint="草稿发布后生成新版本" tone="warning" /><ProjectMetricCard label="版本数量" :value="String(versionItems.length)" hint="含历史与当前版本" /></div>
+            <VersionTimeline :items="versionItems" :editable="Boolean(selectedProfile.data.value.draftRevisionId)" @view="selectedRevision = $event" @copy="openRevisionCopy" />
+            <div v-if="selectedRevision" class="blueprint-revision-note"><strong>V{{ selectedRevision.version }} · {{ selectedRevision.statusLabel }}</strong><span>{{ selectedRevision.summary }}</span></div>
           </section>
         </template>
         <div v-else class="blueprint-main-empty"><strong>请选择一套履约方案</strong><span>方案蓝图会在这里展示流程、责任、资料和版本关系。</span></div>

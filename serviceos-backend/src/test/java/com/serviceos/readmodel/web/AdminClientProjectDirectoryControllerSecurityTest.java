@@ -55,7 +55,7 @@ class AdminClientProjectDirectoryControllerSecurityTest {
                 List.of(new AdminClientProjectDirectoryView.ProjectItem(
                         UUID.randomUUID(), "BYD-SD-HOME", "比亚迪山东家充服务项目", "BYD", "比亚迪汽车",
                         LocalDate.parse("2026-01-01"), null, List.of("济南市"), 1, "ACTIVE",
-                        1, 0, "PUBLISHED", true, null)),
+                        1, 0, "家充勘测安装标准流程", "3", now, "PUBLISHED", true, null)),
                 List.of("CREATE_CLIENT", "CREATE_BRAND"), now));
 
         mvc.perform(get("/api/v1/admin/client-project-directory")

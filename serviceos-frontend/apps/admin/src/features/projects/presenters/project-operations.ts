@@ -1,6 +1,7 @@
 import type {
   AdminProjectFulfillmentProfile,
   AdminProjectWorkspaceView,
+  ProjectFulfillmentStageDraft,
 } from '@serviceos/api-client'
 import type { AdminWorkOrderDirectoryItem, AdminWorkOrderDirectoryView } from '@serviceos/api-client'
 import { formatDateTime } from '../../../presenters/work-order'
@@ -85,9 +86,16 @@ export function buildProjectStageBar(
   project: AdminProjectWorkspaceView | undefined,
   profiles: AdminProjectFulfillmentProfile[],
   workOrders: AdminWorkOrderDirectoryView | undefined,
+  fulfillmentStages: ProjectFulfillmentStageDraft[] = [],
 ): ProjectStageBarItem[] {
   const profile = profiles.find((item) => item.status === 'ACTIVE') ?? profiles[0]
-  const names = workflowStageNames(profile)
+  const names = fulfillmentStages.length
+    ? fulfillmentStages
+        .slice()
+        .sort((left, right) => left.sequence - right.sequence)
+        .map((stage) => stage.stageName)
+        .filter(Boolean)
+    : workflowStageNames(profile)
   if (!names.length) return []
 
   const currentStageName = workOrders?.items.find((item) => item.stageName)?.stageName
