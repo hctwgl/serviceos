@@ -11,6 +11,7 @@ import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.reliability.spi.OutboxMessageHandler;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.CreateWorkflowTaskCommand;
+import com.serviceos.task.api.InputVersionRef;
 import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskCompletedPayload;
 import com.serviceos.task.api.TaskSchedulingService;
@@ -144,7 +145,8 @@ final class WorkflowTaskCompletedHandler
                 message.payloadDigest(),
                 current,
                 progression,
-                activatedAt);
+                activatedAt,
+                reviewSubmission(completed));
         inbox.complete(message.tenantId(), CONSUMER, message.eventId(), progressionDigest);
     }
 
@@ -217,7 +219,7 @@ final class WorkflowTaskCompletedHandler
         var progression = parser.progressionAfterTimer(asset, current.nodeId(), expressionContext);
         activateProgression(
                 timer.tenantId(), fireEventId, correlationId,
-                Sha256.digest(timerSubscriptionId.toString()), current, progression, now);
+                Sha256.digest(timerSubscriptionId.toString()), current, progression, now, null);
     }
 
     @Override
@@ -283,7 +285,7 @@ final class WorkflowTaskCompletedHandler
                 ("wait-wake:" + command.signalId()).getBytes());
         activateProgression(
                 command.tenantId(), activationEventId, command.correlationId(),
-                Sha256.digest(command.signalId()), current, progression, now);
+                Sha256.digest(command.signalId()), current, progression, now, null);
         return new WorkflowWaitSignalResult(
                 wait.waitSubscriptionId(), wait.workflowInstanceId(), wait.workOrderId(),
                 false, "COMPLETED");
@@ -301,7 +303,8 @@ final class WorkflowTaskCompletedHandler
             String payloadDigest,
             NodeRuntime current,
             WorkflowDefinitionParser.ProgressionDefinition progression,
-            Instant activatedAt
+            Instant activatedAt,
+            ReviewSubmission reviewSubmission
     ) {
         if (progression.joinPending()) {
             boolean complete = recordParallelJoinArrival(
@@ -317,7 +320,7 @@ final class WorkflowTaskCompletedHandler
             var afterJoin = parser.progressionAfterJoin(asset, progression.nodeId(), expressionContext);
             return activateProgression(
                     tenantId, activationEventId, correlationId, payloadDigest,
-                    current, afterJoin, activatedAt);
+                    current, afterJoin, activatedAt, reviewSubmission);
         }
         if (progression.fork()) {
             NodeRuntime branchCurrent = current;
@@ -335,7 +338,7 @@ final class WorkflowTaskCompletedHandler
             for (var branch : progression.forkBranches()) {
                 digest.append('|').append(activateProgression(
                         tenantId, activationEventId, correlationId, payloadDigest,
-                        branchCurrent, branch, activatedAt));
+                        branchCurrent, branch, activatedAt, reviewSubmission));
             }
             return Sha256.digest(current.workflowNodeInstanceId() + "|FORK|" + progression.nodeId()
                     + digest);
@@ -427,6 +430,20 @@ final class WorkflowTaskCompletedHandler
                         markEarlyReviewSignalConsumed(tenantId, current.workOrderId(), activatedAt);
                         return Sha256.digest(current.workflowNodeInstanceId() + "|WAIT_EARLY|"
                                 + nextNodeInstanceId + "|" + woke.waitSubscriptionId());
+                    }
+                    if (reviewSubmission != null) {
+                        append(
+                                tenantId, activationEventId, correlationId,
+                                current.workOrderId().toString(),
+                                "workflow.review-submission-required", "Workflow",
+                                current.workflowInstanceId(), current.workflowVersion(),
+                                new ReviewSubmissionRequiredPayload(
+                                        current.workflowInstanceId(), nextNodeInstanceId,
+                                        current.projectId(), current.workOrderId(),
+                                        reviewSubmission.sourceTaskId(),
+                                        reviewSubmission.evidenceSetSnapshotId(),
+                                        reviewSubmission.snapshotContentDigest(), activatedAt),
+                                activatedAt);
                     }
                 }
                 return Sha256.digest(current.workflowNodeInstanceId() + "|WAIT|" + nextNodeInstanceId
@@ -1102,7 +1119,7 @@ final class WorkflowTaskCompletedHandler
                 parentAsset, link.parentNodeId(), expressionContext);
         activateProgression(
                 tenantId, parentCompletionEventId, correlationId,
-                Sha256.digest(link.linkId().toString()), parent, progression, completedAt);
+                Sha256.digest(link.linkId().toString()), parent, progression, completedAt, null);
     }
 
     private record SubProcessLink(
@@ -1395,7 +1412,46 @@ final class WorkflowTaskCompletedHandler
                 .update();
     }
 
+    private static ReviewSubmission reviewSubmission(TaskCompletedPayload completed) {
+        InputVersionRef evidenceInput = completed.inputVersionRefs().stream()
+                .filter(input -> InputVersionRef.EVIDENCE_SET_SNAPSHOT.equals(input.kind()))
+                .findFirst()
+                .orElse(null);
+        String ref = evidenceInput == null ? completed.resultRef() : evidenceInput.ref();
+        String digest = evidenceInput == null ? completed.resultDigest() : evidenceInput.digest();
+        String prefix = "evidence-set-snapshot://";
+        if (ref == null || !ref.startsWith(prefix) || digest == null
+                || !digest.matches("[0-9a-f]{64}")) {
+            return null;
+        }
+        try {
+            return new ReviewSubmission(
+                    completed.taskId(), UUID.fromString(ref.substring(prefix.length())), digest);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("TaskCompleted 资料快照引用非法", exception);
+        }
+    }
+
     private record EarlyReviewSignal(String signalId, String correlationId) {
+    }
+
+    private record ReviewSubmission(
+            UUID sourceTaskId,
+            UUID evidenceSetSnapshotId,
+            String snapshotContentDigest
+    ) {
+    }
+
+    private record ReviewSubmissionRequiredPayload(
+            UUID workflowInstanceId,
+            UUID reviewNodeInstanceId,
+            UUID projectId,
+            UUID workOrderId,
+            UUID sourceTaskId,
+            UUID evidenceSetSnapshotId,
+            String snapshotContentDigest,
+            Instant requiredAt
+    ) {
     }
 
     private record WaitSubscription(

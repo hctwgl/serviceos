@@ -88,6 +88,8 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 header,
                 new WorkOrderWorkspaceTaskSummary(
                         taskId, "SITE_SURVEY", "HUMAN", "READY", "SURVEY", null, 1),
+                List.of(new WorkOrderWorkspace.WorkOrderWorkspaceStageSummary(
+                        "SURVEY", 1, "ACTIVE", now.minusSeconds(80), null)),
                 Map.of("TASKS", "AVAILABLE", "SLA", "UNAVAILABLE", "EXCEPTIONS", "UNAVAILABLE",
                         "SERVICE_ASSIGNMENT", "AVAILABLE"),
                 "/api/v1/tasks/" + taskId + "/allowed-actions",

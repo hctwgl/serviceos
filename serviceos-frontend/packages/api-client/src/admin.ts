@@ -52,11 +52,19 @@ export type WorkOrderWorkspace = {
     updatedAt: string
     configurationBundleVersion: string
     version: number
+    currentStageCode: string | null
     currentAssigneeDisplayName: string | null
     currentNetworkDisplayName: string | null
     currentTechnicianDisplayName: string | null
   }
   currentTaskSummary: WorkOrderWorkspaceTask | null
+  workflowStages: Array<{
+    stageCode: string
+    sequenceNo: number
+    status: 'PENDING' | 'ACTIVE' | 'BLOCKED' | 'COMPLETED' | 'SKIPPED' | 'CANCELLED'
+    activatedAt: string
+    completedAt: string | null
+  }>
   allowedActionLink: string | null
   sectionAvailability: Record<string, 'AVAILABLE' | 'EMPTY' | 'UNAVAILABLE'>
   serviceAssignmentSummary: {
@@ -338,6 +346,25 @@ export type WorkOrderWorkspaceDeliveryAttemptSummary = {
   finishedAt: string | null
 }
 
+export type WorkOrderWorkspaceExternalAcknowledgementSummary = {
+  acknowledgementId: string
+  acknowledgementType: string
+  result: string
+  reasonCode: string | null
+  mappingVersionId: string
+  receivedAt: string
+}
+
+export type WorkOrderWorkspaceDeliveryReplaySummary = {
+  replayRequestId: string
+  executionTaskId: string | null
+  status: string
+  resultCode: string | null
+  requestedAt: string
+  startedAt: string | null
+  finishedAt: string | null
+}
+
 export type WorkOrderWorkspaceOutboundDeliverySummary = {
   deliveryId: string
   projectId: string
@@ -359,12 +386,22 @@ export type WorkOrderWorkspaceOutboundDeliverySummary = {
   deliveredAt: string | null
   acknowledgedAt: string | null
   attempts: WorkOrderWorkspaceDeliveryAttemptSummary[]
+  acknowledgements: WorkOrderWorkspaceExternalAcknowledgementSummary[]
+  replayRequests: WorkOrderWorkspaceDeliveryReplaySummary[]
 }
 
 export type WorkOrderWorkspaceIntegrationSectionData = {
   inboundEnvelopes: WorkOrderWorkspaceInboundEnvelopeSummary[] | null
   outboundDeliveries: WorkOrderWorkspaceOutboundDeliverySummary[] | null
   nextCursor: string | null
+}
+
+export type OutboundReviewSubmission = {
+  deliveryId: string
+  sourceReviewCaseId: string
+  sourceWorkOrderId: string
+  status: 'PENDING' | 'SENDING' | 'DELIVERED' | 'ACKNOWLEDGED' | 'REJECTED' | 'FAILED_FINAL' | 'UNKNOWN'
+  aggregateVersion: number
 }
 
 /** 工单工作区区块快照；只有被请求的那个 section 字段非空。 */
@@ -486,6 +523,15 @@ export function loadWorkspaceSection(workOrderId: string, section: string) {
   return get<WorkspaceSection>(`/work-orders/${workOrderId}/workspace/sections/${section}`).then(
     (result) => result.data,
   )
+}
+
+/** 将已通过的平台审核单提交车企；服务端按 sourceReviewCase 幂等复用既有 Delivery。 */
+export function createBydReviewSubmission(sourceReviewCaseId: string) {
+  return post<OutboundReviewSubmission>(
+    '/internal/integration/byd/review-submissions',
+    { sourceReviewCaseId },
+    { 'Idempotency-Key': newIdempotencyKey('submit-byd-review') },
+  ).then((result) => result.data)
 }
 
 export function loadNetworkCandidates(taskId: string) {

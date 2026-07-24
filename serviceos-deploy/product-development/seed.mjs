@@ -213,7 +213,8 @@ for (const assignment of [
 }
 
 const configurationFoundation = (await request(
-  `/product-development/projects/${project.id}/configuration-foundation`,
+  `/product-development/projects/${project.id}/configuration-foundation`
+    + `?projectCode=${encodeURIComponent(project.code)}`,
   { method: 'POST' },
 )).body
 
@@ -221,6 +222,8 @@ const profile = (await request(`/projects/${project.id}/fulfillment-profiles`, {
   method: 'POST', idempotencyKey: key('fulfillment-profile'),
   body: {
     serviceProductCode: 'HOME_CHARGING_SURVEY_INSTALL',
+    profileCode: 'BYD_SHANDONG_HOME_CHARGING_STANDARD',
+    matchPriority: 100,
     profileName: '家充勘测安装标准履约',
     description: '覆盖预约、勘测、安装、资料审核与车企回传的本地产品场景。',
     templateCode: 'HOME_CHARGING_SURVEY_INSTALL',
@@ -234,24 +237,76 @@ const profileDraft = (await request(
 // 文档中的引用只影响方案可读性与运行说明书，运行期任务模板仍以配置包内 WORKFLOW/FORM/EVIDENCE 资产为准。
 const documentWithRefs = {
   ...profileDraft.document,
-  stages: (profileDraft.document.stages ?? []).map((stage) => {
-    if (stage.stageCode === 'SURVEY') {
-      return {
-        ...stage,
-        slaRef: 'platform.home-charging.task-elapsed',
-        formRefs: ['product.byd-ocean.survey-form'],
-        evidenceRefs: ['product.byd-ocean.survey-evidence'],
-      }
-    }
-    if (stage.stageCode === 'INSTALLATION') {
-      return {
-        ...stage,
-        slaRef: 'platform.home-charging.task-elapsed',
-        evidenceRefs: ['product.byd-ocean.install-evidence'],
-      }
-    }
-    return stage
-  }),
+  matchRule: {
+    brandCodes: ['BYD_OCEAN'],
+    provinceCodes: ['370000'],
+  },
+  stages: [
+    {
+      stageCode: 'SURVEY',
+      stageName: '上门勘测',
+      sequence: 1,
+      stageType: 'USER_TASK',
+      taskType: 'FIELD_SURVEY',
+      ownerType: 'TECHNICIAN',
+      description: '责任师傅按勘测表单完成现场条件确认并采集资料。',
+      formRefs: ['product.byd-ocean.survey-form'],
+      evidenceRefs: ['product.byd-ocean.survey-evidence'],
+      actions: [],
+      transitions: [],
+      exceptionPaths: [],
+      slaRef: 'platform.home-charging.task-elapsed',
+      terminal: false,
+    },
+    {
+      stageCode: 'INSTALLATION',
+      stageName: '上门安装',
+      sequence: 2,
+      stageType: 'USER_TASK',
+      taskType: 'FIELD_INSTALL',
+      ownerType: 'TECHNICIAN',
+      description: '责任师傅完成安装、调试和完工资料采集。',
+      formRefs: [],
+      evidenceRefs: ['product.byd-ocean.install-evidence'],
+      actions: [],
+      transitions: [],
+      exceptionPaths: [],
+      slaRef: 'platform.home-charging.task-elapsed',
+      terminal: false,
+    },
+    {
+      stageCode: 'FINAL_REVIEW',
+      stageName: '资料审核',
+      sequence: 3,
+      stageType: 'REVIEW_TASK',
+      taskType: 'REVIEW',
+      ownerType: 'PLATFORM',
+      description: '平台审核完工资料并决定通过或进入整改。',
+      formRefs: [],
+      evidenceRefs: [],
+      actions: [],
+      transitions: [],
+      exceptionPaths: [],
+      slaRef: null,
+      terminal: false,
+    },
+    {
+      stageCode: 'CLIENT_CALLBACK',
+      stageName: '等待车企确认',
+      sequence: 4,
+      stageType: 'WAIT_EVENT',
+      taskType: null,
+      ownerType: 'SYSTEM',
+      description: '系统等待比亚迪回传确认后完成履约。',
+      formRefs: [],
+      evidenceRefs: [],
+      actions: [],
+      transitions: [],
+      exceptionPaths: [],
+      slaRef: null,
+      terminal: true,
+    },
+  ],
 }
 await request(`/projects/${project.id}/fulfillment-profiles/${profile.profileId}/draft`, {
   method: 'PUT',
@@ -294,6 +349,17 @@ function signByd(parameters, nonce, currentDate) {
     .digest('hex')
 }
 
+function currentShanghaiDate() {
+  // CPIM V7.3.1 的 Cur_Time 是中国标准时区业务日期，不是 UTC 日期。
+  // 本地场景常在北京时间午夜后重置，使用 toISOString 会回退到前一天并被验签失败关闭。
+  return new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+  }).format(new Date())
+}
+
 async function createInstallOrder(index, customerName, districtCode, districtName) {
   const suffix = String(index).padStart(3, '0')
   const parameters = {
@@ -311,7 +377,7 @@ async function createInstallOrder(index, customerName, districtCode, districtNam
     dealerName: '比亚迪汽车济南经销商', rightCode: `RIGHT-${suffix}`,
     orderAmount: 1280 + index * 20, source: '1', channel: 'CPIM',
   }
-  const currentDate = new Date().toISOString().slice(0, 10)
+  const currentDate = currentShanghaiDate()
   const nonce = randomUUID().replaceAll('-', '')
   const response = await fetch(`${baseUrl}/integrations/byd/cpim/v7.3.1/install-orders`, {
     method: 'POST',

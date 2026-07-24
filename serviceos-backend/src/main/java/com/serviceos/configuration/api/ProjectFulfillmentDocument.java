@@ -10,6 +10,7 @@ import java.util.List;
 public record ProjectFulfillmentDocument(
         String schemaVersion,
         String orderTypeName,
+        ProjectFulfillmentMatchRule matchRule,
         List<String> supportedClientKinds,
         List<ProjectFulfillmentStageDraft> stages
 ) {
@@ -17,7 +18,20 @@ public record ProjectFulfillmentDocument(
         if (schemaVersion == null || schemaVersion.isBlank()) {
             schemaVersion = "1.0.0";
         }
+        matchRule = matchRule == null
+                ? ProjectFulfillmentMatchRule.unrestricted()
+                : matchRule;
         supportedClientKinds = List.copyOf(supportedClientKinds == null ? List.of() : supportedClientKinds);
         stages = List.copyOf(stages == null ? List.of() : stages);
+    }
+
+    public ProjectFulfillmentDocument(
+            String schemaVersion,
+            String orderTypeName,
+            List<String> supportedClientKinds,
+            List<ProjectFulfillmentStageDraft> stages
+    ) {
+        this(schemaVersion, orderTypeName, ProjectFulfillmentMatchRule.unrestricted(),
+                supportedClientKinds, stages);
     }
 }

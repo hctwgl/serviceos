@@ -22,6 +22,14 @@ public interface ProjectFulfillmentProfileService {
             CurrentPrincipal principal, String correlationId, UUID projectId);
 
     /**
+     * 按正式建单相同规则模拟履约方案匹配；只读，不创建工单、流程、SLA 或任务实例。
+     */
+    ProjectFulfillmentResolveResult simulateMatch(
+            CurrentPrincipal principal,
+            String correlationId,
+            ProjectFulfillmentResolveQuery query);
+
+    /**
      * M422：项目履约配置中心「使用中工单」摘要。
      *
      * <p>硬门禁 {@code project.fulfillment.read}；{@code workOrder.read} soft-gate：

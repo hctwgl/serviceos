@@ -7,8 +7,10 @@ import java.util.UUID;
 public record ProjectFulfillmentProfileSummary(
         UUID profileId,
         UUID projectId,
+        String profileCode,
         String serviceProductCode,
         String profileName,
+        int matchPriority,
         String status,
         Integer stageCount,
         Integer formCount,

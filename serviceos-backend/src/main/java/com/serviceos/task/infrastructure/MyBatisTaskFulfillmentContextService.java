@@ -5,6 +5,7 @@ import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,6 +21,13 @@ final class MyBatisTaskFulfillmentContextService implements TaskFulfillmentConte
     @Override
     public Optional<TaskFulfillmentContext> find(String tenantId, UUID taskId) {
         return Optional.ofNullable(mapper.find(tenantId, taskId)).map(this::context);
+    }
+
+    @Override
+    public List<TaskFulfillmentContext> listForWorkOrder(String tenantId, UUID workOrderId) {
+        return mapper.listForWorkOrder(tenantId, workOrderId).stream()
+                .map(this::context)
+                .toList();
     }
 
     private TaskFulfillmentContext context(Map<String, Object> row) {

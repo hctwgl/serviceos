@@ -5,6 +5,12 @@ public interface ConfigurationService {
 
     ConfigurationBundleReference publishBundle(PublishConfigurationBundleCommand command);
 
+    default ConfigurationBundleReference publishBundleSuccessor(
+            PublishConfigurationBundleSuccessorCommand command
+    ) {
+        throw new UnsupportedOperationException("bundle successor publication is not supported");
+    }
+
     ConfigurationBundleReference resolve(ResolveConfigurationBundleQuery query);
 
     ConfigurationAssetDefinition requireBundleAsset(

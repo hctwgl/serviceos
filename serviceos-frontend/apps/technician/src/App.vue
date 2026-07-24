@@ -93,6 +93,14 @@ onMounted(() => {
         <h2 id="foundation-title">连接师傅上下文</h2>
         <p v-if="error" class="error" data-testid="technician-nav-error">{{ error }}</p>
         <p v-else-if="switching">正在重新验证当前责任和权限…</p>
+        <button
+          v-if="error && accessToken()"
+          type="button"
+          data-testid="technician-switch-account"
+          @click="signOut"
+        >
+          退出并切换账号
+        </button>
         <button v-if="isLoginAvailable()" type="button" @click="login">{{ loginLabel }}</button>
         <button type="button" @click="refresh()">加载当前会话</button>
         <p v-if="!isLoginAvailable()">身份接入尚未配置，应用失败关闭，不接受手工 Token。</p>

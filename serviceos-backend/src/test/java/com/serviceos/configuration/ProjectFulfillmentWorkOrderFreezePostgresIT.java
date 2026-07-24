@@ -5,10 +5,12 @@ import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.CreateProjectFulfillmentProfileCommand;
+import com.serviceos.configuration.api.ProjectFulfillmentDocument;
 import com.serviceos.configuration.api.ProjectFulfillmentDraftView;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileDetail;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionView;
+import com.serviceos.configuration.api.ProjectFulfillmentStageDraft;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.configuration.api.UpdateProjectFulfillmentDraftCommand;
@@ -121,13 +123,14 @@ class ProjectFulfillmentWorkOrderFreezePostgresIT {
         ProjectFulfillmentProfileDetail created = profiles.create(principal(), meta("c1"),
                 new CreateProjectFulfillmentProfileCommand(
                         projectId, "HOME_CHARGING_SURVEY_INSTALL", "冻结方案",
-                        null, "HOME_CHARGING_SURVEY_INSTALL", null));
+                        null, "HOME_CHARGING_SURVEY_INSTALL", null,
+                        "HOME_CHARGING_FREEZE", 0));
         ProjectFulfillmentDraftView draft = profiles.getDraft(
                 principal(), "d1", projectId, created.profileId());
         profiles.updateDraft(principal(), meta("u1"),
                 new UpdateProjectFulfillmentDraftCommand(
                         created.profileId(), draft.aggregateVersion(),
-                        "冻结方案", null, draft.document(),
+                        "冻结方案", null, runtimeAlignedDocument(draft.document()),
                         workflowVersionId, bundle.bundleId()));
         ProjectFulfillmentProfileDetail ready = profiles.get(
                 principal(), "g1", projectId, created.profileId());
@@ -256,5 +259,29 @@ class ProjectFulfillmentWorkOrderFreezePostgresIT {
 
     private static CommandMetadata meta(String key) {
         return new CommandMetadata("corr-" + key, "idem-" + key);
+    }
+
+    private static ProjectFulfillmentDocument runtimeAlignedDocument(
+            ProjectFulfillmentDocument source
+    ) {
+        return new ProjectFulfillmentDocument(
+                source.schemaVersion(),
+                source.orderTypeName(),
+                source.supportedClientKinds(),
+                List.of(new ProjectFulfillmentStageDraft(
+                        "STAGE_A",
+                        "任务 A",
+                        1,
+                        "USER_TASK",
+                        "DESIGNER_TASK",
+                        "PLATFORM",
+                        "与冻结测试 Workflow 的真实运行阶段一致",
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        null,
+                        true)));
     }
 }

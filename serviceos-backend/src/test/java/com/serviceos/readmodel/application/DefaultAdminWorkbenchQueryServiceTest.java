@@ -43,8 +43,10 @@ class DefaultAdminWorkbenchQueryServiceTest {
         when(corrections.count(any(), anyString(), any())).thenReturn(3);
         when(workOrders.list(any(), anyString(), any())).thenAnswer(invocation -> {
             WorkOrderQuery query = invocation.getArgument(2);
+            if ("NETWORK_UNASSIGNED".equals(query.responsibilityStatus())) {
+                return new WorkOrderPage(List.of(), null, NOW, null, null, 4, false);
+            }
             int total = switch (String.valueOf(query.currentStageCode())) {
-                case "PILOT_DISPATCH" -> 4;
                 case "CLIENT_CALLBACK" -> 6;
                 default -> "OPEN".equals(query.slaRisk()) ? 2 : 0;
             };

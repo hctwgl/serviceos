@@ -107,34 +107,47 @@ const unassignedTaskIds = computed(() => {
 const currentTask = computed(() => detail.value?.tasks[0] ?? null)
 
 const progressSteps = computed(() => {
-  const tasks = detail.value?.tasks ?? []
-  const hasTech = Boolean(detail.value?.technicianId || tasks.some((t) => t.technicianId))
-  const hasAppt = (detail.value?.appointments?.length ?? 0) > 0
-  const hasVisit = (detail.value?.visits?.length ?? 0) > 0
-  const hasCorrection = (detail.value?.corrections?.some((c) => c.status === 'OPEN') ?? false)
+  const task = currentTask.value
+  const hasTech = Boolean(task?.technicianId)
+  const hasAppt = Boolean(
+    task && detail.value?.appointments?.some((item) => item.taskId === task.taskId),
+  )
+  const hasVisit = Boolean(
+    task && detail.value?.visits?.some((item) => item.taskId === task.taskId),
+  )
+  const hasEvidence = Boolean(
+    task &&
+      detail.value?.evidenceItems?.some(
+        (item) => item.taskId === task.taskId && item.latestRevisionStatus === 'VALIDATED',
+      ),
+  )
   const steps: { key: string; label: string; status: 'done' | 'current' | 'upcoming' }[] = [
-    { key: 'intake', label: '已接入', status: 'done' },
+    { key: 'responsibility', label: '网点负责', status: 'done' },
     {
       key: 'assign',
-      label: '待分配',
+      label: '师傅分配',
       status: hasTech ? 'done' : 'current',
     },
     {
       key: 'appointment',
-      label: '已预约',
+      label: '预约确认',
       status: hasAppt ? 'done' : hasTech ? 'current' : 'upcoming',
     },
     {
       key: 'visit',
-      label: '上门中',
+      label: task?.stageCode ? `${statusLabel(task.stageCode)}到场` : '现场到场',
       status: hasVisit ? 'done' : hasAppt ? 'current' : 'upcoming',
     },
     {
-      key: 'review',
-      label: hasCorrection ? '资料整改' : '资料审核',
-      status: hasCorrection ? 'current' : hasVisit ? 'current' : 'upcoming',
+      key: 'evidence',
+      label: '表单资料',
+      status: hasEvidence ? 'done' : hasVisit ? 'current' : 'upcoming',
     },
-    { key: 'done', label: '完成', status: 'upcoming' },
+    {
+      key: 'taskDone',
+      label: '阶段完成',
+      status: task ? 'upcoming' : 'done',
+    },
   ]
   // 保证仅一个 current：取第一个 current，其后 upcoming。
   let sawCurrent = false

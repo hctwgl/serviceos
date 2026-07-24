@@ -60,23 +60,51 @@ const timelineSection = useQuery({
 const railTimeline = computed(() => timelineSection.data.value?.timeline?.items.slice(0, 3) ?? [])
 
 const currentTask = computed(() => workspace.data.value?.workspace.currentTaskSummary ?? null)
-// 同时兼容新版 SURVEY/INSTALLATION 与历史 PILOT_* 阶段码。
-const stageOrder = [
-  'PILOT_INTAKE',
-  'PILOT_DISPATCH',
-  'PILOT_APPOINTMENT',
-  'SURVEY',
-  'PILOT_SURVEY',
-  'INSTALLATION',
-  'PILOT_INSTALLATION',
-  'FINAL_REVIEW',
-  'CLIENT_CALLBACK',
-]
-const activeStageIndex = computed(() => Math.max(0, stageOrder.indexOf(currentTask.value?.stageCode ?? '')))
+const terminalWorkOrder = computed(() =>
+  ['FULFILLED', 'CANCELLED', 'CLOSED'].includes(
+    workspace.data.value?.workspace.header.status ?? '',
+  ),
+)
+
+function responsibilityDisplay(value: string | null | undefined, pending: string): string {
+  if (value) return value
+  return terminalWorkOrder.value ? '已释放' : pending
+}
+
+function assigneeDisplay(value: string | null | undefined): string {
+  if (value) return value
+  return terminalWorkOrder.value ? '已结束' : '待确认'
+}
+const progressStages = computed(() => {
+  const stages = workspace.data.value?.workspace.workflowStages ?? []
+  if (stages.length) {
+    return stages.map((stage, index) => ({
+      code: stage.stageCode,
+      index,
+      current: stage.status === 'ACTIVE',
+      status: stage.status,
+    }))
+  }
+  const seen = new Set<string>()
+  return (tasks.data.value?.tasks?.items ?? [])
+    .filter((task) => Boolean(task.stageCode))
+    .filter((task) => {
+      const stageCode = task.stageCode as string
+      if (seen.has(stageCode)) return false
+      seen.add(stageCode)
+      return true
+    })
+    .map((task, index) => ({
+      code: task.stageCode as string,
+      index,
+      current: task.stageCode === currentTask.value?.stageCode,
+      status: task.stageCode === currentTask.value?.stageCode ? 'ACTIVE' : 'COMPLETED',
+    }))
+})
 const projectPersonnel = computed(() => workspace.data.value?.workspace.projectPersonnel ?? [])
 
 function taskTitle(task: WorkOrderWorkspaceTask | null): string {
-  return task ? taskLabel(task.taskType) : '暂无进行中的任务'
+  return task ? taskLabel(task.taskType) : (workspace.data.value?.taskName ?? '暂无进行中的任务')
 }
 
 function copyOrderCode() {
@@ -158,7 +186,7 @@ function copyOrderCode() {
           <span>SLA 剩余时间</span><strong class="sla-value">{{ workspace.data.value.workspace.slaSummary?.breachedCount ? '已经超时' : `进行中 ${workspace.data.value.workspace.slaSummary?.openCount ?? 0} 项` }}</strong><small>风险状态</small><b>{{ workspace.data.value.workspace.exceptionSummary?.openCount ? `${workspace.data.value.workspace.exceptionSummary.openCount} 项异常` : '暂无异常' }}</b>
         </div>
         <div class="summary-cell">
-          <span>当前责任人</span><strong>{{ workspace.data.value.workspace.header.currentAssigneeDisplayName ?? '待分配' }}</strong><small>配置版本</small><b>{{ workspace.data.value.workspace.header.configurationBundleVersion }}</b>
+          <span>当前责任人</span><strong>{{ assigneeDisplay(workspace.data.value.workspace.header.currentAssigneeDisplayName) }}</strong><small>配置版本</small><b>{{ workspace.data.value.workspace.header.configurationBundleVersion }}</b>
         </div>
       </section>
 
@@ -171,15 +199,17 @@ function copyOrderCode() {
             <h2>履约进度</h2>
             <div class="progress-steps">
               <div
-                v-for="(stage, index) in stageOrder"
-                :key="stage"
+                v-for="stage in progressStages"
+                :key="stage.code"
                 class="progress-step"
-                :class="{ done: index < activeStageIndex, current: index === activeStageIndex }"
+                :class="{ done: stage.status === 'COMPLETED', current: stage.current }"
               >
-                <span class="step-dot"><CheckOutlined v-if="index < activeStageIndex" /><template v-else>{{ index + 1 }}</template></span>
-                <strong>{{ stageLabel(stage) }}</strong>
-                <small>{{ index < activeStageIndex ? '已完成' : index === activeStageIndex ? '进行中' : '待进行' }}</small>
+                <span class="step-dot"><CheckOutlined v-if="stage.status === 'COMPLETED'" /><template v-else>{{ stage.index + 1 }}</template></span>
+                <strong>{{ stageLabel(stage.code) }}</strong>
+                <small>{{ stage.current ? '进行中' : stage.status === 'COMPLETED' ? '已完成' : '未开始' }}</small>
               </div>
+              <p v-if="tasks.isLoading.value" class="section-state">正在读取真实任务进度…</p>
+              <p v-else-if="!progressStages.length" class="section-state">尚未生成履约任务</p>
             </div>
           </Card>
 
@@ -191,11 +221,11 @@ function copyOrderCode() {
               <div class="task-main">
                 <h2>当前任务</h2>
                 <div class="task-title">
-                  <span class="task-icon"><ToolOutlined /></span><div><strong>{{ taskTitle(currentTask) }}</strong><p>{{ stageLabel(currentTask?.stageCode ?? null) }} · {{ currentTask?.status ? '待处理' : '未开始' }}</p></div>
+                  <span class="task-icon"><ToolOutlined /></span><div><strong>{{ taskTitle(currentTask) }}</strong><p>{{ workspace.data.value.stageName }} · {{ terminalWorkOrder ? '全部履约任务已结束' : currentTask?.status ? '待处理' : '等待流程事件' }}</p></div>
                 </div>
                 <dl class="task-facts">
-                  <div><dt>责任网点</dt><dd>{{ workspace.data.value.workspace.header.currentNetworkDisplayName ?? '待分配' }}</dd></div>
-                  <div><dt>责任师傅</dt><dd>{{ workspace.data.value.workspace.header.currentTechnicianDisplayName ?? '待分配' }}</dd></div>
+                  <div><dt>责任网点</dt><dd>{{ responsibilityDisplay(workspace.data.value.workspace.header.currentNetworkDisplayName, '待分配') }}</dd></div>
+                  <div><dt>责任师傅</dt><dd>{{ responsibilityDisplay(workspace.data.value.workspace.header.currentTechnicianDisplayName, '待分配') }}</dd></div>
                   <div><dt>预约信息</dt><dd>在“预约与上门”中查看</dd></div>
                   <div><dt>客户地址</dt><dd>{{ workspace.data.value.workspace.maskedServiceAddress ?? '未提供' }}</dd></div>
                 </dl>
@@ -265,6 +295,7 @@ function copyOrderCode() {
               <ReviewsCorrectionsSection
                 v-else-if="activeTab === 'REVIEWS_CORRECTIONS'"
                 :data="section.data.value?.reviewsCorrections ?? null"
+                @submitted="activeTab = 'INTEGRATION'"
               />
               <IntegrationSection
                 v-else-if="activeTab === 'INTEGRATION'"
@@ -283,7 +314,7 @@ function copyOrderCode() {
             <h2>风险与提醒</h2><dl>
               <div>
                 <dt>SLA 状态</dt><dd class="orange">
-                  {{ workspace.data.value.workspace.slaSummary?.breachedCount ? '已超时' : '计时中' }}
+                  {{ terminalWorkOrder ? '已结束' : workspace.data.value.workspace.slaSummary?.breachedCount ? '已超时' : '计时中' }}
                 </dd>
               </div><div>
                 <dt>逾期风险</dt><dd class="green">
@@ -310,7 +341,7 @@ function copyOrderCode() {
                   </small>
                 </strong>
               </template>
-              <b>当前任务处理人</b><strong>{{ workspace.data.value.workspace.header.currentAssigneeDisplayName ?? '待确认' }}</strong><b>责任网点</b><strong>{{ workspace.data.value.workspace.header.currentNetworkDisplayName ?? '待分配' }}</strong><b>责任师傅</b><strong>{{ workspace.data.value.workspace.header.currentTechnicianDisplayName ?? '待分配' }}</strong>
+              <b>当前任务处理人</b><strong>{{ assigneeDisplay(workspace.data.value.workspace.header.currentAssigneeDisplayName) }}</strong><b>责任网点</b><strong>{{ responsibilityDisplay(workspace.data.value.workspace.header.currentNetworkDisplayName, '待分配') }}</strong><b>责任师傅</b><strong>{{ responsibilityDisplay(workspace.data.value.workspace.header.currentTechnicianDisplayName, '待分配') }}</strong>
             </div>
           </section>
           <section><h2>外部集成信息</h2><dl><div><dt>来源系统</dt><dd>{{ workspace.data.value.clientName }}</dd></div><div><dt>配置版本</dt><dd>{{ workspace.data.value.workspace.header.configurationBundleVersion }}</dd></div></dl></section>

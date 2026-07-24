@@ -48,6 +48,14 @@ onMounted(() => { if (accessToken()) void refresh() })
       <section v-if="!session" class="boundary-card" aria-labelledby="foundation-title">
         <h2 id="foundation-title">连接网点上下文</h2>
         <p v-if="error" class="error">{{ error }}</p>
+        <button
+          v-if="error && accessToken()"
+          type="button"
+          data-testid="network-switch-account"
+          @click="signOut"
+        >
+          退出并切换账号
+        </button>
         <button v-if="isLoginAvailable()" type="button" @click="login">
           {{ loginLabel }}
         </button>

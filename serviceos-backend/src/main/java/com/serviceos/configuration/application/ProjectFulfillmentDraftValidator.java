@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,12 +20,12 @@ final class ProjectFulfillmentDraftValidator {
     List<ProjectFulfillmentValidationIssue> validate(
             UUID profileId,
             Map<String, Object> document,
-            boolean workflowVersionPresent,
+            Map<String, Object> workflowDefinition,
             boolean bundlePresent
     ) {
         List<ProjectFulfillmentValidationIssue> issues = new ArrayList<>();
         String profileKey = profileId.toString();
-        if (!workflowVersionPresent) {
+        if (workflowDefinition == null) {
             issues.add(issue("ERROR", "WORKFLOW_REF_MISSING", profileKey, null, "WORKFLOW", null,
                     "workflowAssetVersionId",
                     "尚未绑定流程版本",
@@ -92,7 +93,55 @@ final class ProjectFulfillmentDraftValidator {
                     "no terminal stage",
                     "建议至少标记一个完成阶段"));
         }
+        if (workflowDefinition != null) {
+            validateWorkflowStageCoverage(profileKey, codes, workflowDefinition, issues);
+        }
         return issues;
+    }
+
+    private static void validateWorkflowStageCoverage(
+            String profileKey,
+            Set<String> documentStageCodes,
+            Map<String, Object> workflowDefinition,
+            List<ProjectFulfillmentValidationIssue> issues
+    ) {
+        Set<String> workflowStageCodes = new LinkedHashSet<>();
+        Object rawNodes = workflowDefinition.get("nodes");
+        if (rawNodes instanceof List<?> nodes) {
+            for (Object rawNode : nodes) {
+                if (!(rawNode instanceof Map<?, ?> node)) {
+                    continue;
+                }
+                String nodeType = string(node.get("nodeType"));
+                if ("START".equals(nodeType) || "END".equals(nodeType)) {
+                    continue;
+                }
+                String stageCode = string(node.get("stageCode"));
+                if (stageCode != null) {
+                    workflowStageCodes.add(stageCode);
+                }
+            }
+        }
+        for (String stageCode : documentStageCodes) {
+            if (!workflowStageCodes.contains(stageCode)) {
+                issues.add(issue(
+                        "ERROR", "STAGE_NOT_IN_WORKFLOW", profileKey, stageCode,
+                        "WORKFLOW", null, "stages.stageCode",
+                        "阶段“" + stageCode + "”不在当前运行流程中",
+                        "document stage is not present in workflow definition",
+                        "请从绑定流程同步阶段，或先发布包含该阶段的新流程版本"));
+            }
+        }
+        for (String stageCode : workflowStageCodes) {
+            if (!documentStageCodes.contains(stageCode)) {
+                issues.add(issue(
+                        "ERROR", "WORKFLOW_STAGE_NOT_DESCRIBED", profileKey, stageCode,
+                        "WORKFLOW", null, "stages",
+                        "运行流程阶段“" + stageCode + "”尚未纳入履约方案",
+                        "workflow stage is missing from fulfillment document",
+                        "请把该运行阶段加入方案后再发布"));
+            }
+        }
     }
 
     private static ProjectFulfillmentValidationIssue issue(

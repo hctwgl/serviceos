@@ -76,6 +76,9 @@ import com.serviceos.task.api.WorkOrderTaskSummary;
 import com.serviceos.workorder.api.WorkOrderDetail;
 import com.serviceos.workorder.api.WorkOrderMaskedContactView;
 import com.serviceos.workorder.api.WorkOrderQueryService;
+import com.serviceos.workflow.api.StageInstanceView;
+import com.serviceos.workflow.api.WorkflowExecutionProjection;
+import com.serviceos.workflow.api.WorkflowExecutionQueryService;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -105,6 +108,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
 
     private final WorkOrderQueryService workOrders;
     private final WorkOrderTaskQueryService workOrderTasks;
+    private final WorkflowExecutionQueryService workflowExecutions;
     private final WorkOrderTimelineQueryService timelines;
     private final WorkOrderTimelineProjectionRuntime projectionRuntime;
     private final SlaQueryService slaQueries;
@@ -125,6 +129,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
     DefaultWorkOrderWorkspaceQueryService(
             WorkOrderQueryService workOrders,
             WorkOrderTaskQueryService workOrderTasks,
+            WorkflowExecutionQueryService workflowExecutions,
             WorkOrderTimelineQueryService timelines,
             WorkOrderTimelineProjectionRuntime projectionRuntime,
             SlaQueryService slaQueries,
@@ -144,6 +149,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
     ) {
         this.workOrders = workOrders;
         this.workOrderTasks = workOrderTasks;
+        this.workflowExecutions = workflowExecutions;
         this.timelines = timelines;
         this.projectionRuntime = projectionRuntime;
         this.slaQueries = slaQueries;
@@ -178,6 +184,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 .filter(task -> ACTIVE_TASK_STATUSES.contains(task.status()))
                 .findFirst()
                 .orElse(null);
+        WorkflowExecutionProjection workflow =
+                workflowExecutions.get(principal, correlationId, workOrderId);
 
         var timelinePage = timelines.list(principal, correlationId, workOrderId, null, 1);
         String timelineFreshness = timelinePage.freshnessStatus();
@@ -214,6 +222,9 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         return new WorkOrderWorkspace(
                 detail.workOrder(),
                 current == null ? null : toTaskSummary(current),
+                workflow.stages().stream()
+                        .map(DefaultWorkOrderWorkspaceQueryService::toStageSummary)
+                        .toList(),
                 availability,
                 current == null ? null : "/api/v1/tasks/" + current.id() + "/allowed-actions",
                 serviceAssignmentSummary,
@@ -226,6 +237,17 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 contact.maskedCustomerName(),
                 contact.maskedCustomerPhone(),
                 contact.maskedServiceAddress());
+    }
+
+    private static WorkOrderWorkspace.WorkOrderWorkspaceStageSummary toStageSummary(
+            StageInstanceView stage
+    ) {
+        return new WorkOrderWorkspace.WorkOrderWorkspaceStageSummary(
+                stage.stageCode(),
+                stage.sequenceNo(),
+                stage.status(),
+                stage.activatedAt(),
+                stage.completedAt());
     }
 
     @Override

@@ -77,6 +77,8 @@ class DefaultAdminWorkOrderQueryServiceTest {
                 fixture.workOrder,
                 new WorkOrderWorkspace.WorkOrderWorkspaceTaskSummary(
                         taskId, "INSTALLATION", "HUMAN", "READY", "PILOT_INSTALLATION", null, 2),
+                List.of(new WorkOrderWorkspace.WorkOrderWorkspaceStageSummary(
+                        "PILOT_INSTALLATION", 2, "ACTIVE", NOW.minusSeconds(60), null)),
                 Map.of("TASKS", "AVAILABLE"),
                 "/api/v1/tasks/" + taskId + "/allowed-actions",
                 null, null, null, List.of(), "FRESH",
@@ -103,6 +105,73 @@ class DefaultAdminWorkOrderQueryServiceTest {
         assertThat(result.blockedActions()).singleElement()
                 .extracting(AdminWorkOrderWorkspaceView.BlockedAction::reason)
                 .isEqualTo("还有 1 项必填资料未上传");
+        assertThat(result.dataComplete()).isTrue();
+    }
+
+    @Test
+    @DisplayName("无任务的工作流门闸应使用工单权威阶段且不误报数据不完整")
+    void shouldBuildWorkspaceForWorkflowGateWithoutTask() {
+        Fixture fixture = fixture();
+        WorkOrderWorkspace workspace = new WorkOrderWorkspace(
+                fixture.workOrder,
+                null,
+                List.of(new WorkOrderWorkspace.WorkOrderWorkspaceStageSummary(
+                        "PILOT_INSTALLATION", 2, "ACTIVE", NOW.minusSeconds(60), null)),
+                Map.of("TASKS", "AVAILABLE"),
+                null,
+                null, null, null, List.of(), "FRESH",
+                new WorkOrderWorkspace.WorkOrderWorkspaceSourceVersions(3),
+                new WorkOrderWorkspace.WorkOrderWorkspaceMeta(
+                        NOW, "checkpoint", "FRESH", "query"),
+                "王*", "*******5678", "山东省济南市历城区***");
+        when(fixture.workspaces.get(fixture.principal, "corr-gate", fixture.workOrderId))
+                .thenReturn(workspace);
+
+        AdminWorkOrderWorkspaceView result = fixture.service.getWorkspace(
+                fixture.principal, "corr-gate", fixture.workOrderId);
+
+        assertThat(result.stageName()).isEqualTo("上门安装");
+        assertThat(result.taskName()).isEqualTo("上门安装");
+        assertThat(result.allowedActions()).isEmpty();
+        assertThat(result.dataComplete()).isTrue();
+    }
+
+    @Test
+    @DisplayName("已完成工单无活动节点时应展示明确终态而不是尚未进入流程")
+    void shouldBuildCompletedWorkspaceWithoutActiveTask() {
+        Fixture fixture = fixture();
+        WorkOrderView active = fixture.workOrder;
+        WorkOrderView completed = new WorkOrderView(
+                active.id(), active.tenantId(), active.projectId(), active.clientCode(),
+                active.brandCode(), active.serviceProductCode(), active.externalOrderCode(),
+                "FULFILLED", active.configurationBundleId(), active.configurationBundleCode(),
+                active.configurationBundleVersion(), active.configurationBundleDigest(),
+                active.provinceCode(), active.cityCode(), active.districtCode(),
+                active.externalDispatchedAt(), active.receivedAt(), NOW, active.activatedAt(), NOW,
+                active.version() + 1, active.maskedCustomerName(), active.maskedCustomerPhone(),
+                active.maskedServiceAddress(), null, null, null, null, null,
+                null, null, null, null);
+        WorkOrderWorkspace workspace = new WorkOrderWorkspace(
+                completed,
+                null,
+                List.of(new WorkOrderWorkspace.WorkOrderWorkspaceStageSummary(
+                        "CLIENT_CALLBACK", 4, "COMPLETED", NOW.minusSeconds(60), NOW)),
+                Map.of("TASKS", "AVAILABLE"),
+                null,
+                null, null, null, List.of(), "FRESH",
+                new WorkOrderWorkspace.WorkOrderWorkspaceSourceVersions(4),
+                new WorkOrderWorkspace.WorkOrderWorkspaceMeta(
+                        NOW, "checkpoint", "FRESH", "query"),
+                "王*", "*******5678", "山东省济南市历城区***");
+        when(fixture.workspaces.get(fixture.principal, "corr-completed", fixture.workOrderId))
+                .thenReturn(workspace);
+
+        AdminWorkOrderWorkspaceView result = fixture.service.getWorkspace(
+                fixture.principal, "corr-completed", fixture.workOrderId);
+
+        assertThat(result.statusName()).isEqualTo("已完成");
+        assertThat(result.stageName()).isEqualTo("履约已完成");
+        assertThat(result.taskName()).isEqualTo("全部任务已完成");
         assertThat(result.dataComplete()).isTrue();
     }
 

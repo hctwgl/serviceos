@@ -91,7 +91,32 @@ function latestAttemptAt(delivery: WorkOrderWorkspaceOutboundDeliverySummary): s
               <dt>最近投递</dt>
               <dd>{{ formatDateTime(latestAttemptAt(delivery)) }}</dd>
             </div>
+            <div>
+              <dt>车企审核</dt>
+              <dd>{{ delivery.clientReviewCaseId ? '已建立回执路由' : '等待车企接收' }}</dd>
+            </div>
+            <div>
+              <dt>业务回执</dt>
+              <dd>{{ delivery.acknowledgements.length ? `${delivery.acknowledgements.length} 条` : '尚未收到' }}</dd>
+            </div>
+            <div>
+              <dt>确认时间</dt>
+              <dd>{{ formatDateTime(delivery.acknowledgedAt) }}</dd>
+            </div>
           </dl>
+          <ol
+            v-if="delivery.acknowledgements.length"
+            class="it-ack-list"
+          >
+            <li
+              v-for="ack in delivery.acknowledgements"
+              :key="ack.acknowledgementId"
+            >
+              <strong>{{ ack.result }}</strong>
+              <span>{{ ack.acknowledgementType }}</span>
+              <small>{{ formatDateTime(ack.receivedAt) }}</small>
+            </li>
+          </ol>
         </article>
       </section>
     </template>
@@ -160,5 +185,27 @@ function latestAttemptAt(delivery: WorkOrderWorkspaceOutboundDeliverySummary): s
   margin: 3px 0 0;
   color: var(--sos-text-strong);
   font-size: 12px;
+}
+
+.it-ack-list {
+  display: grid;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--sos-border-soft);
+  list-style: none;
+}
+
+.it-ack-list li {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) 1fr auto;
+  gap: 10px;
+  align-items: center;
+  color: var(--sos-text-muted);
+  font-size: 11px;
+}
+
+.it-ack-list strong {
+  color: var(--sos-success);
 }
 </style>

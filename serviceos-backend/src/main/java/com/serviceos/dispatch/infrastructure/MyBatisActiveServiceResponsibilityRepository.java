@@ -22,13 +22,19 @@ final class MyBatisActiveServiceResponsibilityRepository
     }
 
     @Override
-    public Optional<ActiveServiceResponsibility> find(String tenantId, UUID taskId) {
-        return Optional.ofNullable(mapper.find(tenantId, taskId)).map(this::responsibility);
+    public Optional<ActiveServiceResponsibility> find(
+            String tenantId, UUID taskId, UUID workOrderId
+    ) {
+        return Optional.ofNullable(mapper.find(tenantId, taskId, workOrderId))
+                .map(this::responsibility);
     }
 
     @Override
-    public Optional<ServiceAssignmentSummary> findSummary(String tenantId, UUID taskId) {
-        return Optional.ofNullable(mapper.findSummary(tenantId, taskId)).map(this::summary);
+    public Optional<ServiceAssignmentSummary> findSummary(
+            String tenantId, UUID taskId, UUID workOrderId
+    ) {
+        return Optional.ofNullable(mapper.findSummary(tenantId, taskId, workOrderId))
+                .map(this::summary);
     }
 
     private ActiveServiceResponsibility responsibility(Map<String, Object> row) {

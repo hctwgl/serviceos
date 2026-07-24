@@ -16,6 +16,8 @@ export function useUpdateProjectFulfillmentDraftCommand(
       description?: string
       document: ProjectFulfillmentDocument
       profileName: string
+      sourceBundleId: string | null
+      workflowAssetVersionId: string | null
     }) => updateProjectFulfillmentDraft(
       projectId(),
       profileId(),

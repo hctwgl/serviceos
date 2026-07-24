@@ -5,6 +5,7 @@ import type {
   WorkOrderWorkspaceReviewsCorrectionsSectionData,
 } from '@serviceos/api-client'
 import {
+  createBydReviewSubmission,
   createReviewCase,
   decideReviewCase,
   getEvidenceSetSnapshot,
@@ -31,6 +32,7 @@ import StatusPill from './StatusPill.vue'
  * 整组结论由服务端派生，CLIENT 审核单只读、不提供裁决入口。
  */
 const props = defineProps<{ data: WorkOrderWorkspaceReviewsCorrectionsSectionData | null }>()
+const emit = defineEmits<{ submitted: [] }>()
 
 const queryClient = useQueryClient()
 
@@ -107,6 +109,21 @@ const resubmitReviewCommand = useMutation({
   onError: (error) => message.error(errorDetail(error)),
 })
 
+const submitClientReviewCommand = useMutation({
+  mutationFn: (review: WorkOrderWorkspaceReviewCaseSummary) =>
+    createBydReviewSubmission(review.reviewCaseId),
+  onSuccess: async (delivery) => {
+    message.success(
+      delivery.status === 'PENDING'
+        ? '已生成车企提审任务，正在可靠投递'
+        : '该审核单已有车企提审记录，已打开外部回传',
+    )
+    await refreshWorkspace()
+    emit('submitted')
+  },
+  onError: (error) => message.error(errorDetail(error)),
+})
+
 function reviewStatusTone(status: WorkOrderWorkspaceReviewCaseSummary['status']) {
   if (status === 'APPROVED' || status === 'FORCE_APPROVED') return 'green'
   if (status === 'REJECTED') return 'red'
@@ -122,6 +139,11 @@ function correctionStatusTone(status: WorkOrderWorkspaceCorrectionCaseSummary['s
 
 function canDecide(review: WorkOrderWorkspaceReviewCaseSummary): boolean {
   return review.status === 'OPEN' && review.origin === 'INTERNAL'
+}
+
+function canSubmitClientReview(review: WorkOrderWorkspaceReviewCaseSummary): boolean {
+  return review.origin === 'INTERNAL'
+    && (review.status === 'APPROVED' || review.status === 'FORCE_APPROVED')
 }
 </script>
 
@@ -156,19 +178,33 @@ function canDecide(review: WorkOrderWorkspaceReviewCaseSummary): boolean {
               <small>策略版本 {{ review.policyVersion }}</small>
             </span>
             <span
-              v-if="canDecide(review)"
+              v-if="canDecide(review) || canSubmitClientReview(review)"
               class="rc-actions"
             >
               <Button
+                v-if="canDecide(review)"
                 type="primary"
                 size="small"
                 @click="openDecide(review, 'APPROVED')"
               >审核通过</Button>
               <Button
+                v-if="canDecide(review)"
                 danger
                 size="small"
                 @click="openDecide(review, 'REJECTED')"
               >审核驳回</Button>
+              <Button
+                v-if="canSubmitClientReview(review)"
+                type="primary"
+                size="small"
+                :loading="
+                  submitClientReviewCommand.isPending.value
+                    && submitClientReviewCommand.variables.value?.reviewCaseId === review.reviewCaseId
+                "
+                @click="submitClientReviewCommand.mutate(review)"
+              >
+                提交车企复核
+              </Button>
             </span>
           </header>
           <dl class="rc-facts">

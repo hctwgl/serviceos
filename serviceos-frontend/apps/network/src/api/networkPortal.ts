@@ -712,6 +712,13 @@ export type NetworkPortalAppointmentRevision = {
   createdBy?: string
 }
 
+export type NetworkPortalAppointmentType =
+  | 'CORRECTION'
+  | 'INSTALLATION'
+  | 'REPAIR'
+  | 'SECOND_VISIT'
+  | 'SURVEY'
+
 export type NetworkPortalAppointment = {
   appointmentId: string
   taskId: string
@@ -746,7 +753,7 @@ export function proposeNetworkPortalAppointment(
   networkContextId: string,
   taskId: string,
   body: {
-    type: string
+    type: NetworkPortalAppointmentType
     window: AppointmentWindow
     addressRef: string
     addressVersion: string

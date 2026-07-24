@@ -9,6 +9,7 @@ import com.serviceos.configuration.api.ProjectFulfillmentCompareImpact;
 import com.serviceos.configuration.api.ProjectFulfillmentDocument;
 import com.serviceos.configuration.api.ProjectFulfillmentDraftView;
 import com.serviceos.configuration.api.ProjectFulfillmentManifestView;
+import com.serviceos.configuration.api.ProjectFulfillmentMatchRule;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileDetail;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
 import com.serviceos.configuration.api.ProjectFulfillmentStageDraft;
@@ -159,7 +160,8 @@ class ProjectFulfillmentProfilePostgresIT {
         ProjectFulfillmentProfileDetail created = profiles.create(principal(), meta("sum-c1"),
                 new CreateProjectFulfillmentProfileCommand(
                         projectId, "HOME_CHARGING_SURVEY_INSTALL", "方案计数",
-                        "试点", "HOME_CHARGING_SURVEY_INSTALL", null));
+                        "试点", "HOME_CHARGING_SURVEY_INSTALL", null,
+                        "HOME_CHARGING_SCHEME_COUNT", 0));
         assertThat(created.draftRevisionId()).isNotNull();
 
         List<ProjectFulfillmentSchemeCount> allowed = profiles.summarizeSchemeCounts(
@@ -177,32 +179,97 @@ class ProjectFulfillmentProfilePostgresIT {
     }
 
     @Test
+    void copyProfileKeepsRuntimeBindingsAndRejectsForeignScope() {
+        ProjectFulfillmentProfileDetail source = profiles.create(principal(), meta("copy-source"),
+                new CreateProjectFulfillmentProfileCommand(
+                        projectId, "HOME_CHARGING_SURVEY_INSTALL", "复制来源方案",
+                        "来源", "HOME_CHARGING_SURVEY_INSTALL", null,
+                        "HOME_CHARGING_COPY_SOURCE", 0));
+        ProjectFulfillmentDraftView sourceDraft = profiles.getDraft(
+                principal(), "corr-copy-source", projectId, source.profileId());
+        ProjectFulfillmentDraftView boundSource = profiles.updateDraft(
+                principal(), meta("copy-bind"),
+                new UpdateProjectFulfillmentDraftCommand(
+                        source.profileId(),
+                        sourceDraft.aggregateVersion(),
+                        "复制来源方案",
+                        "来源",
+                        runtimeAlignedDocument(sourceDraft.document()),
+                        workflowVersionId,
+                        bundle.bundleId()));
+
+        ProjectFulfillmentProfileDetail copied = profiles.create(principal(), meta("copy-target"),
+                new CreateProjectFulfillmentProfileCommand(
+                        projectId, "HOME_CHARGING_INSTALL_COPY", "复制后的方案",
+                        "复制目标", null, source.profileId(),
+                        "HOME_CHARGING_COPY_TARGET", 0));
+        ProjectFulfillmentDraftView copiedDraft = profiles.getDraft(
+                principal(), "corr-copy-target", projectId, copied.profileId());
+        assertThat(copiedDraft.document()).isEqualTo(boundSource.document());
+        assertThat(copiedDraft.workflowAssetVersionId()).isEqualTo(workflowVersionId);
+        assertThat(copiedDraft.sourceBundleId()).isEqualTo(bundle.bundleId());
+
+        UUID foreignProjectId = seedForeignProjectAndDraft();
+        UUID foreignProfileId = jdbc.sql("""
+                SELECT profile_id
+                  FROM cfg_project_fulfillment_profile
+                 WHERE tenant_id = 'tenant-foreign-pfp'
+                   AND project_id = :projectId
+                """)
+                .param("projectId", foreignProjectId)
+                .query(UUID.class)
+                .single();
+        assertThatThrownBy(() -> profiles.create(principal(), meta("copy-foreign"),
+                new CreateProjectFulfillmentProfileCommand(
+                        projectId, "HOME_CHARGING_FOREIGN_COPY", "非法复制",
+                        null, null, foreignProfileId,
+                        "HOME_CHARGING_FOREIGN_COPY", 0)))
+                .isInstanceOf(BusinessProblem.class)
+                .extracting(ex -> ((BusinessProblem) ex).code())
+                .isEqualTo(ProblemCode.RESOURCE_NOT_FOUND);
+        assertThat(profiles.list(principal(), "corr-copy-list", projectId))
+                .extracting(item -> item.serviceProductCode())
+                .doesNotContain("HOME_CHARGING_FOREIGN_COPY");
+    }
+
+    @Test
     void createListUpdateValidatePublishAndResolve() {
         ProjectFulfillmentProfileDetail created = profiles.create(principal(), meta("c1"),
                 new CreateProjectFulfillmentProfileCommand(
                         projectId, "HOME_CHARGING_SURVEY_INSTALL", "标准家充履约",
-                        "试点", "HOME_CHARGING_SURVEY_INSTALL", null));
+                        "试点", "HOME_CHARGING_SURVEY_INSTALL", null,
+                        "HOME_CHARGING_STANDARD", 0));
         assertThat(created.status()).isEqualTo("DRAFT");
         assertThat(created.draftRevisionId()).isNotNull();
         assertThat(profiles.list(principal(), "corr-list", projectId)).hasSize(1);
 
         assertThatThrownBy(() -> profiles.create(principal(), meta("c-dup"),
                 new CreateProjectFulfillmentProfileCommand(
-                        projectId, "HOME_CHARGING_SURVEY_INSTALL", "重复", null, null, null)))
+                        projectId, "HOME_CHARGING_SURVEY_INSTALL", "重复", null, null, null,
+                        "HOME_CHARGING_STANDARD", 0)))
                 .isInstanceOf(BusinessProblem.class);
 
         ProjectFulfillmentDraftView draft = profiles.getDraft(
                 principal(), "corr-draft", projectId, created.profileId());
         assertThat(draft.document()).isNotNull();
         assertThat(draft.document().stages()).isNotEmpty();
+        ProjectFulfillmentDocument alignedDocument = runtimeAlignedDocument(draft.document());
         ProjectFulfillmentDraftView updated = profiles.updateDraft(principal(), meta("u1"),
                 new UpdateProjectFulfillmentDraftCommand(
                         created.profileId(), draft.aggregateVersion(),
-                        "标准家充履约 v2", "更新说明", draft.document(),
+                        "标准家充履约 v2", "更新说明", alignedDocument,
                         workflowVersionId, bundle.bundleId()));
         assertThat(updated.aggregateVersion()).isEqualTo(draft.aggregateVersion() + 1);
         assertThat(updated.workflowAssetVersionId()).isEqualTo(workflowVersionId);
-        assertThat(updated.document().stages()).hasSize(draft.document().stages().size());
+        assertThat(updated.document().stages()).hasSize(alignedDocument.stages().size());
+
+        ProjectFulfillmentDraftView preserved = profiles.updateDraft(principal(), meta("u-preserve"),
+                new UpdateProjectFulfillmentDraftCommand(
+                        created.profileId(), updated.aggregateVersion(),
+                        "标准家充履约 v2", "只更新业务草稿", updated.document(),
+                        null, null));
+        assertThat(preserved.workflowAssetVersionId()).isEqualTo(workflowVersionId);
+        assertThat(preserved.sourceBundleId()).isEqualTo(bundle.bundleId());
 
         assertThatThrownBy(() -> profiles.updateDraft(principal(), meta("u-conflict"),
                 new UpdateProjectFulfillmentDraftCommand(
@@ -261,7 +328,7 @@ class ProjectFulfillmentProfilePostgresIT {
         ProjectFulfillmentDraftView afterPublishDraft = profiles.getDraft(
                 principal(), "corr-draft-2", projectId, created.profileId());
         ProjectFulfillmentDocument mutated = renameStage(
-                afterPublishDraft.document(), "现场勘测", "现场勘测修订版");
+                afterPublishDraft.document(), "任务 A", "任务 A 修订版");
         assertThat(mutated).isNotEqualTo(afterPublishDraft.document());
         profiles.updateDraft(principal(), meta("u-diff"),
                 new UpdateProjectFulfillmentDraftCommand(
@@ -282,13 +349,14 @@ class ProjectFulfillmentProfilePostgresIT {
         ProjectFulfillmentProfileDetail created = profiles.create(principal(), meta("c-iso"),
                 new CreateProjectFulfillmentProfileCommand(
                         projectId, "HOME_CHARGING_SURVEY_INSTALL", "隔离测试",
-                        null, "HOME_CHARGING_SURVEY_INSTALL", null));
+                        null, "HOME_CHARGING_SURVEY_INSTALL", null,
+                        "HOME_CHARGING_ISOLATION", 0));
         ProjectFulfillmentDraftView draft = profiles.getDraft(
                 principal(), "corr-iso", projectId, created.profileId());
         profiles.updateDraft(principal(), meta("u-iso"),
                 new UpdateProjectFulfillmentDraftCommand(
                         created.profileId(), draft.aggregateVersion(),
-                        "隔离测试", null, draft.document(),
+                        "隔离测试", null, runtimeAlignedDocument(draft.document()),
                         workflowVersionId, bundle.bundleId()));
         ProjectFulfillmentProfileDetail ready = profiles.get(
                 principal(), "corr-iso2", projectId, created.profileId());
@@ -339,11 +407,48 @@ class ProjectFulfillmentProfilePostgresIT {
     }
 
     @Test
+    void resolvesMultiplePlansByPriorityThenSpecificityAndRejectsTies() {
+        Instant effectiveAt = Instant.now().plusSeconds(5);
+        ProjectFulfillmentProfileDetail generic = createPublishedPlan(
+                "HOME_GENERIC", "通用家充方案", 10,
+                ProjectFulfillmentMatchRule.unrestricted(), effectiveAt, "multi-generic");
+        ProjectFulfillmentProfileDetail byd = createPublishedPlan(
+                "HOME_BYD_OCEAN", "比亚迪海洋网专用方案", 10,
+                new ProjectFulfillmentMatchRule(List.of("BYD_OCEAN"), List.of()),
+                effectiveAt, "multi-byd");
+
+        var bydResolved = profiles.simulateMatch(principal(), "corr-simulate-byd",
+                new ProjectFulfillmentResolveQuery(
+                TENANT, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                effectiveAt.plusSeconds(1), null, "BYD_OCEAN", "370000"));
+        assertThat(bydResolved.profileId()).isEqualTo(byd.profileId());
+        assertThat(bydResolved.profileCode()).isEqualTo("HOME_BYD_OCEAN");
+        assertThat(bydResolved.matchPriority()).isEqualTo(10);
+        assertThat(bydResolved.matchSpecificity()).isEqualTo(1);
+        assertThat(bydResolved.matchExplanation()).contains("品牌=BYD_OCEAN");
+
+        var genericResolved = resolver.resolve(new ProjectFulfillmentResolveQuery(
+                TENANT, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                effectiveAt.plusSeconds(1), null, "OTHER_BRAND", "370000"));
+        assertThat(genericResolved.profileId()).isEqualTo(generic.profileId());
+        assertThat(genericResolved.matchSpecificity()).isZero();
+
+        assertThatThrownBy(() -> createPublishedPlan(
+                "HOME_BYD_OCEAN_CONFLICT", "比亚迪海洋网冲突方案", 10,
+                new ProjectFulfillmentMatchRule(List.of("BYD_OCEAN"), List.of()),
+                effectiveAt, "multi-conflict"))
+                .isInstanceOf(BusinessProblem.class)
+                .extracting(ex -> ((BusinessProblem) ex).code())
+                .isEqualTo(ProblemCode.VALIDATION_FAILED);
+    }
+
+    @Test
     void publishWithoutBundleFailsClosed() {
         ProjectFulfillmentProfileDetail created = profiles.create(principal(), meta("c2"),
                 new CreateProjectFulfillmentProfileCommand(
                         projectId, "HOME_CHARGING_SURVEY_INSTALL", "无 Bundle",
-                        null, "BLANK", null));
+                        null, "BLANK", null,
+                        "HOME_CHARGING_WITHOUT_BUNDLE", 0));
         assertThatThrownBy(() -> profiles.publish(
                 principal(), meta("p-fail"), projectId, created.profileId(),
                 created.aggregateVersion(), Instant.now().plusSeconds(30), null))
@@ -357,7 +462,8 @@ class ProjectFulfillmentProfilePostgresIT {
         ProjectFulfillmentProfileDetail created = profiles.create(principal(), meta("c-cmp-auth"),
                 new CreateProjectFulfillmentProfileCommand(
                         projectId, "HOME_CHARGING_SURVEY_INSTALL", "鉴权测试",
-                        null, "HOME_CHARGING_SURVEY_INSTALL", null));
+                        null, "HOME_CHARGING_SURVEY_INSTALL", null,
+                        "HOME_CHARGING_AUTHORIZATION", 0));
 
         UUID foreignProjectId = UUID.randomUUID();
         assertThatThrownBy(() -> profiles.compareImpact(
@@ -481,6 +587,60 @@ class ProjectFulfillmentProfilePostgresIT {
                 .update();
     }
 
+    private UUID seedForeignProjectAndDraft() {
+        UUID foreignProjectId = UUID.randomUUID();
+        UUID foreignProfileId = UUID.randomUUID();
+        UUID foreignRevisionId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at
+                ) VALUES (
+                    :projectId, 'tenant-foreign-pfp', 'FOREIGN-PFP', 'OTHER',
+                    '其他租户项目', :startsOn, NULL, 'ACTIVE', 1, now()
+                )
+                """)
+                .param("projectId", foreignProjectId)
+                .param("startsOn", LocalDate.now().minusDays(1))
+                .update();
+        jdbc.sql("""
+                INSERT INTO cfg_project_fulfillment_profile (
+                    profile_id, tenant_id, project_id, profile_code, service_product_code,
+                    profile_name, description, match_priority, status,
+                    active_revision_id, draft_revision_id,
+                    aggregate_version, created_by, updated_by, created_at, updated_at
+                ) VALUES (
+                    :profileId, 'tenant-foreign-pfp', :projectId, 'FOREIGN_PLAN',
+                    'FOREIGN_PRODUCT', '其他租户方案', NULL, 0, 'DRAFT', NULL, NULL,
+                    1, 'foreign', 'foreign', now(), now()
+                )
+                """)
+                .param("profileId", foreignProfileId)
+                .param("projectId", foreignProjectId)
+                .update();
+        jdbc.sql("""
+                INSERT INTO cfg_project_fulfillment_revision (
+                    revision_id, tenant_id, profile_id, version_no, revision_status,
+                    document_json, created_at
+                ) VALUES (
+                    :revisionId, 'tenant-foreign-pfp', :profileId, 0, 'DRAFT',
+                    '{"schemaVersion":"1.0.0","stages":[]}'::jsonb, now()
+                )
+                """)
+                .param("revisionId", foreignRevisionId)
+                .param("profileId", foreignProfileId)
+                .update();
+        jdbc.sql("""
+                UPDATE cfg_project_fulfillment_profile
+                   SET draft_revision_id = :revisionId
+                 WHERE profile_id = :profileId
+                """)
+                .param("revisionId", foreignRevisionId)
+                .param("profileId", foreignProfileId)
+                .update();
+        return foreignProjectId;
+    }
+
     private static CurrentPrincipal principal() {
         return new CurrentPrincipal(ACTOR, TENANT, CurrentPrincipal.PrincipalType.USER,
                 "admin-web", Set.of(
@@ -500,12 +660,38 @@ class ProjectFulfillmentProfilePostgresIT {
         return new CommandMetadata("corr-" + key, "idem-" + key);
     }
 
+    private static ProjectFulfillmentDocument runtimeAlignedDocument(
+            ProjectFulfillmentDocument source
+    ) {
+        return new ProjectFulfillmentDocument(
+                source.schemaVersion(),
+                source.orderTypeName(),
+                source.matchRule(),
+                source.supportedClientKinds(),
+                List.of(new ProjectFulfillmentStageDraft(
+                        "STAGE_A",
+                        "任务 A",
+                        1,
+                        "USER_TASK",
+                        "DESIGNER_TASK",
+                        "PLATFORM",
+                        "与测试 Workflow 的真实运行阶段一致",
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        null,
+                        true)));
+    }
+
     private static ProjectFulfillmentDocument renameStage(
             ProjectFulfillmentDocument source, String fromName, String toName
     ) {
         return new ProjectFulfillmentDocument(
                 source.schemaVersion(),
                 source.orderTypeName(),
+                source.matchRule(),
                 source.supportedClientKinds(),
                 source.stages().stream()
                         .map(stage -> Objects.equals(stage.stageName(), fromName)
@@ -526,5 +712,58 @@ class ProjectFulfillmentProfilePostgresIT {
                                         stage.terminal())
                                 : stage)
                         .toList());
+    }
+
+    private ProjectFulfillmentProfileDetail createPublishedPlan(
+            String profileCode,
+            String name,
+            int matchPriority,
+            ProjectFulfillmentMatchRule matchRule,
+            Instant effectiveAt,
+            String key
+    ) {
+        ProjectFulfillmentProfileDetail created = profiles.create(
+                principal(),
+                meta("create-" + key),
+                new CreateProjectFulfillmentProfileCommand(
+                        projectId,
+                        "HOME_CHARGING_SURVEY_INSTALL",
+                        name,
+                        null,
+                        "HOME_CHARGING_SURVEY_INSTALL",
+                        null,
+                        profileCode,
+                        matchPriority));
+        ProjectFulfillmentDraftView draft = profiles.getDraft(
+                principal(), "corr-draft-" + key, projectId, created.profileId());
+        ProjectFulfillmentDocument aligned = runtimeAlignedDocument(draft.document());
+        ProjectFulfillmentDocument scoped = new ProjectFulfillmentDocument(
+                aligned.schemaVersion(),
+                aligned.orderTypeName(),
+                matchRule,
+                aligned.supportedClientKinds(),
+                aligned.stages());
+        profiles.updateDraft(
+                principal(),
+                meta("update-" + key),
+                new UpdateProjectFulfillmentDraftCommand(
+                        created.profileId(),
+                        draft.aggregateVersion(),
+                        name,
+                        null,
+                        scoped,
+                        workflowVersionId,
+                        bundle.bundleId()));
+        ProjectFulfillmentProfileDetail ready = profiles.get(
+                principal(), "corr-ready-" + key, projectId, created.profileId());
+        profiles.publish(
+                principal(),
+                meta("publish-" + key),
+                projectId,
+                created.profileId(),
+                ready.aggregateVersion(),
+                effectiveAt,
+                "多方案匹配测试");
+        return profiles.get(principal(), "corr-result-" + key, projectId, created.profileId());
     }
 }

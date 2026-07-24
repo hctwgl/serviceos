@@ -20,4 +20,16 @@ public interface TaskAssignmentService {
             String tenantId,
             String correlationId,
             AssignTaskCandidatesCommand command);
+
+    /**
+     * ServiceAssignment protocol v1 完成后，把已确认师傅冻结为 Task 候选执行人。
+     *
+     * <p>仅供 Dispatch 应用服务调用；责任主体转换、Task 版本检查和候选快照写入均失败关闭。
+     * 来源必须是 {@link AssignmentSourceType#SYSTEM}，sourceId 使用稳定的
+     * ServiceAssignment ID，重复完成不会生成第二批候选。</p>
+     */
+    TaskAssignmentBatchReceipt assignCandidateFromServiceAssignment(
+            String tenantId,
+            String correlationId,
+            AssignTaskCandidatesCommand command);
 }

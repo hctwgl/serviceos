@@ -2,6 +2,8 @@ package com.serviceos.dispatch.application;
 
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentView;
+import com.serviceos.task.api.TaskFulfillmentContext;
+import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,7 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -18,9 +23,14 @@ import java.util.UUID;
 @Service
 final class DefaultTechnicianActiveAssignmentQuery implements TechnicianActiveAssignmentQuery {
     private final JdbcClient jdbc;
+    private final TaskFulfillmentContextService tasks;
 
-    DefaultTechnicianActiveAssignmentQuery(JdbcClient jdbc) {
+    DefaultTechnicianActiveAssignmentQuery(
+            JdbcClient jdbc,
+            TaskFulfillmentContextService tasks
+    ) {
         this.jdbc = jdbc;
+        this.tasks = tasks;
     }
 
     @Override
@@ -167,20 +177,33 @@ final class DefaultTechnicianActiveAssignmentQuery implements TechnicianActiveAs
         if (candidateTaskIds == null || candidateTaskIds.isEmpty()) {
             return List.of();
         }
-        return jdbc.sql("""
-                        SELECT DISTINCT n.task_id
+        Map<UUID, UUID> workOrderByTask = new LinkedHashMap<>();
+        for (UUID taskId : candidateTaskIds) {
+            tasks.find(tenantId, taskId)
+                    .map(TaskFulfillmentContext::workOrderId)
+                    .ifPresent(workOrderId -> workOrderByTask.put(taskId, workOrderId));
+        }
+        if (workOrderByTask.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> allowedWorkOrders = Set.copyOf(jdbc.sql("""
+                        SELECT DISTINCT n.work_order_id
                           FROM dsp_service_assignment n
                          WHERE n.tenant_id = :tenantId
                            AND n.responsibility_level = 'NETWORK'
                            AND n.assignee_id = :networkId
                            AND n.status IN ('ACTIVE', 'ENDED')
-                           AND n.task_id IN (:taskIds)
+                           AND n.work_order_id IN (:workOrderIds)
                         """)
                 .param("tenantId", tenantId)
                 .param("networkId", networkId)
-                .param("taskIds", List.copyOf(candidateTaskIds))
-                .query((rs, rowNum) -> rs.getObject("task_id", UUID.class))
-                .list();
+                .param("workOrderIds", List.copyOf(workOrderByTask.values()))
+                .query((rs, rowNum) -> rs.getObject("work_order_id", UUID.class))
+                .list());
+        return workOrderByTask.entrySet().stream()
+                .filter(entry -> allowedWorkOrders.contains(entry.getValue()))
+                .map(Map.Entry::getKey)
+                .toList();
     }
 
     private static TechnicianActiveAssignmentView map(java.sql.ResultSet rs) throws java.sql.SQLException {

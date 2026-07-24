@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/workflow-review-submission-required-v1.schema.json",
+  "title": "WorkflowReviewSubmissionRequiredV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "workflow.review-submission-required"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "Workflow"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflowInstanceId", "reviewNodeInstanceId", "projectId", "workOrderId",
+        "sourceTaskId", "evidenceSetSnapshotId", "snapshotContentDigest", "requiredAt"
+      ],
+      "properties": {
+        "workflowInstanceId": {"type": "string", "format": "uuid"},
+        "reviewNodeInstanceId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "workOrderId": {"type": "string", "format": "uuid"},
+        "sourceTaskId": {"type": "string", "format": "uuid"},
+        "evidenceSetSnapshotId": {"type": "string", "format": "uuid"},
+        "snapshotContentDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "requiredAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

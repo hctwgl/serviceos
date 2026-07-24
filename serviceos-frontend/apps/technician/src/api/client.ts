@@ -5,6 +5,8 @@ import { accessToken, beginLogin } from '@serviceos/auth-context'
 // 使移植的 technicianPortal/me/pages 无需改动。
 const API_BASE =
   (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_API_BASE_URL ?? '/api/v1'
+const SERVICEOS_CLIENT_KIND = 'TECHNICIAN_WEB'
+const SERVICEOS_CLIENT_VERSION = '1.0.0'
 
 export type ProblemBody = {
   errorCode?: string
@@ -77,6 +79,9 @@ async function request<T>(
     Accept: 'application/json',
     'X-Correlation-Id': crypto.randomUUID(),
     ...(options.headers ?? {}),
+    // 显式声明 H5 执行端，让后端按冻结 Bundle 的 supportedClientKinds 与能力目录失败关闭。
+    'X-ServiceOS-Client-Kind': SERVICEOS_CLIENT_KIND,
+    'X-ServiceOS-Client-Version': SERVICEOS_CLIENT_VERSION,
   }
   if (token) headers.Authorization = `Bearer ${token}`
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'

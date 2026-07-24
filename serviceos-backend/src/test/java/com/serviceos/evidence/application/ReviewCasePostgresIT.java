@@ -670,6 +670,67 @@ class ReviewCasePostgresIT {
     }
 
     @Test
+    void workflowReviewSubmissionRequiredCreatesOneInternalReviewAndHandlingTask() throws Exception {
+        EvidenceSetSnapshotView snapshot = createSnapshot("workflow-review-required");
+        UUID workflowInstanceId = UUID.randomUUID();
+        UUID reviewNodeInstanceId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        Instant requiredAt = clock.instant();
+        String payload = """
+                {
+                  "workflowInstanceId":"%s",
+                  "reviewNodeInstanceId":"%s",
+                  "projectId":"%s",
+                  "workOrderId":"%s",
+                  "sourceTaskId":"%s",
+                  "evidenceSetSnapshotId":"%s",
+                  "snapshotContentDigest":"%s",
+                  "requiredAt":"%s"
+                }
+                """.formatted(
+                workflowInstanceId, reviewNodeInstanceId, projectId, workOrderId,
+                taskId, snapshot.evidenceSetSnapshotId(), snapshot.contentDigest(), requiredAt);
+        OutboxMessage message = new OutboxMessage(
+                UUID.randomUUID(), eventId, "workflow",
+                "workflow.review-submission-required", 1,
+                "Workflow", workflowInstanceId.toString(), 1,
+                TENANT, "corr-workflow-review-required", UUID.randomUUID().toString(),
+                workOrderId.toString(), payload, Sha256.digest(payload), requiredAt, 1);
+        OutboxMessageHandler handler = handlers.stream()
+                .filter(candidate -> candidate.supports(message.eventType(), message.schemaVersion()))
+                .findFirst()
+                .orElseThrow();
+
+        handler.handle(message);
+        handler.handle(message);
+
+        Map<String, Object> created = jdbc.sql("""
+                SELECT review_case_id, review_task_id, status, origin
+                  FROM evd_review_case
+                 WHERE tenant_id=:tenant
+                   AND evidence_set_snapshot_id=:snapshotId
+                """)
+                .param("tenant", TENANT)
+                .param("snapshotId", snapshot.evidenceSetSnapshotId())
+                .query().singleRow();
+        assertThat(text(created, "status")).isEqualTo("OPEN");
+        assertThat(text(created, "origin")).isEqualTo("INTERNAL");
+        assertThat(jdbc.sql("""
+                SELECT status FROM tsk_task WHERE tenant_id=:tenant AND task_id=:taskId
+                """)
+                .param("tenant", TENANT)
+                .param("taskId", uuid(created, "review_task_id"))
+                .query(String.class).single()).isEqualTo("READY");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM evd_review_case
+                 WHERE tenant_id=:tenant AND evidence_set_snapshot_id=:snapshotId
+                """)
+                .param("tenant", TENANT)
+                .param("snapshotId", snapshot.evidenceSetSnapshotId())
+                .query(Long.class).single()).isOne();
+    }
+
+    @Test
     void createsApprovesAndReplaysWithoutDuplicateDecisions() throws Exception {
         EvidenceSetSnapshotView snapshot = createSnapshot("approve");
 

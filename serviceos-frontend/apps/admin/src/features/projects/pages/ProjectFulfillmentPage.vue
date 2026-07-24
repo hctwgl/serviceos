@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import type {
   CreateProjectFulfillmentProfileInput,
+  ProjectFulfillmentMatchResult,
   ProjectFulfillmentProfileSummary,
 } from '@serviceos/api-client'
 import type { TableColumnsType } from '@serviceos/design-system'
 
+import {
+  simulateProjectFulfillmentMatch,
+} from '@serviceos/api-client'
 import {
   Button,
   Card,
@@ -40,16 +44,42 @@ const selectedSummary = computed(() => (
 ))
 const createOpen = ref(false)
 const createdProfileName = ref<string>()
+const initializationMode = ref('TEMPLATE:HOME_CHARGING_SURVEY_INSTALL')
 const form = reactive<CreateProjectFulfillmentProfileInput>({
+  matchPriority: 0,
+  profileCode: '',
   profileName: '',
   serviceProductCode: '',
-  templateCode: 'HOME_CHARGING_SURVEY_INSTALL',
   description: '',
 })
 const createCommand = useCreateProjectFulfillmentCommand(() => projectId.value)
+const simulationOpen = ref(false)
+const simulationLoading = ref(false)
+const simulationError = ref<string>()
+const simulationResult = ref<ProjectFulfillmentMatchResult>()
+const simulationForm = reactive({
+  brandCode: 'BYD_OCEAN',
+  provinceCode: '370000',
+  serviceProductCode: 'HOME_CHARGING_SURVEY_INSTALL',
+})
+const initializationOptions = computed(() => [
+  {
+    value: 'TEMPLATE:HOME_CHARGING_SURVEY_INSTALL',
+    label: '家充勘测安装标准流程（需后续绑定运行资产）',
+  },
+  {
+    value: 'TEMPLATE:BLANK',
+    label: '空白配置（适合新服务场景）',
+  },
+  ...(profiles.data.value ?? []).map((profile) => ({
+    value: `COPY:${profile.profileId}`,
+    label: `复制“${profile.profileName}”及其运行绑定`,
+  })),
+])
 
 const columns: TableColumnsType<ProjectFulfillmentProfileSummary> = [
-  { title: '履约方案', key: 'profile', width: 240 },
+  { title: '履约方案', key: 'profile', width: 280 },
+  { title: '匹配优先级', key: 'priority', width: 110 },
   { title: '状态', key: 'status', width: 100 },
   { title: '流程阶段', key: 'stages', width: 100 },
   { title: '表单 / 资料', key: 'assets', width: 130 },
@@ -97,9 +127,11 @@ function selectProfile(profileId: string) {
 
 function resetCreateForm() {
   form.profileName = ''
+  form.profileCode = ''
   form.serviceProductCode = ''
-  form.templateCode = 'HOME_CHARGING_SURVEY_INSTALL'
+  form.matchPriority = 0
   form.description = ''
+  initializationMode.value = 'TEMPLATE:HOME_CHARGING_SURVEY_INSTALL'
   createCommand.reset()
 }
 
@@ -108,11 +140,51 @@ function closeCreate() {
   resetCreateForm()
 }
 
+function openSimulation() {
+  simulationForm.serviceProductCode = selectedSummary.value?.serviceProductCode
+    ?? 'HOME_CHARGING_SURVEY_INSTALL'
+  simulationResult.value = undefined
+  simulationError.value = undefined
+  simulationOpen.value = true
+}
+
+function closeSimulation() {
+  simulationOpen.value = false
+  simulationResult.value = undefined
+  simulationError.value = undefined
+}
+
+async function runSimulation() {
+  simulationLoading.value = true
+  simulationError.value = undefined
+  simulationResult.value = undefined
+  try {
+    simulationResult.value = await simulateProjectFulfillmentMatch(projectId.value, {
+      brandCode: simulationForm.brandCode.trim().toUpperCase() || undefined,
+      provinceCode: simulationForm.provinceCode.trim() || undefined,
+      serviceProductCode: simulationForm.serviceProductCode.trim().toUpperCase(),
+    })
+  } catch (error) {
+    simulationError.value = error instanceof Error ? error.message : '模拟匹配失败'
+  } finally {
+    simulationLoading.value = false
+  }
+}
+
 async function createProfile() {
+  const copyFromProfileId = initializationMode.value.startsWith('COPY:')
+    ? initializationMode.value.slice('COPY:'.length)
+    : undefined
+  const templateCode = initializationMode.value.startsWith('TEMPLATE:')
+    ? initializationMode.value.slice('TEMPLATE:'.length) as 'BLANK' | 'HOME_CHARGING_SURVEY_INSTALL'
+    : undefined
   const created = await createCommand.mutateAsync({
+    copyFromProfileId,
+    matchPriority: Number(form.matchPriority ?? 0),
+    profileCode: form.profileCode?.trim().toUpperCase(),
     profileName: form.profileName.trim(),
     serviceProductCode: form.serviceProductCode.trim().toUpperCase(),
-    templateCode: form.templateCode,
+    templateCode,
     description: form.description?.trim() || undefined,
   })
   createdProfileName.value = created.profileName
@@ -131,6 +203,7 @@ async function createProfile() {
     <template #extra>
       <Space>
         <RouterLink :to="`/projects/${projectId}`"><Button>返回项目详情</Button></RouterLink>
+        <Button @click="openSimulation">模拟匹配</Button>
         <Button type="primary" @click="createOpen = true">新建履约方案</Button>
       </Space>
     </template>
@@ -158,9 +231,10 @@ async function createProfile() {
             <template v-if="column.key === 'profile'">
               <div class="table-primary-cell">
                 <strong>{{ record.profileName }}</strong>
-                <span>{{ serviceProductLabel(record.serviceProductCode) }}</span>
+                <span>{{ serviceProductLabel(record.serviceProductCode) }} · {{ record.profileCode }}</span>
               </div>
             </template>
+            <template v-else-if="column.key === 'priority'">{{ record.matchPriority }}</template>
             <template v-else-if="column.key === 'status'">
               <Tag :color="presentStatus(record.status).color">
                 {{ presentStatus(record.status).label }}
@@ -191,6 +265,7 @@ async function createProfile() {
             <div>
               <span>{{ serviceProductLabel(selectedProfile.data.value.serviceProductCode) }}</span>
               <h2>{{ selectedProfile.data.value.profileName }}</h2>
+              <p>{{ selectedProfile.data.value.profileCode }} · 优先级 {{ selectedProfile.data.value.matchPriority }}</p>
               <p>{{ selectedProfile.data.value.description || '尚未填写方案说明' }}</p>
             </div>
             <Tag :color="presentStatus(selectedProfile.data.value.status).color">
@@ -261,14 +336,22 @@ async function createProfile() {
         <Form.Item label="服务产品编码" required>
           <Input v-model:value="form.serviceProductCode" placeholder="例如：HOME_CHARGING_INSTALL" :maxlength="96" />
         </Form.Item>
+        <Form.Item label="方案编码" required>
+          <Input v-model:value="form.profileCode" placeholder="例如：BYD_SHANDONG_HOME_STANDARD" :maxlength="96" />
+          <small class="field-hint">方案编码在项目内唯一；同一服务产品可以配置多套不同适用范围的方案。</small>
+        </Form.Item>
+        <Form.Item label="匹配优先级" required>
+          <Input v-model:value="form.matchPriority" type="number" :min="-10000" :max="10000" />
+          <small class="field-hint">数字越大越优先；同优先级时选择适用条件更具体的方案。</small>
+        </Form.Item>
         <Form.Item label="初始化方式" required>
           <Select
-            v-model:value="form.templateCode"
-            :options="[
-              { value: 'HOME_CHARGING_SURVEY_INSTALL', label: '家充勘测安装标准流程' },
-              { value: 'BLANK', label: '空白配置' },
-            ]"
+            v-model:value="initializationMode"
+            :options="initializationOptions"
           />
+          <small class="field-hint">
+            复制现有方案会在同一项目范围内原子复制流程文档、Workflow 与 Bundle 运行绑定。
+          </small>
         </Form.Item>
         <Form.Item label="方案说明">
           <Input.TextArea v-model:value="form.description" :rows="4" placeholder="说明适用业务范围和履约目标" />
@@ -279,11 +362,56 @@ async function createProfile() {
           <Button @click="closeCreate">取消</Button>
           <Button
             type="primary"
-            :disabled="!form.profileName.trim() || !form.serviceProductCode.trim()"
+            :disabled="!form.profileName.trim() || !form.profileCode?.trim() || !form.serviceProductCode.trim()"
             :loading="createCommand.isPending.value"
             @click="createProfile"
           >
             创建方案
+          </Button>
+        </div>
+      </template>
+    </Drawer>
+
+    <Drawer :open="simulationOpen" width="560" title="履约方案匹配模拟器" @close="closeSimulation">
+      <p class="create-user-intro">使用与正式建单相同的适用范围、匹配优先级和规则具体度算法；模拟不会创建工单或运行实例。</p>
+      <PageError v-if="simulationError" :detail="simulationError" />
+      <Form layout="vertical">
+        <Form.Item label="服务产品编码" required>
+          <Input v-model:value="simulationForm.serviceProductCode" :maxlength="96" />
+        </Form.Item>
+        <Form.Item label="客户品牌编码">
+          <Input v-model:value="simulationForm.brandCode" placeholder="例如：BYD_OCEAN" :maxlength="64" />
+        </Form.Item>
+        <Form.Item label="省级行政区编码">
+          <Input v-model:value="simulationForm.provinceCode" placeholder="例如：370000" :maxlength="6" />
+        </Form.Item>
+      </Form>
+      <section v-if="simulationResult" class="fulfillment-simulation-result">
+        <header>
+          <div><span>唯一命中</span><h3>{{ simulationResult.profileName }}</h3></div>
+          <Tag color="success">V{{ simulationResult.fulfillmentVersion }}</Tag>
+        </header>
+        <dl>
+          <div><dt>方案编码</dt><dd>{{ simulationResult.profileCode }}</dd></div>
+          <div><dt>匹配优先级</dt><dd>{{ simulationResult.matchPriority }}</dd></div>
+          <div><dt>规则具体度</dt><dd>{{ simulationResult.matchSpecificity }}</dd></div>
+          <div><dt>配置包版本</dt><dd>{{ simulationResult.configurationBundleVersion }}</dd></div>
+        </dl>
+        <div class="fulfillment-simulation-reasons">
+          <strong>命中解释</strong>
+          <Tag v-for="reason in simulationResult.matchExplanation" :key="reason" color="processing">{{ reason }}</Tag>
+        </div>
+      </section>
+      <template #footer>
+        <div class="drawer-footer">
+          <Button @click="closeSimulation">关闭</Button>
+          <Button
+            type="primary"
+            :disabled="!simulationForm.serviceProductCode.trim()"
+            :loading="simulationLoading"
+            @click="runSimulation"
+          >
+            开始模拟
           </Button>
         </div>
       </template>

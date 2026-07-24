@@ -45,6 +45,7 @@ final class DefaultServiceAssignmentQueryService implements ServiceAssignmentQue
         authorization.require(principal, AuthorizationRequest.projectCapability(
                 READ, principal.tenantId(), "Task", taskId.toString(), task.projectId().toString()),
                 correlationId);
-        return responsibilities.findSummary(principal.tenantId(), taskId);
+        return responsibilities.findSummary(
+                principal.tenantId(), taskId, task.workOrderId());
     }
 }

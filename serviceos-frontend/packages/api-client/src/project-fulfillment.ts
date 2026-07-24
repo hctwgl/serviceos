@@ -9,8 +9,10 @@ export type ProjectFulfillmentProfileSummary = {
   evidenceCount: number
   formCount: number
   profileId: string
+  profileCode: string
   profileName: string
   projectId: string
+  matchPriority: number
   serviceProductCode: string
   slaSummary: string | null
   stageCount: number
@@ -30,18 +32,23 @@ export type ProjectFulfillmentProfileDetail = {
   description: string | null
   draftRevisionId: string | null
   profileId: string
+  profileCode: string
   profileName: string
   projectId: string
+  matchPriority: number
   serviceProductCode: string
   status: ProjectFulfillmentProfileStatus
   updatedAt: string
 }
 
 export type CreateProjectFulfillmentProfileInput = {
+  copyFromProfileId?: string
   description?: string
+  matchPriority?: number
+  profileCode?: string
   profileName: string
   serviceProductCode: string
-  templateCode: 'BLANK' | 'HOME_CHARGING_SURVEY_INSTALL'
+  templateCode?: 'BLANK' | 'HOME_CHARGING_SURVEY_INSTALL'
 }
 
 export type ProjectFulfillmentStageDraft = {
@@ -62,6 +69,10 @@ export type ProjectFulfillmentStageDraft = {
 }
 
 export type ProjectFulfillmentDocument = {
+  matchRule?: {
+    brandCodes: string[]
+    provinceCodes: string[]
+  }
   orderTypeName: string | null
   schemaVersion: string
   stages: ProjectFulfillmentStageDraft[]
@@ -76,7 +87,9 @@ export type ProjectFulfillmentDraft = {
   profileName: string
   revisionId: string
   serviceProductCode: string
+  sourceBundleId: string | null
   updatedAt: string
+  workflowAssetVersionId: string | null
 }
 
 export type ProjectFulfillmentValidationIssue = {
@@ -160,6 +173,23 @@ export type ProjectFulfillmentRevision = {
   versionNo: number
 }
 
+export type ProjectFulfillmentMatchResult = {
+  configurationBundleCode: string
+  configurationBundleDigest: string
+  configurationBundleId: string
+  configurationBundleVersion: string
+  contentDigest: string
+  fulfillmentVersion: string
+  manifestJson: string
+  matchExplanation: string[]
+  matchPriority: number
+  matchSpecificity: number
+  profileCode: string
+  profileId: string
+  profileName: string
+  revisionId: string
+}
+
 export function loadProjectFulfillmentProfiles(projectId: string) {
   return get<ProjectFulfillmentProfileSummary[]>(`/projects/${projectId}/fulfillment-profiles`)
     .then((result) => result.data)
@@ -181,6 +211,22 @@ export function createProjectFulfillmentProfile(
   ).then((result) => result.data)
 }
 
+export function simulateProjectFulfillmentMatch(
+  projectId: string,
+  input: {
+    asOf?: string
+    brandCode?: string
+    clientKind?: 'ADMIN_WEB' | 'NETWORK_WEB' | 'TECHNICIAN_IOS' | 'TECHNICIAN_WEB'
+    provinceCode?: string
+    serviceProductCode: string
+  },
+) {
+  return post<ProjectFulfillmentMatchResult>(
+    `/projects/${projectId}/fulfillment-profiles/simulations`,
+    input,
+  ).then((result) => result.data)
+}
+
 export function loadProjectFulfillmentDraft(projectId: string, profileId: string) {
   return get<ProjectFulfillmentDraft>(
     `/projects/${projectId}/fulfillment-profiles/${profileId}/draft`,
@@ -195,6 +241,8 @@ export function updateProjectFulfillmentDraft(
     description?: string
     document: ProjectFulfillmentDocument
     profileName?: string
+    sourceBundleId: string | null
+    workflowAssetVersionId: string | null
   },
 ) {
   return put<ProjectFulfillmentDraft>(

@@ -68,7 +68,28 @@ function itemStatusTone(item: WorkOrderWorkspaceEvidenceItemSummary) {
   if (item.status === 'ACCEPTED') return 'green'
   if (item.status === 'REJECTED') return 'red'
   if (item.status === 'UNDER_REVIEW' || item.status === 'SUBMITTED') return 'blue'
+  if (item.status === 'OPEN' && item.latestRevisionStatus === 'VALIDATED') return 'green'
+  if (item.status === 'OPEN' && item.latestRevisionStatus === 'VALIDATION_FAILED') return 'red'
+  if (
+    item.status === 'OPEN'
+    && (item.latestRevisionStatus === 'STORED' || item.latestRevisionStatus === 'VALIDATING')
+  ) return 'blue'
   return 'gray'
+}
+
+/**
+ * EvidenceItem 的 OPEN 表示仍可追加修订，不等于“尚未上传”。
+ * 已存在修订时优先表达用户关心的上传/校验结果，避免把校验通过的资料误写成待提交。
+ */
+function itemStatusLabel(item: WorkOrderWorkspaceEvidenceItemSummary) {
+  if (item.status !== 'OPEN' || !item.latestRevisionStatus) {
+    return evidenceItemStatusLabel(item.status)
+  }
+  if (item.latestRevisionStatus === 'VALIDATED') return '已上传'
+  if (item.latestRevisionStatus === 'VALIDATION_FAILED') return '校验未通过'
+  if (item.latestRevisionStatus === 'QUARANTINED') return '已隔离'
+  if (item.latestRevisionStatus === 'INVALIDATED') return '已作废'
+  return '处理中'
 }
 
 // 预览走受控授权：申请短时下载授权后新窗口打开，不内嵌永久 URL。
@@ -176,7 +197,7 @@ const preview = useMutation({
                 <strong>资料 {{ item.itemOrdinal }}</strong>
                 <StatusPill
                   :tone="itemStatusTone(item)"
-                  :label="evidenceItemStatusLabel(item.status)"
+                  :label="itemStatusLabel(item)"
                 />
                 <span class="fe-item-meta">
                   {{ item.latestRevisionNumber ? `第 ${item.latestRevisionNumber} 版` : '暂无版本' }}

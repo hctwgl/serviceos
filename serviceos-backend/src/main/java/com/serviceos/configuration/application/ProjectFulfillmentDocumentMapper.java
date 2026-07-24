@@ -1,6 +1,7 @@
 package com.serviceos.configuration.application;
 
 import com.serviceos.configuration.api.ProjectFulfillmentDocument;
+import com.serviceos.configuration.api.ProjectFulfillmentMatchRule;
 import com.serviceos.configuration.api.ProjectFulfillmentStageDraft;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
@@ -58,6 +59,7 @@ final class ProjectFulfillmentDocumentMapper {
         return new ProjectFulfillmentDocument(
                 stringVal(raw.get("schemaVersion"), "1.0.0"),
                 stringOrNull(raw.get("orderTypeName")),
+                matchRule(raw.get("matchRule")),
                 clientKinds,
                 stages);
     }
@@ -68,6 +70,10 @@ final class ProjectFulfillmentDocumentMapper {
         if (document.orderTypeName() != null) {
             raw.put("orderTypeName", document.orderTypeName());
         }
+        Map<String, Object> matchRule = new LinkedHashMap<>();
+        matchRule.put("brandCodes", document.matchRule().brandCodes());
+        matchRule.put("provinceCodes", document.matchRule().provinceCodes());
+        raw.put("matchRule", matchRule);
         if (!document.supportedClientKinds().isEmpty()) {
             raw.put("supportedClientKinds", document.supportedClientKinds());
         }
@@ -120,6 +126,15 @@ final class ProjectFulfillmentDocumentMapper {
             return List.of();
         }
         return list.stream().map(String::valueOf).toList();
+    }
+
+    private static ProjectFulfillmentMatchRule matchRule(Object value) {
+        if (!(value instanceof Map<?, ?> map)) {
+            return ProjectFulfillmentMatchRule.unrestricted();
+        }
+        return new ProjectFulfillmentMatchRule(
+                stringList(map.get("brandCodes")),
+                stringList(map.get("provinceCodes")));
     }
 
     @SuppressWarnings("unchecked")

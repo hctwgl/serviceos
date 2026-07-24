@@ -31,6 +31,10 @@ class ManualServiceAssignmentPostgresIT {
     private static final String TENANT = "tenant-manual-assign-it";
     private static final String MANAGER = "manual-assign-manager";
     private static final String BUSINESS_TYPE = "INSTALLATION";
+    private static final UUID TECHNICIAN_PROFILE =
+            UUID.fromString("b6fd9adb-acde-44d1-ae58-2dc0f28326be");
+    private static final UUID TECHNICIAN_PRINCIPAL =
+            UUID.fromString("f4eb39d8-563b-4e58-b2fe-b79d3b2b4f88");
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -59,8 +63,11 @@ class ManualServiceAssignmentPostgresIT {
                     dsp_service_assignment, dsp_capacity_counter,
                     aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
                     rel_idempotency_record, auth_role_field_policy,
-                    auth_role_grant, auth_role_capability, auth_role, tsk_task CASCADE
+                    auth_role_grant, auth_role_capability, auth_role, tsk_task,
+                    net_technician_profile, idn_security_principal CASCADE
                 """).update();
+        DispatchTechnicianFixture.seed(
+                jdbc, TENANT, TECHNICIAN_PROFILE, TECHNICIAN_PRINCIPAL, "试点安装师傅");
         seedGrant(Set.of("dispatch.capacity.configure", "dispatch.assignment.manage"));
     }
 
@@ -72,11 +79,11 @@ class ManualServiceAssignmentPostgresIT {
         ManualServiceAssignmentReceipt receipt = manualAssignments.manualAssign(
                 manager(), metadata("manual-initial"),
                 new ManualAssignServiceAssignmentCommand(
-                        taskId, "network-pilot-1", "technician-pilot-1", BUSINESS_TYPE));
+                        taskId, "network-pilot-1", TECHNICIAN_PROFILE.toString(), BUSINESS_TYPE));
 
         assertThat(receipt.workOrderId()).isEqualTo(workOrderId);
         assertThat(receipt.networkAssigneeId()).isEqualTo("network-pilot-1");
-        assertThat(receipt.technicianAssigneeId()).isEqualTo("technician-pilot-1");
+        assertThat(receipt.technicianAssigneeId()).isEqualTo(TECHNICIAN_PROFILE.toString());
         assertThat(jdbc.sql("""
                         SELECT responsibility_level || ':' || assignee_id || ':' || status
                           FROM dsp_service_assignment
@@ -87,7 +94,7 @@ class ManualServiceAssignmentPostgresIT {
                 .query(String.class).list())
                 .containsExactly(
                         "NETWORK:network-pilot-1:ACTIVE",
-                        "TECHNICIAN:technician-pilot-1:ACTIVE");
+                        "TECHNICIAN:" + TECHNICIAN_PROFILE + ":ACTIVE");
         assertThat(jdbc.sql("""
                         SELECT count(*) FROM dsp_capacity_reservation
                          WHERE tenant_id = :tenantId AND status = 'CONFIRMED'
@@ -105,7 +112,7 @@ class ManualServiceAssignmentPostgresIT {
         ManualServiceAssignmentReceipt replay = manualAssignments.manualAssign(
                 manager(), metadata("manual-initial"),
                 new ManualAssignServiceAssignmentCommand(
-                        taskId, "network-pilot-1", "technician-pilot-1", BUSINESS_TYPE));
+                        taskId, "network-pilot-1", TECHNICIAN_PROFILE.toString(), BUSINESS_TYPE));
         assertThat(replay.networkServiceAssignmentId())
                 .isEqualTo(receipt.networkServiceAssignmentId());
         assertThat(replay.technicianServiceAssignmentId())

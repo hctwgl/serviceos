@@ -15,12 +15,9 @@ import com.serviceos.dispatch.api.ServiceAssignmentTimeoutScanner;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.application.OutboxWorker;
 import com.serviceos.shared.CommandMetadata;
-import com.serviceos.task.api.AssignTaskCandidatesCommand;
-import com.serviceos.task.api.AssignmentSourceType;
 import com.serviceos.task.api.ClaimHumanTaskCommand;
 import com.serviceos.task.api.CreateWorkflowTaskCommand;
 import com.serviceos.task.api.HumanTaskCommandService;
-import com.serviceos.task.api.TaskAssignmentService;
 import com.serviceos.task.api.TaskSchedulingService;
 import com.serviceos.task.api.WorkflowTaskKind;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +46,14 @@ class DispatchTaskReassignmentSagaPostgresIT {
     private static final String TENANT = "tenant-dispatch-task-saga-it";
     private static final String MANAGER = "dispatch-manager";
     private static final String BUSINESS_TYPE = "SITE_SURVEY";
+    private static final UUID TECHNICIAN_PROFILE_A =
+            UUID.fromString("b55cd213-9871-4e1f-bc2d-0e88b0f94005");
+    private static final UUID TECHNICIAN_PRINCIPAL_A =
+            UUID.fromString("1a117c0c-9494-40d6-b6b9-5e04a199ee35");
+    private static final UUID TECHNICIAN_PROFILE_B =
+            UUID.fromString("656ad4c1-103f-4353-b994-10d8e932b194");
+    private static final UUID TECHNICIAN_PRINCIPAL_B =
+            UUID.fromString("e88c4d63-b7ae-44f5-a37e-2a0c56744833");
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -67,7 +72,6 @@ class DispatchTaskReassignmentSagaPostgresIT {
     @Autowired CapacityAuthorityService capacities;
     @Autowired ServiceAssignmentService serviceAssignments;
     @Autowired TaskSchedulingService tasks;
-    @Autowired TaskAssignmentService taskAssignments;
     @Autowired HumanTaskCommandService humanTasks;
     @Autowired OutboxWorker outboxWorker;
     @Autowired ServiceAssignmentTimeoutScanner timeoutScanner;
@@ -93,12 +97,17 @@ class DispatchTaskReassignmentSagaPostgresIT {
                     aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
                     rel_inbox_record, rel_idempotency_record,
                     auth_role_field_policy, auth_role_grant,
-                    auth_role_capability, auth_role CASCADE
+                    auth_role_capability, auth_role,
+                    net_technician_profile, idn_security_principal CASCADE
                 """).update();
+        DispatchTechnicianFixture.seed(
+                jdbc, TENANT, TECHNICIAN_PROFILE_A, TECHNICIAN_PRINCIPAL_A, "初始勘测师傅");
+        DispatchTechnicianFixture.seed(
+                jdbc, TENANT, TECHNICIAN_PROFILE_B, TECHNICIAN_PRINCIPAL_B, "改派勘测师傅");
         seedGrant(MANAGER, Set.of(
                 "dispatch.capacity.configure", "dispatch.assignment.manage",
                 "task.assign", "task.reassignment.manage"));
-        seedGrant("technician-a", Set.of("task.claim"));
+        seedGrant(TECHNICIAN_PRINCIPAL_A.toString(), Set.of("task.claim"));
     }
 
     @Test
@@ -435,8 +444,8 @@ class DispatchTaskReassignmentSagaPostgresIT {
     }
 
     private Baseline baseline(String key) {
-        configure("technician-a", "capacity-a-" + key);
-        configure("technician-b", "capacity-b-" + key);
+        configure(TECHNICIAN_PROFILE_A.toString(), "capacity-a-" + key);
+        configure(TECHNICIAN_PROFILE_B.toString(), "capacity-b-" + key);
         EvidenceContext evidence = seedEvidenceContext(key);
         UUID workOrderId = UUID.randomUUID();
         seedWorkOrder(evidence, workOrderId, key);
@@ -447,19 +456,11 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 "SURVEY", BUSINESS_TYPE, WorkflowTaskKind.HUMAN, null, null, null, null, null,
                 "work-order:m25-" + key, "b".repeat(64),
                 500, Instant.now(), 1, "corr-task-" + key, "cause-task-" + key)).taskId();
-        taskAssignments.assignCandidates(
-                manager(), metadata("assign-a-" + key),
-                new AssignTaskCandidatesCommand(taskId, 1, List.of("technician-a"),
-                        AssignmentSourceType.MANUAL, "manual://m25-initial"));
-        humanTasks.claim(
-                principal("technician-a", "task.claim"), metadata("claim-a-" + key),
-                new ClaimHumanTaskCommand(taskId, 2));
-
         ServiceAssignmentReceipt pending = serviceAssignments.prepare(
                 manager(), metadata("service-a-prepare-" + key),
                 new PrepareServiceAssignmentCommand(
                         UUID.randomUUID(), workOrderId, taskId, ResponsibilityLevel.TECHNICIAN,
-                        "technician-a", BUSINESS_TYPE, "decision://initial-a-" + key,
+                        TECHNICIAN_PROFILE_A.toString(), BUSINESS_TYPE, "decision://initial-a-" + key,
                         null, null, 1));
         UUID preparedId = UUID.randomUUID();
         serviceAssignments.confirmTaskPrepared(
@@ -476,6 +477,9 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 manager(), metadata("service-a-complete-" + key),
                 new CompleteServiceAssignmentActivationCommand(
                         pending.sagaId(), pending.serviceAssignmentId(), preparedId, 3));
+        humanTasks.claim(
+                principal(TECHNICIAN_PRINCIPAL_A.toString(), "task.claim"), metadata("claim-a-" + key),
+                new ClaimHumanTaskCommand(taskId, 2));
         drainOutbox();
         return new Baseline(workOrderId, taskId, pending.serviceAssignmentId());
     }
@@ -538,7 +542,7 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 manager(), metadata("service-b-prepare-" + key),
                 new PrepareServiceAssignmentCommand(
                         UUID.randomUUID(), baseline.workOrderId(), baseline.taskId(),
-                        ResponsibilityLevel.TECHNICIAN, "technician-b", BUSINESS_TYPE,
+                        ResponsibilityLevel.TECHNICIAN, TECHNICIAN_PROFILE_B.toString(), BUSINESS_TYPE,
                         "decision://reassign-b-" + key, baseline.serviceAssignmentId(),
                         "MANUAL_REASSIGNMENT", 1,
                         "authority://b-" + key, 7,
@@ -592,16 +596,20 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 SELECT assignee_id || ':' || status FROM dsp_service_assignment
                  WHERE task_id = :taskId ORDER BY created_at
                 """).param("taskId", baseline.taskId()).query(String.class).list())
-                .containsExactly("technician-a:ENDED", "technician-b:ACTIVE");
+                .containsExactly(
+                        TECHNICIAN_PROFILE_A + ":ENDED",
+                        TECHNICIAN_PROFILE_B + ":ACTIVE");
         assertThat(jdbc.sql("SELECT claimed_by FROM tsk_task WHERE task_id = :taskId")
                 .param("taskId", baseline.taskId()).query(String.class).single())
-                .isEqualTo("technician-b");
+                .isEqualTo(TECHNICIAN_PRINCIPAL_B.toString());
         assertThat(jdbc.sql("""
                 SELECT principal_id || ':' || status FROM tsk_task_assignment
                  WHERE task_id = :taskId AND assignment_kind = 'RESPONSIBLE'
                  ORDER BY created_at
                 """).param("taskId", baseline.taskId()).query(String.class).list())
-                .containsExactly("technician-a:REVOKED", "technician-b:ACTIVE");
+                .containsExactly(
+                        TECHNICIAN_PRINCIPAL_A + ":REVOKED",
+                        TECHNICIAN_PRINCIPAL_B + ":ACTIVE");
         assertThat(jdbc.sql("""
                 SELECT status FROM tsk_task_execution_guard
                  WHERE guard_key = :sagaId
@@ -620,16 +628,20 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 SELECT assignee_id || ':' || status FROM dsp_service_assignment
                  WHERE task_id = :taskId ORDER BY created_at
                 """).param("taskId", baseline.taskId()).query(String.class).list())
-                .containsExactly("technician-a:ACTIVE", "technician-b:FAILED_ACTIVATION");
+                .containsExactly(
+                        TECHNICIAN_PROFILE_A + ":ACTIVE",
+                        TECHNICIAN_PROFILE_B + ":FAILED_ACTIVATION");
         assertThat(jdbc.sql("SELECT claimed_by FROM tsk_task WHERE task_id = :taskId")
                 .param("taskId", baseline.taskId()).query(String.class).single())
-                .isEqualTo("technician-a");
+                .isEqualTo(TECHNICIAN_PRINCIPAL_A.toString());
         assertThat(jdbc.sql("""
                 SELECT principal_id || ':' || status FROM tsk_task_assignment
                  WHERE task_id = :taskId AND assignment_kind = 'RESPONSIBLE'
                  ORDER BY created_at
                 """).param("taskId", baseline.taskId()).query(String.class).list())
-                .containsExactly("technician-a:ACTIVE", "technician-b:ABORTED");
+                .containsExactly(
+                        TECHNICIAN_PRINCIPAL_A + ":ACTIVE",
+                        TECHNICIAN_PRINCIPAL_B + ":ABORTED");
         assertThat(jdbc.sql("""
                 SELECT status FROM tsk_task_execution_guard
                  WHERE guard_key = :sagaId

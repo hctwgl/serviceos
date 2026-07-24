@@ -8,11 +8,15 @@ import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.configuration.api.CreateProjectFulfillmentProfileCommand;
 import com.serviceos.configuration.api.ProjectFulfillmentCompareImpact;
 import com.serviceos.configuration.api.ProjectFulfillmentDraftView;
+import com.serviceos.configuration.api.ProjectFulfillmentDocument;
 import com.serviceos.configuration.api.ProjectFulfillmentManifestView;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileDetail;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileStatus;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileSummary;
+import com.serviceos.configuration.api.ProjectFulfillmentResolveQuery;
+import com.serviceos.configuration.api.ProjectFulfillmentResolveResult;
+import com.serviceos.configuration.api.ProjectFulfillmentResolver;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionStatus;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionView;
 import com.serviceos.configuration.api.ProjectFulfillmentSchemeCount;
@@ -75,6 +79,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
     private final ProjectFulfillmentRunbookAssembler runbookAssembler;
     private final ProjectFulfillmentCompareAnalyzer compareAnalyzer;
     private final ProjectFulfillmentDocumentMapper documentMapper;
+    private final ProjectFulfillmentResolver fulfillmentResolver;
     private final WorkOrderQueryService workOrders;
     private final PrincipalPersonaQuery personas;
     private final ObjectMapper objectMapper;
@@ -89,6 +94,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
             ProjectFulfillmentRunbookAssembler runbookAssembler,
             ProjectFulfillmentCompareAnalyzer compareAnalyzer,
             ProjectFulfillmentDocumentMapper documentMapper,
+            ProjectFulfillmentResolver fulfillmentResolver,
             WorkOrderQueryService workOrders,
             PrincipalPersonaQuery personas,
             ObjectMapper objectMapper,
@@ -102,6 +108,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         this.runbookAssembler = runbookAssembler;
         this.compareAnalyzer = compareAnalyzer;
         this.documentMapper = documentMapper;
+        this.fulfillmentResolver = fulfillmentResolver;
         this.workOrders = workOrders;
         this.personas = personas;
         this.objectMapper = objectMapper;
@@ -126,46 +133,51 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         UUID profileId = UUID.randomUUID();
         UUID draftRevisionId = UUID.randomUUID();
         Instant now = clock.instant();
-        String documentJson = initialDocument(command);
+        InitialDraft initialDraft = initialDraft(principal.tenantId(), command);
         try {
             jdbc.sql("""
                     INSERT INTO cfg_project_fulfillment_profile (
-                        profile_id, tenant_id, project_id, service_product_code, profile_name,
-                        description, status, active_revision_id, draft_revision_id,
+                        profile_id, tenant_id, project_id, profile_code, service_product_code,
+                        profile_name, description, match_priority, status,
+                        active_revision_id, draft_revision_id,
                         aggregate_version, created_by, updated_by, created_at, updated_at
                     ) VALUES (
-                        :profileId, :tenantId, :projectId, :product, :name,
-                        :description, 'DRAFT', NULL, NULL,
+                        :profileId, :tenantId, :projectId, :profileCode, :product,
+                        :name, :description, :matchPriority, 'DRAFT', NULL, NULL,
                         1, :actor, :actor, :now, :now
                     )
                     """)
                     .param("profileId", profileId)
                     .param("tenantId", principal.tenantId())
                     .param("projectId", command.projectId())
+                    .param("profileCode", command.profileCode())
                     .param("product", command.serviceProductCode())
                     .param("name", command.profileName())
                     .param("description", command.description())
+                    .param("matchPriority", command.matchPriority())
                     .param("actor", principal.principalId())
                     .param("now", PostgresJdbcParameters.timestamptz(now))
                     .update();
         } catch (DuplicateKeyException ex) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
-                    "同一项目下该工单类型已存在履约配置");
+                    "同一项目下履约方案编码已存在");
         }
 
         jdbc.sql("""
                 INSERT INTO cfg_project_fulfillment_revision (
                     revision_id, tenant_id, profile_id, version_no, revision_status,
-                    document_json, created_at
+                    document_json, workflow_asset_version_id, source_bundle_id, created_at
                 ) VALUES (
                     :revisionId, :tenantId, :profileId, 0, 'DRAFT',
-                    CAST(:document AS jsonb), :now
+                    CAST(:document AS jsonb), :workflowVersionId, :bundleId, :now
                 )
                 """)
                 .param("revisionId", draftRevisionId)
                 .param("tenantId", principal.tenantId())
                 .param("profileId", profileId)
-                .param("document", documentJson)
+                .param("document", initialDraft.documentJson())
+                .param("workflowVersionId", initialDraft.workflowAssetVersionId())
+                .param("bundleId", initialDraft.sourceBundleId())
                 .param("now", PostgresJdbcParameters.timestamptz(now))
                 .update();
 
@@ -230,8 +242,8 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 READ, principal.tenantId(), RESOURCE, projectId.toString(), projectId.toString()),
                 correlationId);
         return jdbc.sql("""
-                SELECT p.profile_id, p.project_id, p.service_product_code, p.profile_name, p.status,
-                       p.aggregate_version, p.updated_at,
+                SELECT p.profile_id, p.project_id, p.profile_code, p.service_product_code,
+                       p.profile_name, p.match_priority, p.status, p.aggregate_version, p.updated_at,
                        r.version_no AS active_version_no, r.effective_from,
                        COALESCE(r.document_json, d.document_json) AS document_json
                   FROM cfg_project_fulfillment_profile p
@@ -240,7 +252,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
              LEFT JOIN cfg_project_fulfillment_revision d
                     ON d.revision_id = p.draft_revision_id
                  WHERE p.tenant_id = :tenantId AND p.project_id = :projectId
-                 ORDER BY p.service_product_code
+                 ORDER BY p.service_product_code, p.match_priority DESC, p.profile_code
                 """)
                 .param("tenantId", principal.tenantId())
                 .param("projectId", projectId)
@@ -251,8 +263,10 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                     return new ProjectFulfillmentProfileSummary(
                             rs.getObject("profile_id", UUID.class),
                             rs.getObject("project_id", UUID.class),
+                            rs.getString("profile_code"),
                             rs.getString("service_product_code"),
                             rs.getString("profile_name"),
+                            rs.getInt("match_priority"),
                             rs.getString("status"),
                             counts.stages(),
                             counts.forms(),
@@ -265,6 +279,28 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                             toInstant(rs.getObject("updated_at", OffsetDateTime.class)));
                 })
                 .list();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProjectFulfillmentResolveResult simulateMatch(
+            CurrentPrincipal principal,
+            String correlationId,
+            ProjectFulfillmentResolveQuery query
+    ) {
+        Objects.requireNonNull(query, "query");
+        if (!Objects.equals(principal.tenantId(), query.tenantId())) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED, "不得模拟其他租户的履约方案");
+        }
+        requireProject(principal.tenantId(), query.projectId());
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                READ,
+                principal.tenantId(),
+                RESOURCE,
+                query.projectId().toString(),
+                query.projectId().toString()),
+                correlationId);
+        return fulfillmentResolver.resolve(query);
     }
 
     @Override
@@ -349,8 +385,9 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
             }
         }
         return new ProjectFulfillmentProfileDetail(
-                row.profileId(), row.projectId(), row.serviceProductCode(), row.profileName(),
-                row.description(), row.status(), row.draftRevisionId(), row.activeRevisionId(),
+                row.profileId(), row.projectId(), row.profileCode(), row.serviceProductCode(),
+                row.profileName(), row.description(), row.matchPriority(), row.status(),
+                row.draftRevisionId(), row.activeRevisionId(),
                 activeVersion, effectiveFrom, allowedActions(row.status()), row.aggregateVersion(),
                 row.createdAt(), row.updatedAt(), clock.instant());
     }
@@ -423,8 +460,9 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         int updated = jdbc.sql("""
                 UPDATE cfg_project_fulfillment_revision
                    SET document_json = CAST(:document AS jsonb),
-                       workflow_asset_version_id = :workflowVersionId,
-                       source_bundle_id = :bundleId,
+                       workflow_asset_version_id = COALESCE(
+                           :workflowVersionId, workflow_asset_version_id),
+                       source_bundle_id = COALESCE(:bundleId, source_bundle_id),
                        validation_json = NULL
                  WHERE tenant_id = :tenantId
                    AND revision_id = :revisionId
@@ -481,12 +519,12 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 metadata.correlationId());
         DraftRow draft = loadDraft(principal.tenantId(), profile.draftRevisionId());
         Map<String, Object> document = parseDocument(draft.documentJson());
-        boolean workflowOk = draft.workflowAssetVersionId() != null
-                && assetVersionExists(principal.tenantId(), draft.workflowAssetVersionId(), "WORKFLOW");
+        Map<String, Object> workflowDefinition = loadPublishedWorkflowDefinition(
+                principal.tenantId(), draft.workflowAssetVersionId());
         boolean bundleOk = draft.sourceBundleId() != null
                 && bundleExists(principal.tenantId(), projectId, draft.sourceBundleId());
         List<ProjectFulfillmentValidationIssue> issues = validator.validate(
-                profileId, document, workflowOk, bundleOk);
+                profileId, document, workflowDefinition, bundleOk);
         try {
             String validationJson = objectMapper.writeValueAsString(issues);
             jdbc.sql("""
@@ -613,12 +651,12 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         }
         DraftRow draft = loadDraft(principal.tenantId(), profile.draftRevisionId());
         Map<String, Object> document = parseDocument(draft.documentJson());
-        boolean workflowOk = draft.workflowAssetVersionId() != null
-                && assetVersionExists(principal.tenantId(), draft.workflowAssetVersionId(), "WORKFLOW");
+        Map<String, Object> workflowDefinition = loadPublishedWorkflowDefinition(
+                principal.tenantId(), draft.workflowAssetVersionId());
         boolean bundleOk = draft.sourceBundleId() != null
                 && bundleExists(principal.tenantId(), projectId, draft.sourceBundleId());
         List<ProjectFulfillmentValidationIssue> issues = validator.validate(
-                profileId, document, workflowOk, bundleOk);
+                profileId, document, workflowDefinition, bundleOk);
         if (issues.stream().anyMatch(i -> "ERROR".equals(i.severity()))) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
                     "履约配置存在阻断错误，无法发布：" + issues.getFirst().userMessage());
@@ -630,6 +668,11 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         if (from.isBefore(clock.instant().minusSeconds(1))) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "生效时间不能早于当前时间");
         }
+        validateMatchRuleConflicts(
+                principal.tenantId(),
+                profile,
+                documentMapper.fromJson(draft.documentJson()),
+                from);
         int nextVersion = nextPublishedVersion(principal.tenantId(), profileId);
         UUID publishedRevisionId = UUID.randomUUID();
         BundleRef bundle = loadBundle(principal.tenantId(), draft.sourceBundleId());
@@ -863,20 +906,35 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         return get(principal, metadata.correlationId(), projectId, profileId);
     }
 
-    private String initialDocument(CreateProjectFulfillmentProfileCommand command) {
+    private InitialDraft initialDraft(
+            String tenantId,
+            CreateProjectFulfillmentProfileCommand command
+    ) {
         if (command.copyFromProfileId() != null) {
-            String copied = jdbc.sql("""
-                    SELECT document_json::text
+            // 复制只允许发生在当前 tenant + project 范围内。运行时绑定与业务文档必须
+            // 原子复制，否则新草稿看似完整却无法发布，且不能借 UUID 探测其他项目配置。
+            return jdbc.sql("""
+                    SELECT r.document_json::text,
+                           r.workflow_asset_version_id,
+                           r.source_bundle_id
                       FROM cfg_project_fulfillment_revision r
                       JOIN cfg_project_fulfillment_profile p ON p.draft_revision_id = r.revision_id
-                     WHERE p.profile_id = :profileId
+                     WHERE p.tenant_id = :tenantId
+                       AND p.project_id = :projectId
+                       AND p.profile_id = :profileId
+                       AND r.tenant_id = p.tenant_id
+                       AND r.revision_status = 'DRAFT'
                     """)
+                    .param("tenantId", tenantId)
+                    .param("projectId", command.projectId())
                     .param("profileId", command.copyFromProfileId())
-                    .query(String.class)
+                    .query((rs, rowNum) -> new InitialDraft(
+                            rs.getString("document_json"),
+                            rs.getObject("workflow_asset_version_id", UUID.class),
+                            rs.getObject("source_bundle_id", UUID.class)))
                     .optional()
                     .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND,
                             "复制来源履约配置不存在"));
-            return copied;
         }
         String template = command.templateCode() == null
                 ? TEMPLATE_SURVEY_INSTALL
@@ -893,13 +951,14 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
             doc.put("stages", List.of());
         } else {
             doc.put("stages", List.of(
-                    stage("INTAKE", "接单受理", 1, "PLATFORM", "DISPATCH"),
-                    stage("SURVEY", "现场勘测", 2, "TECHNICIAN", "SURVEY"),
-                    stage("INSTALLATION", "上门安装", 3, "TECHNICIAN", "INSTALL"),
-                    stage("FINAL_REVIEW", "终审", 4, "PLATFORM", "REVIEW", true)));
+                    stage("INTAKE", "接单受理", 1, "PLATFORM", "ASSIGN_COORDINATORS"),
+                    stage("SURVEY", "现场勘测", 2, "TECHNICIAN", "FIELD_SURVEY"),
+                    stage("INSTALL", "上门安装", 3, "TECHNICIAN", "FIELD_INSTALL"),
+                    stage("REVIEW", "资料审核", 4, "PLATFORM", "REVIEW"),
+                    stage("HANDOFF", "车企确认", 5, "SYSTEM", null, true)));
         }
         try {
-            return objectMapper.writeValueAsString(doc);
+            return new InitialDraft(objectMapper.writeValueAsString(doc), null, null);
         } catch (Exception ex) {
             throw new IllegalStateException(ex);
         }
@@ -1020,18 +1079,21 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         }
     }
 
-    private boolean assetVersionExists(String tenantId, UUID versionId, String assetType) {
-        Integer count = jdbc.sql("""
-                SELECT COUNT(1) FROM cfg_configuration_asset_version
+    private Map<String, Object> loadPublishedWorkflowDefinition(String tenantId, UUID versionId) {
+        if (versionId == null) {
+            return null;
+        }
+        String definitionJson = jdbc.sql("""
+                SELECT definition::text FROM cfg_configuration_asset_version
                  WHERE tenant_id = :tenantId AND version_id = :versionId
-                   AND asset_type = :assetType AND status = 'PUBLISHED'
+                   AND asset_type = 'WORKFLOW' AND status = 'PUBLISHED'
                 """)
                 .param("tenantId", tenantId)
                 .param("versionId", versionId)
-                .param("assetType", assetType)
-                .query(Integer.class)
-                .single();
-        return count != null && count > 0;
+                .query(String.class)
+                .optional()
+                .orElse(null);
+        return definitionJson == null ? null : parseDocument(definitionJson);
     }
 
     private boolean bundleExists(String tenantId, UUID projectId, UUID bundleId) {
@@ -1110,9 +1172,11 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         return new ProfileRow(
                 rs.getObject("profile_id", UUID.class),
                 rs.getObject("project_id", UUID.class),
+                rs.getString("profile_code"),
                 rs.getString("service_product_code"),
                 rs.getString("profile_name"),
                 rs.getString("description"),
+                rs.getInt("match_priority"),
                 rs.getString("status"),
                 rs.getObject("draft_revision_id", UUID.class),
                 rs.getObject("active_revision_id", UUID.class),
@@ -1187,18 +1251,89 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         return value == null ? null : value.toInstant();
     }
 
+    /**
+     * 发布期阻止运行时无法唯一解释的方案重叠。
+     *
+     * <p>同一服务产品下，只有优先级和具体度都相同且每个结构化维度存在交集时才阻断。
+     * 空集合是通配，因此与任意明确集合存在交集。校验发生在关闭旧版本之前，失败时事务
+     * 不会改变当前生效版本或草稿。</p>
+     */
+    private void validateMatchRuleConflicts(
+            String tenantId,
+            ProfileRow profile,
+            ProjectFulfillmentDocument proposed,
+            Instant effectiveFrom
+    ) {
+        List<PublishedMatchRule> others = jdbc.sql("""
+                SELECT p.profile_id, p.profile_code, p.profile_name, p.match_priority,
+                       r.document_json::text AS document_json
+                  FROM cfg_project_fulfillment_profile p
+                  JOIN cfg_project_fulfillment_revision r
+                    ON r.tenant_id = p.tenant_id AND r.profile_id = p.profile_id
+                 WHERE p.tenant_id = :tenantId
+                   AND p.project_id = :projectId
+                   AND p.service_product_code = :product
+                   AND p.profile_id <> :profileId
+                   AND p.status = 'ACTIVE'
+                   AND r.revision_status = 'PUBLISHED'
+                   AND r.effective_from <= :at
+                   AND (r.effective_to IS NULL OR r.effective_to > :at)
+                """)
+                .param("tenantId", tenantId)
+                .param("projectId", profile.projectId())
+                .param("product", profile.serviceProductCode())
+                .param("profileId", profile.profileId())
+                .param("at", PostgresJdbcParameters.timestamptz(effectiveFrom))
+                .query((rs, rowNum) -> new PublishedMatchRule(
+                        rs.getObject("profile_id", UUID.class),
+                        rs.getString("profile_code"),
+                        rs.getString("profile_name"),
+                        rs.getInt("match_priority"),
+                        documentMapper.fromJson(rs.getString("document_json")).matchRule()))
+                .list();
+        for (PublishedMatchRule other : others) {
+            if (profile.matchPriority() != other.matchPriority()
+                    || proposed.matchRule().constrainedDimensionCount()
+                    != other.rule().constrainedDimensionCount()) {
+                continue;
+            }
+            if (overlaps(proposed.matchRule().brandCodes(), other.rule().brandCodes())
+                    && overlaps(proposed.matchRule().provinceCodes(), other.rule().provinceCodes())) {
+                throw new BusinessProblem(
+                        ProblemCode.VALIDATION_FAILED,
+                        "履约方案与“" + other.profileName() + "”（" + other.profileCode()
+                                + "）的适用范围、优先级和具体度冲突");
+            }
+        }
+    }
+
+    private static boolean overlaps(List<String> left, List<String> right) {
+        return left.isEmpty() || right.isEmpty() || left.stream().anyMatch(right::contains);
+    }
+
     private record ProfileRow(
             UUID profileId,
             UUID projectId,
+            String profileCode,
             String serviceProductCode,
             String profileName,
             String description,
+            int matchPriority,
             String status,
             UUID draftRevisionId,
             UUID activeRevisionId,
             long aggregateVersion,
             Instant createdAt,
             Instant updatedAt
+    ) {
+    }
+
+    private record PublishedMatchRule(
+            UUID profileId,
+            String profileCode,
+            String profileName,
+            int matchPriority,
+            com.serviceos.configuration.api.ProjectFulfillmentMatchRule rule
     ) {
     }
 
@@ -1211,6 +1346,13 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
     }
 
     private record BundleRef(UUID bundleId, String bundleVersion) {
+    }
+
+    private record InitialDraft(
+            String documentJson,
+            UUID workflowAssetVersionId,
+            UUID sourceBundleId
+    ) {
     }
 
     private record Counts(

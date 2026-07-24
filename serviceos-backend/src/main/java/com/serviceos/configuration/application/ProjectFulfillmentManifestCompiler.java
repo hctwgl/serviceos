@@ -60,6 +60,7 @@ final class ProjectFulfillmentManifestCompiler {
         if (document.get("supportedClientKinds") != null) {
             manifest.put("supportedClientKinds", document.get("supportedClientKinds"));
         }
+        manifest.put("matchRule", document.getOrDefault("matchRule", Map.of()));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> stages = (List<Map<String, Object>>) document.getOrDefault(
                 "stages", List.of());

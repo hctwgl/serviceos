@@ -10,7 +10,9 @@ public record CreateProjectFulfillmentProfileCommand(
         String profileName,
         String description,
         String templateCode,
-        UUID copyFromProfileId
+        UUID copyFromProfileId,
+        String profileCode,
+        int matchPriority
 ) {
     public CreateProjectFulfillmentProfileCommand {
         projectId = Objects.requireNonNull(projectId, "projectId");
@@ -22,6 +24,10 @@ public record CreateProjectFulfillmentProfileCommand(
         }
         if (templateCode != null) {
             templateCode = text(templateCode, "templateCode", 96);
+        }
+        profileCode = text(profileCode, "profileCode", 96);
+        if (matchPriority < -10_000 || matchPriority > 10_000) {
+            throw new IllegalArgumentException("matchPriority must be between -10000 and 10000");
         }
     }
 

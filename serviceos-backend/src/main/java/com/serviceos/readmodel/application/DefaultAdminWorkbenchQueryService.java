@@ -52,9 +52,11 @@ final class DefaultAdminWorkbenchQueryService implements AdminWorkbenchQueryServ
                 principal, correlationId, new ReviewCaseQueueQuery(null, "OPEN", null, null, null, 1));
         int correctionCount = corrections.count(
                 principal, correlationId, new CorrectionCaseQueueQuery(null, "IN_PROGRESS", null, null, null, 1));
-        int dispatchCount = countWorkOrders(principal, correlationId, "PILOT_DISPATCH", null);
-        int slaRiskCount = countWorkOrders(principal, correlationId, null, "OPEN");
-        int waitingExternalCount = countWorkOrders(principal, correlationId, "CLIENT_CALLBACK", null);
+        int dispatchCount = countWorkOrders(
+                principal, correlationId, null, "NETWORK_UNASSIGNED", null);
+        int slaRiskCount = countWorkOrders(principal, correlationId, null, null, "OPEN");
+        int waitingExternalCount = countWorkOrders(
+                principal, correlationId, "CLIENT_CALLBACK", null, null);
         int exceptionCount = countOpenExceptions(principal, correlationId);
 
         // “今日优先处理”表达待处理事项数量而非工单去重数，避免工作台隐藏同一工单的多类风险。
@@ -75,12 +77,13 @@ final class DefaultAdminWorkbenchQueryService implements AdminWorkbenchQueryServ
             CurrentPrincipal principal,
             String correlationId,
             String currentStageCode,
+            String responsibilityStatus,
             String slaRisk
     ) {
         WorkOrderQuery query = new WorkOrderQuery(
                 null, null, null, null,
                 null, null, null, currentStageCode, null,
-                null, null, slaRisk,
+                null, null, responsibilityStatus, slaRisk,
                 null, null, null, null, null, 1);
         return workOrders.list(principal, correlationId, query).totalCount();
     }

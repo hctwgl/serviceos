@@ -46,7 +46,10 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
 final class DefaultTaskAssignmentService implements TaskAssignmentService {
     private static final String OPERATION = "task.assignment.assign-candidates";
     private static final String POLICY_OPERATION = "task.assignment.assign-candidates-from-policy";
-    private static final String SYSTEM_ACTOR = "system:assignee-policy";
+    private static final String SERVICE_ASSIGNMENT_OPERATION =
+            "task.assignment.assign-candidate-from-service-assignment";
+    private static final String POLICY_SYSTEM_ACTOR = "system:assignee-policy";
+    private static final String SERVICE_ASSIGNMENT_SYSTEM_ACTOR = "system:service-assignment";
 
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;
@@ -115,7 +118,7 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
                     "assignCandidatesFromFrozenPolicy requires ASSIGNEE_POLICY sourceType");
         }
         CommandContext context = new CommandContext(
-                tenantId, SYSTEM_ACTOR, correlationId,
+                tenantId, POLICY_SYSTEM_ACTOR, correlationId,
                 "assignee-policy:" + command.taskId() + ":" + command.sourceId());
         String requestDigest = requestDigest(command);
         IdempotencyDecision decision = idempotency.begin(context, POLICY_OPERATION, requestDigest);
@@ -126,6 +129,38 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
                 context, command, requestDigest, List.of(), "assignee-policy-runtime-v1",
                 "TASK_ASSIGN_CANDIDATES_FROM_POLICY");
         idempotency.complete(context, POLICY_OPERATION, receipt.assignmentBatchId().toString(),
+                Sha256.digest(serialize(receipt)));
+        return receipt;
+    }
+
+    @Override
+    @Transactional
+    public TaskAssignmentBatchReceipt assignCandidateFromServiceAssignment(
+            String tenantId,
+            String correlationId,
+            AssignTaskCandidatesCommand command
+    ) {
+        if (command.sourceType() != AssignmentSourceType.SYSTEM) {
+            throw new IllegalArgumentException(
+                    "assignCandidateFromServiceAssignment requires SYSTEM sourceType");
+        }
+        CommandContext context = new CommandContext(
+                tenantId, SERVICE_ASSIGNMENT_SYSTEM_ACTOR, correlationId,
+                "service-assignment:" + command.sourceId() + ":" + command.taskId());
+        String requestDigest = requestDigest(command);
+        IdempotencyDecision decision =
+                idempotency.begin(context, SERVICE_ASSIGNMENT_OPERATION, requestDigest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return findBatch(
+                    context.tenantId(), UUID.fromString(decision.resourceId().orElseThrow()));
+        }
+        TaskAssignmentBatchReceipt receipt = writeCandidateSnapshot(
+                context, command, requestDigest, List.of(), "service-assignment-runtime-v1",
+                "TASK_ASSIGN_CANDIDATE_FROM_SERVICE_ASSIGNMENT");
+        idempotency.complete(
+                context,
+                SERVICE_ASSIGNMENT_OPERATION,
+                receipt.assignmentBatchId().toString(),
                 Sha256.digest(serialize(receipt)));
         return receipt;
     }

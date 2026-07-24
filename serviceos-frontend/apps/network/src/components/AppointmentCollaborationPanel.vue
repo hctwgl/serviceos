@@ -5,6 +5,7 @@ import {
   proposeNetworkPortalAppointment,
   recordNetworkPortalTaskContactAttempt,
   type NetworkPortalTaskItem,
+  type NetworkPortalAppointmentType,
   type NetworkPortalWorkspaceAppointmentSummary,
   type NetworkPortalWorkspaceContactAttemptSummary,
 } from '../api/networkPortal'
@@ -48,6 +49,10 @@ const latestAppointment = computed(() => {
   return list.find((item) => item.taskId === selectedTaskId.value) ?? list[0] ?? null
 })
 
+const selectedTask = computed(
+  () => props.tasks.find((task) => task.taskId === selectedTaskId.value) ?? null,
+)
+
 const taskContacts = computed(() => {
   const list = props.contactAttempts ?? []
   if (!selectedTaskId.value) return list
@@ -83,12 +88,17 @@ function toIso(localValue: string) {
 
 async function propose() {
   if (!selectedTaskId.value) return
+  const appointmentType = appointmentTypeFor(selectedTask.value)
+  if (!appointmentType) {
+    error.value = '当前任务类型不支持预约，请检查履约方案阶段配置'
+    return
+  }
   busy.value = true
   error.value = null
   message.value = null
   try {
     const receipt = await proposeNetworkPortalAppointment(props.networkContextId, selectedTaskId.value, {
-      type: 'SERVICE',
+      type: appointmentType,
       window: {
         start: toIso(windowStart.value),
         end: toIso(windowEnd.value),
@@ -107,6 +117,18 @@ async function propose() {
   } finally {
     busy.value = false
   }
+}
+
+function appointmentTypeFor(
+  task: NetworkPortalTaskItem | null,
+): NetworkPortalAppointmentType | null {
+  const code = task?.stageCode || task?.taskType
+  if (code === 'SURVEY' || code === 'FIELD_SURVEY') return 'SURVEY'
+  if (code === 'INSTALLATION' || code === 'FIELD_INSTALL') return 'INSTALLATION'
+  if (code === 'REPAIR' || code === 'FIELD_REPAIR') return 'REPAIR'
+  if (code === 'CORRECTION') return 'CORRECTION'
+  if (code === 'SECOND_VISIT') return 'SECOND_VISIT'
+  return null
 }
 
 async function confirmLatest() {
