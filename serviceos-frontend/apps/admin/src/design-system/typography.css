@@ -1,0 +1,47 @@
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--sos-font-family);
+}
+
+body {
+  color: var(--sos-text);
+  font-size: var(--sos-font-size-md);
+  line-height: var(--sos-line-height-normal);
+  text-rendering: optimizeLegibility;
+}
+
+.serviceos-vben-layout,
+.serviceos-vben-layout button,
+.serviceos-vben-layout input,
+.serviceos-vben-layout select,
+.serviceos-vben-layout textarea {
+  font-size: var(--sos-font-size-md);
+}
+
+.serviceos-vben-layout h1,
+.serviceos-vben-layout h2,
+.serviceos-vben-layout h3,
+.serviceos-vben-layout h4,
+.serviceos-vben-layout p {
+  overflow-wrap: anywhere;
+}
+
+.serviceos-vben-layout h1,
+.serviceos-vben-layout h2,
+.serviceos-vben-layout h3,
+.serviceos-vben-layout h4 {
+  color: var(--sos-text-heading);
+  line-height: var(--sos-line-height-tight);
+}
+
+.serviceos-vben-layout :where(small, .ant-form-item-extra, .ant-form-item-explain) {
+  line-height: var(--sos-line-height-relaxed);
+}
+
+.serviceos-vben-layout :where(a, button, [role='button']):focus-visible {
+  outline: 2px solid var(--sos-brand);
+  outline-offset: 2px;
+}
