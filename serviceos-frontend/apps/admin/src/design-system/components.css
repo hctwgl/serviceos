@@ -1,0 +1,70 @@
+/* 基础控件密度：保持企业 SaaS 信息密度，不压缩可读性。 */
+.serviceos-vben-layout .ant-card {
+  border-color: var(--sos-border);
+  border-radius: var(--sos-radius-md);
+  box-shadow: var(--sos-shadow-card);
+}
+
+.serviceos-vben-layout .ant-card-head {
+  min-height: 52px;
+}
+
+.serviceos-vben-layout .ant-table {
+  font-size: var(--sos-font-size-sm);
+}
+
+.serviceos-vben-layout .ant-table-thead > tr > th {
+  min-block-size: var(--sos-table-header-height);
+  padding: 10px 12px;
+  color: var(--sos-text-secondary);
+  font-size: var(--sos-font-size-xs);
+  font-weight: 650;
+  line-height: var(--sos-line-height-normal);
+}
+
+.serviceos-vben-layout .ant-table-tbody > tr > td {
+  min-block-size: var(--sos-table-row-min-height);
+  padding: 10px 12px;
+  color: var(--sos-text-strong);
+  line-height: var(--sos-line-height-normal);
+}
+
+.serviceos-vben-layout .ant-input,
+.serviceos-vben-layout .ant-input-affix-wrapper,
+.serviceos-vben-layout .ant-select-selector,
+.serviceos-vben-layout .ant-input-number,
+.serviceos-vben-layout .ant-picker {
+  border-radius: var(--sos-radius-sm);
+}
+
+.serviceos-vben-layout .ant-input:focus,
+.serviceos-vben-layout .ant-input-focused,
+.serviceos-vben-layout .ant-input-affix-wrapper-focused,
+.serviceos-vben-layout .ant-select-focused .ant-select-selector {
+  box-shadow: var(--sos-focus-ring);
+}
+
+/* Foundation containers must grow with their contents. Local tables/canvases opt into x-scroll explicitly. */
+.serviceos-page-root,
+.directory-page,
+.workspace-page,
+.user-directory-page,
+.role-directory-page,
+.organization-page,
+.resource-page,
+.project-workspace-page,
+.project-operations-page,
+.fulfillment-blueprint-page,
+.serviceos-workspace-content {
+  min-block-size: 100%;
+  min-inline-size: 0;
+}
+
+.data-table-wrap,
+.stage-flow-canvas,
+.sos-workflow-canvas__scroll,
+.project-operations-tabs,
+.workspace-tabs {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sos-border) transparent;
+}

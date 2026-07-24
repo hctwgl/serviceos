@@ -3,6 +3,7 @@ package com.serviceos.readmodel.application;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
 import com.serviceos.project.api.ProjectClientBrandItem;
 import com.serviceos.project.api.ProjectClientBrandPage;
 import com.serviceos.project.api.ProjectClientDirectoryItem;
@@ -36,6 +37,7 @@ class DefaultAdminClientProjectDirectoryQueryServiceTest {
     @DisplayName("客户项目目录应返回客户品牌、区域名称和履约配置状态")
     void shouldComposeClientAndProjectFacts() {
         ProjectQueryService projects = mock(ProjectQueryService.class);
+        ProjectFulfillmentProfileService fulfillmentProfiles = mock(ProjectFulfillmentProfileService.class);
         AuthorizationService authorization = mock(AuthorizationService.class);
         CurrentPrincipal actor = new CurrentPrincipal(
                 "admin-1", "tenant-1", CurrentPrincipal.PrincipalType.USER, "admin-web", Set.of());
@@ -57,9 +59,10 @@ class DefaultAdminClientProjectDirectoryQueryServiceTest {
                         new ProjectClientBrandItem("BYD", "OCEAN", "海洋网", "ACTIVE", 10),
                         new ProjectClientBrandItem("BYD", "DYNASTY", "王朝网", "ACTIVE", 20)), NOW));
         when(authorization.authorize(any(), any(), any())).thenReturn(AuthorizationDecision.allow());
+        when(fulfillmentProfiles.list(actor, "corr-projects", project.id())).thenReturn(List.of());
 
         var service = new DefaultAdminClientProjectDirectoryQueryService(
-                projects, authorization, Clock.fixed(NOW, ZoneOffset.UTC));
+                projects, fulfillmentProfiles, authorization, Clock.fixed(NOW, ZoneOffset.UTC));
         var result = service.load(actor, "corr-projects");
 
         assertThat(result.clients()).singleElement().satisfies(client -> {

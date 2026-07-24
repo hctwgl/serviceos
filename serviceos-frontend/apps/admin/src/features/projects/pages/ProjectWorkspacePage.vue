@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import type { AdminWorkOrderDirectoryView } from '@serviceos/api-client'
-import { loadAdminWorkOrders } from '@serviceos/api-client'
+import {
+  loadAdminWorkOrders,
+  loadProjectFulfillmentDraft,
+  loadProjectFulfillmentProfile,
+} from '@serviceos/api-client'
 import { useQuery } from '@tanstack/vue-query'
 import { computed } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import PageError from '../../../components/PageError.vue'
-import StatusPill from '../../../components/StatusPill.vue'
+import BusinessTimeline from '../../../components/serviceos/BusinessTimeline.vue'
 import FulfillmentStageBar from '../../../components/serviceos/FulfillmentStageBar.vue'
+import ProjectMetricCard from '../../../components/serviceos/ProjectMetricCard.vue'
+import ProjectSummaryHeader from '../../../components/serviceos/ProjectSummaryHeader.vue'
 import RiskPanel from '../../../components/serviceos/RiskPanel.vue'
 import SlaHealthCard from '../../../components/serviceos/SlaHealthCard.vue'
-import VersionBadge from '../../../components/serviceos/VersionBadge.vue'
 import {
   buildProjectActivities,
   buildProjectRiskItems,
@@ -49,11 +54,46 @@ const activeProfile = computed(() => (
   project.value?.fulfillmentProfiles.find((profile) => profile.status === 'ACTIVE')
     ?? project.value?.fulfillmentProfiles[0]
 ))
+const activeProfileDetail = useQuery({
+  queryKey: computed(() => ['admin-project-active-fulfillment-profile', projectId.value, activeProfile.value?.profileId]),
+  queryFn: () => loadProjectFulfillmentProfile(projectId.value, activeProfile.value!.profileId),
+  enabled: computed(() => Boolean(projectId.value && activeProfile.value?.profileId)),
+})
+const fulfillmentDraft = useQuery({
+  queryKey: computed(() => ['admin-project-active-fulfillment-draft', projectId.value, activeProfile.value?.profileId]),
+  queryFn: () => loadProjectFulfillmentDraft(projectId.value, activeProfile.value!.profileId),
+  enabled: computed(() => Boolean(projectId.value && activeProfile.value?.profileId && activeProfileDetail.data.value?.draftRevisionId)),
+})
 const status = computed(() => project.value ? presentAdminProjectStatus(project.value.status) : null)
-const stageBar = computed(() => buildProjectStageBar(project.value, project.value?.fulfillmentProfiles ?? [], workOrders.data.value))
+const stageBar = computed(() => buildProjectStageBar(
+  project.value,
+  project.value?.fulfillmentProfiles ?? [],
+  workOrders.data.value,
+  fulfillmentDraft.data.value?.document.stages,
+))
 const riskItems = computed(() => buildProjectRiskItems(workOrders.data.value))
 const activities = computed(() => buildProjectActivities(workOrders.data.value?.items ?? []))
 const dashboardUnavailable = computed(() => workOrders.isError.value || !workOrders.data.value)
+const slaHealth = computed(() => {
+  const total = project.value?.activeWorkOrderCount
+  const risks = workOrders.data.value?.queueSummary.slaRiskCount
+  if (total === null || total === undefined || risks === undefined) {
+    return { label: '待同步', tone: 'default' as const, hint: '等待项目工单投影' }
+  }
+  const percentage = total === 0 ? 100 : Math.max(0, Math.round(((total - risks) / total) * 100))
+  return {
+    label: `${percentage}%`,
+    tone: risks > 0 ? 'warning' as const : 'success' as const,
+    hint: risks > 0 ? `${risks} 单存在时效风险` : '当前没有 SLA 风险',
+  }
+})
+const timelineItems = computed(() => activities.value.map((activity) => ({
+  id: activity.id,
+  title: activity.label,
+  time: activity.time,
+  description: activity.detail,
+  tone: activity.tone,
+})))
 
 function openTab(tab: ProjectTab) {
   if (tab === 'fulfillment') {
@@ -81,34 +121,28 @@ function countLabel(value: number | null, suffix: string) {
     <PageError v-if="workspace.isError.value" :detail="workspace.error.value?.message ?? '项目工作区加载失败'" />
     <div v-else-if="workspace.isLoading.value" class="page-loading">正在加载新能源履约项目…</div>
     <template v-else-if="project">
-      <header class="project-operations-header">
-        <div class="project-operations-header__title">
-          <p class="breadcrumb">客户与项目 / 项目管理 / 运营工作区</p>
-          <div class="project-title-line">
-            <h1>{{ project.projectName }}</h1>
-            <StatusPill v-if="status" :tone="status.tone" :label="status.label" />
-          </div>
-          <p>{{ project.clientName ?? '客户品牌待确认' }} · {{ project.projectCode }} · 新能源现场服务网络</p>
-        </div>
-        <div class="project-operations-header__actions">
+      <ProjectSummaryHeader
+        :project-name="project.projectName"
+        :project-code="project.projectCode"
+        :client-name="project.clientName ?? '客户品牌待确认'"
+        :region-label="project.regionNames.join('、') || '服务区域待配置'"
+        :status-label="status?.label ?? '状态待确认'"
+        :status-tone="status?.tone ?? 'gray'"
+        :fulfillment-name="activeProfile?.profileName ?? '尚未建立方案'"
+        :version="activeProfile?.activeVersion"
+      >
+        <template #actions>
           <RouterLink class="secondary-link-button" :to="`/work-orders?projectId=${project.projectId}`">查看项目工单</RouterLink>
           <RouterLink class="primary-link-button" :to="`/projects/${project.projectId}/fulfillment`">进入方案设计器</RouterLink>
-        </div>
-      </header>
+        </template>
+      </ProjectSummaryHeader>
 
       <PageError v-if="!project.dataComplete" :detail="project.dataProblem ?? '项目页面数据不完整，部分事实暂不可用。'" />
 
-      <section class="project-operations-summary" aria-label="项目摘要">
-        <div class="project-summary-lead">
-          <span>项目状态</span>
-          <strong>{{ status?.label ?? '状态待确认' }}</strong>
-          <small>{{ project.activeWorkOrderCount === null ? '运行工单数量暂不可见' : '项目当前运行范围' }}</small>
-        </div>
-        <div><span>服务周期</span><strong>{{ projectPeriod(project.startsOn, project.endsOn) }}</strong><small>项目合同周期</small></div>
-        <div><span>客户品牌</span><strong>{{ project.clientName ?? '品牌待确认' }}</strong><small>项目协作方</small></div>
-        <div><span>服务区域</span><strong>{{ project.regionNames.join('、') || '区域待配置' }}</strong><small>{{ project.regionNames.length }} 个区域</small></div>
-        <div><span>当前履约方案</span><strong>{{ activeProfile?.profileName ?? '尚未建立方案' }}</strong><small>{{ activeProfile?.serviceProductName ?? '等待方案配置' }}</small></div>
-        <div><span>当前版本</span><VersionBadge :status="activeProfile?.status" :version="activeProfile?.activeVersion" /><small>{{ activeProfile?.updatedAt ? `更新于 ${activeProfile.updatedAt.slice(0, 10)}` : '版本信息待确认' }}</small></div>
+      <section class="sos-project-context-strip" aria-label="项目上下文">
+        <div><span>服务周期</span><strong>{{ projectPeriod(project.startsOn, project.endsOn) }}</strong></div>
+        <div><span>项目编号</span><strong>{{ project.projectCode }}</strong></div>
+        <div><span>数据更新时间</span><strong>{{ project.asOf.slice(0, 16).replace('T', ' ') }}</strong></div>
       </section>
 
       <nav class="project-operations-tabs" aria-label="项目业务视图">
@@ -129,10 +163,10 @@ function countLabel(value: number | null, suffix: string) {
         <section class="project-operations-grid">
           <main class="project-operations-main">
             <div class="project-ops-metric-row">
-              <article><span>运行工单</span><strong>{{ countLabel(project.activeWorkOrderCount, ' 单') }}</strong><small>当前项目范围</small></article>
-              <article><span>参与网点</span><strong>{{ project.networkNames.length }} 个</strong><small>责任网点候选范围</small></article>
-              <article><span>履约方案</span><strong>{{ project.fulfillmentProfiles.length }} 套</strong><small>项目服务场景</small></article>
-              <article><span>数据时间</span><strong>{{ project.asOf.slice(11, 16) || '—' }}</strong><small>服务端投影时间</small></article>
+              <ProjectMetricCard label="运行工单" :value="countLabel(project.activeWorkOrderCount, ' 单')" hint="当前项目范围" tone="blue" />
+              <ProjectMetricCard label="参与网点" :value="`${project.networkNames.length} 个`" hint="责任网点候选范围" />
+              <ProjectMetricCard label="履约方案" :value="`${project.fulfillmentProfiles.length} 套`" hint="项目服务场景" tone="blue" />
+              <ProjectMetricCard label="SLA 健康度" :value="slaHealth.label" :hint="slaHealth.hint" :tone="slaHealth.tone" />
             </div>
 
             <FulfillmentStageBar
@@ -141,21 +175,9 @@ function countLabel(value: number | null, suffix: string) {
               description="沿用项目绑定方案与当前工单投影，不另建一套项目状态。"
             />
 
-            <section class="project-activity-panel">
-              <header class="sos-panel-heading">
-                <div><span class="sos-eyebrow">PROJECT ACTIVITY</span><h2>最近业务动态</h2><p>从当前项目工单投影汇总，点击进入单张工单查看完整事件。</p></div>
-                <RouterLink to="/work-orders">全部工单</RouterLink>
-              </header>
-              <div v-if="dashboardUnavailable" class="sos-inline-unavailable"><strong>项目动态暂时无法获取</strong><span>工单投影恢复后会自动刷新，不显示伪造的“无动态”。</span></div>
-              <div v-else-if="!activities.length" class="sos-inline-empty"><strong>当前项目还没有工单动态</strong><span>新工单受理后，最近业务事件会出现在这里。</span></div>
-              <ol v-else class="project-activity-list">
-                <li v-for="activity in activities" :key="activity.id" :class="`tone-${activity.tone}`">
-                  <span class="project-activity-list__time">{{ activity.time }}</span>
-                  <span class="project-activity-list__dot" />
-                  <span class="project-activity-list__copy"><strong>{{ activity.label }}</strong><small>{{ activity.detail }}</small></span>
-                </li>
-              </ol>
-            </section>
+            <BusinessTimeline :items="timelineItems" :unavailable="dashboardUnavailable">
+              <template #extra><RouterLink to="/work-orders">全部工单</RouterLink></template>
+            </BusinessTimeline>
           </main>
 
           <aside class="project-operations-rail">

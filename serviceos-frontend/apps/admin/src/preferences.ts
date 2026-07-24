@@ -38,7 +38,8 @@ export const overridesPreferences = defineOverridesPreferences({
     collapseWidth: 60,
     draggable: false,
     enable: true,
-    expandOnHover: false,
+    // 产品导航保持稳定展开，避免鼠标离开后退化成难以识别的图标栏；用户仍可手动收起。
+    expandOnHover: true,
     fixedButton: false,
     hidden: false,
     width: 224,
@@ -59,7 +60,7 @@ export const overridesPreferences = defineOverridesPreferences({
     lockScreen: false,
     notification: false,
     refresh: false,
-    sidebarToggle: false,
+    sidebarToggle: true,
     themeToggle: false,
     timezone: false,
   },

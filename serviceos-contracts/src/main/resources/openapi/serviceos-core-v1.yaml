@@ -8011,6 +8011,9 @@ components:
         status: { enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED] }
         publishedConfigurationCount: { type: [integer, 'null'], minimum: 0 }
         draftConfigurationCount: { type: [integer, 'null'], minimum: 0 }
+        currentFulfillmentPlanName: { type: [string, 'null'], maxLength: 200, description: 当前生效履约方案名称；无权限或尚未发布时为 null }
+        currentFulfillmentVersion: { type: [string, 'null'], maxLength: 64, description: 当前生效履约方案版本；无权限或尚未发布时为 null }
+        updatedAt: { type: [string, 'null'], format: date-time, description: 当前生效履约方案最近更新时间；没有生效方案时为 null }
         configurationStatus:
           enum: [NOT_CONFIGURED, DRAFT, PUBLISHED, UNPUBLISHED_CHANGES, NO_PERMISSION]
         dataComplete: { type: boolean }
