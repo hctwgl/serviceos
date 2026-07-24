@@ -817,13 +817,164 @@ html, body, #app { width: 100%; min-height: 100%; }
   .stage-node-inspector { position: static; }
 }
 
-.blueprint-home-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
-.blueprint-home-metrics .sos-project-metric-card { min-height: 104px; }
+/* PR226：任务型工作区覆盖。内容随事实增长，只有流程和表格在自身边界内横向滚动。 */
+.project-next-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+  padding: 13px 15px;
+  border: 1px solid var(--sos-brand-border);
+  border-radius: 7px;
+  background: var(--sos-brand-panel);
+}
+.project-next-action > div { display: grid; gap: 3px; min-width: 0; }
+.project-next-action strong { overflow: hidden; color: var(--sos-brand-panel-text); font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.project-next-action p { margin: 0; overflow: hidden; color: var(--sos-brand-panel-text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.project-next-action .primary-link-button { flex: 0 0 auto; background: var(--sos-brand); }
+.project-context-note--compact { gap: 6px; padding: 12px 13px; }
+.project-context-note--compact > strong { color: var(--sos-text-heading); font-size: 13px; }
+.sos-project-risk-panel, .sos-project-timeline {
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--sos-border);
+  border-radius: 7px;
+  background: var(--sos-surface);
+}
+.sos-project-risk-panel__mark { color: var(--sos-warning-strong); font-size: 17px; }
+.sos-project-risk-list { display: grid; gap: 0; }
+.sos-project-risk-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto 12px; align-items: center; gap: 9px; min-width: 0; padding: 10px 0; border-top: 1px solid var(--sos-border-subtle); }
+.sos-project-risk-row:first-child { border-top: 0; }
+.sos-project-risk-row__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sos-text-muted); }
+.sos-project-risk-row--danger .sos-project-risk-row__dot { background: var(--sos-danger); }
+.sos-project-risk-row--warning .sos-project-risk-row__dot { background: var(--sos-warning); }
+.sos-project-risk-row--neutral .sos-project-risk-row__dot { background: var(--sos-brand); }
+.sos-project-risk-row__copy { display: grid; gap: 2px; min-width: 0; }
+.sos-project-risk-row__copy strong { color: var(--sos-text-strong); font-size: 12px; }
+.sos-project-risk-row__copy small { overflow: hidden; color: var(--sos-text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.sos-project-risk-row > b { color: var(--sos-text-heading); font-size: 15px; }
+.sos-project-risk-row > svg { color: var(--sos-brand); font-size: 10px; }
+.sos-project-timeline__list { display: grid; gap: 0; margin: 0; padding: 2px 0; list-style: none; }
+.sos-project-timeline__list li { display: grid; grid-template-columns: 64px 16px minmax(0, 1fr); gap: 10px; min-width: 0; min-height: 58px; }
+.sos-project-timeline__list time { padding-top: 2px; color: var(--sos-text-muted); font-size: 10px; }
+.sos-project-timeline__rail { position: relative; display: flex; justify-content: center; }
+.sos-project-timeline__rail::before { position: absolute; top: 8px; bottom: -8px; width: 1px; background: var(--sos-border); content: ''; }
+.sos-project-timeline__list li:last-child .sos-project-timeline__rail::before { display: none; }
+.sos-project-timeline__rail i { position: relative; z-index: 1; width: 9px; height: 9px; margin-top: 3px; border: 2px solid var(--sos-brand); border-radius: 50%; background: var(--sos-surface); }
+.sos-project-timeline__list li.tone-green .sos-project-timeline__rail i { border-color: var(--sos-success); }
+.sos-project-timeline__list li.tone-orange .sos-project-timeline__rail i { border-color: var(--sos-danger); }
+.sos-project-timeline__list li > div { display: grid; gap: 3px; min-width: 0; padding-bottom: 13px; }
+.sos-project-timeline__list strong { color: var(--sos-text-strong); font-size: 12px; }
+.sos-project-timeline__list p { margin: 0; overflow: hidden; color: var(--sos-text-secondary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+
+.fulfillment-blueprint-header__title-line { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+.fulfillment-blueprint-header__title-line h1 { margin-bottom: 0; }
+.fulfillment-blueprint-layout { grid-template-columns: 210px minmax(0, 1fr) 260px; align-items: start; }
+.sos-blueprint-sidebar { min-height: 620px; }
+.blueprint-canvas-column { gap: 12px; padding: 16px; }
+.blueprint-main-heading { align-items: center; gap: 12px; padding-bottom: 11px; }
+.blueprint-main-heading h2 { font-size: 18px; }
+.blueprint-main-heading dl { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px 18px; margin: 0; }
+.blueprint-main-heading dl > div { display: grid; gap: 2px; min-width: 78px; }
+.blueprint-main-heading dt { color: var(--sos-text-muted); font-size: 10px; }
+.blueprint-main-heading dd { margin: 0; color: var(--sos-text-strong); font-size: 11px; font-weight: 650; }
+.blueprint-design-surface { display: grid; gap: 10px; min-width: 0; }
+.blueprint-surface-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 2px; color: var(--sos-text-muted); font-size: 11px; }
+.blueprint-surface-footer a { color: var(--sos-brand); font-weight: 650; }
+.blueprint-stage-surface { gap: 12px; }
+.blueprint-stage-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--sos-border); }
+.blueprint-stage-list li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-width: 0; padding: 10px 6px; border-bottom: 1px solid var(--sos-border-subtle); cursor: pointer; }
+.blueprint-stage-list li:hover, .blueprint-stage-list li.active { background: var(--sos-brand-hover); }
+.blueprint-stage-list__number { color: var(--sos-brand); font-size: 11px; font-weight: 750; }
+.blueprint-stage-list li > div { display: grid; gap: 3px; min-width: 0; }
+.blueprint-stage-list li strong { overflow: hidden; color: var(--sos-text-strong); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.blueprint-stage-list li small, .blueprint-stage-list li > span:last-child { color: var(--sos-text-muted); font-size: 10px; }
+.blueprint-stage-list li > span:last-child { white-space: nowrap; }
+.blueprint-reference-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.blueprint-reference-table th { padding: 8px 9px; background: var(--sos-canvas-subtle); color: var(--sos-text-muted); font-size: 10px; font-weight: 700; text-align: left; }
+.blueprint-reference-table td { padding: 9px; border-top: 1px solid var(--sos-border-subtle); color: var(--sos-text-secondary); vertical-align: top; }
+.blueprint-reference-table td:first-child { color: var(--sos-text-strong); font-weight: 650; }
+.blueprint-simulation-surface, .blueprint-unavailable-surface { display: grid; gap: 14px; min-width: 0; padding: 16px; border: 1px solid var(--sos-border); border-radius: 7px; background: var(--sos-surface); }
+.blueprint-simulation-surface dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.blueprint-simulation-surface dl > div { display: grid; gap: 4px; padding: 11px 12px; background: var(--sos-bg-subtle); }
+.blueprint-simulation-surface dt { color: var(--sos-text-muted); font-size: 10px; }
+.blueprint-simulation-surface dd { margin: 0; color: var(--sos-text-strong); font-size: 12px; font-weight: 650; }
+.sos-workflow-node--design .sos-workflow-node__index { background: var(--sos-brand-soft); color: var(--sos-brand); }
+.sos-task-template-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; margin: 0; }
+.sos-task-template-facts > div { display: grid; gap: 4px; min-width: 0; }
+.sos-task-template-facts .span-2 { grid-column: 1 / -1; }
+.sos-task-template-facts dt { color: var(--sos-text-muted); font-size: 10px; }
+.sos-task-template-facts dd { margin: 0; color: var(--sos-text-strong); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.sos-sla-rule-panel { display: grid; gap: 14px; min-width: 0; padding: 16px; border: 1px solid var(--sos-border); border-radius: 7px; background: var(--sos-surface); }
+.sos-sla-rule-panel__workspace { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 13px; min-width: 0; }
+.sos-sla-rule-panel__table-wrap { min-width: 0; overflow-x: auto; border: 1px solid var(--sos-border); border-radius: 6px; }
+.sos-sla-rule-panel__table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 11px; }
+.sos-sla-rule-panel__table th { padding: 9px 10px; background: var(--sos-canvas-subtle); color: var(--sos-text-muted); font-size: 10px; font-weight: 700; text-align: left; }
+.sos-sla-rule-panel__table td { padding: 10px; border-top: 1px solid var(--sos-border-subtle); color: var(--sos-text-secondary); vertical-align: top; cursor: pointer; }
+.sos-sla-rule-panel__table tr.active td, .sos-sla-rule-panel__table tbody tr:hover td { background: var(--sos-brand-hover); }
+.sos-sla-rule-panel__table td strong, .sos-sla-rule-panel__table td small { display: block; }
+.sos-sla-rule-panel__table td strong { color: var(--sos-text-strong); font-size: 11px; }
+.sos-sla-rule-panel__table td small { margin-top: 3px; color: var(--sos-text-muted); font-size: 9px; }
+.sos-sla-rule-panel__inspector { display: grid; align-content: start; gap: 11px; padding: 12px; border: 1px solid var(--sos-border); border-radius: 6px; background: var(--sos-bg-subtle); }
+.sos-sla-rule-panel__inspector header { display: grid; gap: 4px; padding-bottom: 10px; border-bottom: 1px solid var(--sos-border); }
+.sos-sla-rule-panel__inspector header span, .sos-sla-rule-panel__inspector dt { color: var(--sos-text-muted); font-size: 10px; }
+.sos-sla-rule-panel__inspector header strong { color: var(--sos-text-heading); font-size: 13px; }
+.sos-sla-rule-panel__inspector dl { display: grid; gap: 9px; margin: 0; }
+.sos-sla-rule-panel__inspector dl > div { display: grid; gap: 3px; }
+.sos-sla-rule-panel__inspector dd { margin: 0; color: var(--sos-text-strong); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.sos-workflow-node-panel { display: grid; align-content: start; gap: 13px; min-width: 0; padding: 16px 14px; border-left: 1px solid var(--sos-border); background: var(--sos-bg-subtle); }
+.sos-workflow-node-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding-bottom: 11px; border-bottom: 1px solid var(--sos-border); }
+.sos-workflow-node-panel > header > div { display: grid; gap: 4px; min-width: 0; }
+.sos-workflow-node-panel h2 { margin: 0; overflow: hidden; color: var(--sos-text-heading); font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.sos-workflow-node-panel__number { color: var(--sos-brand); font-size: 21px; font-weight: 750; line-height: 1; }
+.sos-workflow-node-panel__identity { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--sos-text-muted); font-size: 10px; }
+.sos-workflow-node-panel dl { display: grid; gap: 8px; margin: 0; }
+.sos-workflow-node-panel dl > div { display: flex; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--sos-border-subtle); }
+.sos-workflow-node-panel dt { color: var(--sos-text-muted); font-size: 10px; }
+.sos-workflow-node-panel dd { max-width: 62%; margin: 0; color: var(--sos-text-strong); font-size: 11px; font-weight: 650; text-align: right; overflow-wrap: anywhere; }
+.sos-workflow-node-panel__description { margin: 0; color: var(--sos-text-secondary); font-size: 11px; line-height: 1.55; }
+.sos-workflow-node-panel__hint { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--sos-warning-border); background: var(--sos-warning-soft); }
+.sos-workflow-node-panel__hint strong { color: var(--sos-warning-strong); font-size: 11px; }
+.sos-workflow-node-panel__hint span { color: var(--sos-text-secondary); font-size: 10px; line-height: 1.5; }
+.sos-workflow-node-panel__overview { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--sos-border); background: var(--sos-surface); }
+.sos-workflow-node-panel__overview span, .sos-workflow-node-panel__overview small { color: var(--sos-text-muted); font-size: 10px; }
+.sos-workflow-node-panel__overview strong { color: var(--sos-text-heading); font-size: 16px; }
+
+@media (max-width: 1280px) {
+  .fulfillment-blueprint-layout { grid-template-columns: 195px minmax(0, 1fr) 240px; }
+  .project-operations-grid { grid-template-columns: minmax(0, 1fr) 270px; }
+}
 
 @media (max-width: 1080px) {
-  .blueprint-home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fulfillment-blueprint-layout { grid-template-columns: 185px minmax(0, 1fr); }
+  .sos-workflow-node-panel { grid-column: 1 / -1; grid-template-columns: minmax(170px, .55fr) minmax(0, 1fr); align-items: start; border-top: 1px solid var(--sos-border); border-left: 0; }
+  .sos-workflow-node-panel > header { grid-row: 1 / span 2; }
+  .sos-sla-rule-panel__workspace { grid-template-columns: 1fr; }
+  .sos-sla-rule-panel__inspector { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sos-sla-rule-panel__inspector header, .sos-sla-rule-panel__inspector .sos-editor-note { grid-column: 1 / -1; }
+  .project-operations-grid { grid-template-columns: 1fr; }
+  .project-operations-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .project-context-note--compact { grid-column: 1 / -1; }
 }
 
 @media (max-width: 760px) {
-  .blueprint-home-metrics { grid-template-columns: 1fr; }
+  .project-next-action, .fulfillment-blueprint-header { align-items: flex-start; flex-direction: column; }
+  .project-next-action .primary-link-button { align-self: stretch; justify-content: center; }
+  .project-operations-rail { grid-template-columns: 1fr; }
+  .project-context-note--compact { grid-column: auto; }
+  .fulfillment-blueprint-layout { grid-template-columns: 1fr; }
+  .sos-blueprint-sidebar { min-height: 0; border-right: 0; border-bottom: 1px solid var(--sos-border); }
+  .sos-blueprint-sidebar__nav { grid-template-columns: repeat(3, minmax(112px, 1fr)); overflow-x: auto; }
+  .sos-blueprint-sidebar__label { grid-column: 1 / -1; }
+  .sos-workflow-node-panel { grid-template-columns: 1fr; }
+  .sos-workflow-node-panel > header { grid-row: auto; }
+  .blueprint-main-heading, .blueprint-surface-footer { align-items: flex-start; flex-direction: column; }
+  .blueprint-main-heading dl { justify-content: flex-start; }
+  .blueprint-fact-grid, .sos-task-template-facts, .blueprint-simulation-surface dl { grid-template-columns: 1fr; }
+  .sos-task-template-facts .span-2 { grid-column: auto; }
+  .blueprint-stage-list li { grid-template-columns: 30px minmax(0, 1fr); }
+  .blueprint-stage-list li > span:last-child { grid-column: 2; }
 }

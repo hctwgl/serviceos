@@ -14,8 +14,12 @@ export type FormFieldItem = {
 const props = withDefaults(defineProps<{
   fields: FormFieldItem[]
   editable?: boolean
+  formName?: string
+  unavailableReason?: string
 }>(), {
   editable: false,
+  formName: '表单预览',
+  unavailableReason: '',
 })
 
 const emit = defineEmits<{
@@ -78,9 +82,9 @@ function addField(type: FormFieldItem['type']) {
   <section class="sos-form-designer">
     <header class="sos-section-heading">
       <div>
-        <span class="sos-eyebrow">FORM DESIGNER</span>
-        <h3>现场勘测表</h3>
-        <span>用业务字段组织现场采集，不暴露技术结构；表单随方案版本整体冻结。</span>
+        <span class="sos-eyebrow">表单设计</span>
+        <h3>{{ formName }}</h3>
+        <span>字段库、表单预览和字段属性在同一设计面查看。</span>
       </div>
       <Tag :color="editable ? 'processing' : 'default'">{{ editable ? '活动草稿' : '只读预览' }}</Tag>
     </header>
@@ -91,13 +95,16 @@ function addField(type: FormFieldItem['type']) {
         <button v-for="item in fieldLibrary" :key="item.type" type="button" :disabled="!editable" @click="addField(item.type)">
           <strong>{{ item.label }}</strong><small>{{ item.detail }}</small><span>＋</span>
         </button>
-        <p>字段类型保持克制，先覆盖现场履约最常用的采集动作。</p>
+        <p>{{ editable ? '字段类型保持克制，先覆盖现场履约常用采集动作。' : '字段定义需从活动草稿接口返回后才能编辑。' }}</p>
       </aside>
 
       <main class="sos-form-designer__preview">
         <div class="sos-form-preview-phone">
-          <header><span>现场勘测表</span><small>BYD 山东家充项目</small></header>
-          <div v-if="!fields.length" class="sos-inline-empty"><strong>表单尚未添加字段</strong><span>从左侧字段库选择字段。</span></div>
+          <header><span>{{ formName }}</span><small>方案版本预览</small></header>
+          <div v-if="!fields.length" :class="unavailableReason ? 'sos-inline-unavailable' : 'sos-inline-empty'">
+            <strong>{{ unavailableReason ? '字段定义未返回' : '表单尚未添加字段' }}</strong>
+            <span>{{ unavailableReason || '从左侧字段库选择字段。' }}</span>
+          </div>
           <div v-else class="sos-form-preview-fields">
             <label v-for="field in fields" :key="field.id" :class="{ active: field.id === selectedFieldId }" @click="selectedFieldId = field.id">
               <span>{{ field.label }}<b v-if="field.required">*</b></span>

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { Input, Select, Tag } from '@serviceos/design-system'
+import { Tag } from '@serviceos/design-system'
 import { computed, ref, watch } from 'vue'
 
 export type TaskTemplateItem = {
   id: string
   name: string
   owner: string
+  input: string
+  output: string
   sla: string
   form: string
   evidence: string
@@ -20,10 +22,6 @@ const props = withDefaults(defineProps<{
   editable: false,
 })
 
-const emit = defineEmits<{
-  'update:tasks': [tasks: TaskTemplateItem[]]
-}>()
-
 const selectedId = ref<string>()
 const selectedTask = computed(() => props.tasks.find((task) => task.id === selectedId.value))
 
@@ -35,28 +33,15 @@ watch(
   { immediate: true },
 )
 
-const ownerOptions = [
-  { value: '平台运营', label: '平台运营' },
-  { value: '责任网点', label: '责任网点' },
-  { value: '责任师傅', label: '责任师傅' },
-  { value: '系统自动执行', label: '系统自动执行' },
-]
-
-function patchSelected(patch: Partial<TaskTemplateItem>) {
-  if (!selectedTask.value) return
-  emit('update:tasks', props.tasks.map((task) => (
-    task.id === selectedTask.value?.id ? { ...task, ...patch } : task
-  )))
-}
 </script>
 
 <template>
   <section class="sos-task-template-panel">
     <header class="sos-section-heading">
       <div>
-        <span class="sos-eyebrow">TASK TEMPLATES</span>
+        <span class="sos-eyebrow">任务模板</span>
         <h3>任务模板设计</h3>
-        <span>把每个履约节点落成可执行任务，负责人、SLA、表单和证据要求在同一处确认。</span>
+        <span>每个任务对应一个责任交付，不把任务降级为字段列表。</span>
       </div>
       <Tag color="processing">{{ tasks.length }} 个任务</Tag>
     </header>
@@ -81,18 +66,19 @@ function patchSelected(patch: Partial<TaskTemplateItem>) {
 
       <div v-if="selectedTask" class="sos-task-template-panel__detail">
         <header>
-          <div><span>当前任务</span><h4>{{ selectedTask.name }}</h4></div>
-          <Tag :color="editable ? 'processing' : 'default'">{{ editable ? '草稿编辑态' : '只读预览' }}</Tag>
+          <div><span>{{ selectedTask.stage }}</span><h4>{{ selectedTask.name }}</h4></div>
+          <Tag :color="editable ? 'processing' : 'default'">{{ editable ? '活动草稿' : '方案事实' }}</Tag>
         </header>
-        <div class="sos-form-grid">
-          <label><span>任务名称</span><Input :value="selectedTask.name" :disabled="!editable" @update:value="patchSelected({ name: String($event) })" /></label>
-          <label><span>负责人</span><Select :value="selectedTask.owner" :options="ownerOptions" :disabled="!editable" @update:value="patchSelected({ owner: String($event) })" /></label>
-          <label><span>SLA 目标</span><Input :value="selectedTask.sla" :disabled="!editable" @update:value="patchSelected({ sla: String($event) })" /></label>
-          <label><span>关联表单</span><Input :value="selectedTask.form" :disabled="!editable" @update:value="patchSelected({ form: String($event) })" /></label>
-          <label><span>证据要求</span><Input :value="selectedTask.evidence" :disabled="!editable" @update:value="patchSelected({ evidence: String($event) })" /></label>
-          <label class="span-2"><span>完成条件</span><Input.TextArea :value="selectedTask.completion" :rows="3" :disabled="!editable" @update:value="patchSelected({ completion: String($event) })" /></label>
-        </div>
-        <p class="sos-editor-note">{{ editable ? '修改会作用于当前浏览器中的草稿编辑态；保存仍由方案草稿命令统一提交。' : '当前接口未提供独立任务模板保存命令，页面展示绑定到方案版本的任务事实。' }}</p>
+        <dl class="sos-task-template-facts">
+          <div><dt>责任角色</dt><dd>{{ selectedTask.owner }}</dd></div>
+          <div><dt>SLA</dt><dd>{{ selectedTask.sla }}</dd></div>
+          <div><dt>输入</dt><dd>{{ selectedTask.input }}</dd></div>
+          <div><dt>输出</dt><dd>{{ selectedTask.output }}</dd></div>
+          <div><dt>关联表单</dt><dd>{{ selectedTask.form }}</dd></div>
+          <div><dt>证据要求</dt><dd>{{ selectedTask.evidence }}</dd></div>
+          <div class="span-2"><dt>完成条件</dt><dd>{{ selectedTask.completion }}</dd></div>
+        </dl>
+        <p class="sos-editor-note">{{ editable ? '编辑仍需进入活动草稿，由方案命令统一保存。' : '当前接口未提供独立任务模板编辑命令，以上内容来自方案阶段与编译预览。' }}</p>
       </div>
     </div>
   </section>
