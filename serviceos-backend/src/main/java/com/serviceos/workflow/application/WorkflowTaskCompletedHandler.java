@@ -136,7 +136,8 @@ final class WorkflowTaskCompletedHandler
         var asset = configurations.requireAssetVersion(
                 message.tenantId(), current.workflowDefinitionVersionId(),
                 ConfigurationAssetType.WORKFLOW, current.workflowDefinitionDigest());
-        ExpressionContext expressionContext = expressionContext(message.tenantId(), current);
+        ExpressionContext expressionContext = expressionContext(
+                message.tenantId(), current, completionResultCode(completed, current));
         var progression = parser.progression(asset, current.nodeId(), expressionContext);
         String progressionDigest = activateProgression(
                 message.tenantId(),
@@ -173,7 +174,7 @@ final class WorkflowTaskCompletedHandler
                         rs.getString("node_id"),
                         rs.getString("status")))
                 .single();
-        if ("FIRED".equals(timer.status())) {
+        if ("FIRED".equals(timer.status()) || "CANCELLED".equals(timer.status())) {
             return;
         }
         if (!"CLAIMED".equals(timer.status()) && !"WAITING".equals(timer.status())) {
@@ -215,8 +216,21 @@ final class WorkflowTaskCompletedHandler
         var asset = configurations.requireAssetVersion(
                 timer.tenantId(), current.workflowDefinitionVersionId(),
                 ConfigurationAssetType.WORKFLOW, current.workflowDefinitionDigest());
-        ExpressionContext expressionContext = expressionContext(timer.tenantId(), current);
-        var progression = parser.progressionAfterTimer(asset, current.nodeId(), expressionContext);
+        int cancelledWait = jdbc.sql("""
+                        UPDATE wfl_wait_subscription
+                           SET status = 'CANCELLED', version = version + 1
+                         WHERE tenant_id = :tenantId
+                           AND workflow_node_instance_id = :nodeInstanceId
+                           AND status = 'WAITING'
+                        """)
+                .param("tenantId", timer.tenantId())
+                .param("nodeInstanceId", timer.workflowNodeInstanceId())
+                .update();
+        ExpressionContext expressionContext = expressionContext(
+                timer.tenantId(), current, cancelledWait == 1 ? "TIMEOUT" : null);
+        var progression = cancelledWait == 1
+                ? parser.progressionAfterWait(asset, current.nodeId(), expressionContext)
+                : parser.progressionAfterTimer(asset, current.nodeId(), expressionContext);
         activateProgression(
                 timer.tenantId(), fireEventId, correlationId,
                 Sha256.digest(timerSubscriptionId.toString()), current, progression, now, null);
@@ -258,6 +272,18 @@ final class WorkflowTaskCompletedHandler
         if (waitUpdated != 1) {
             throw new IllegalStateException("WAIT_EVENT subscription is no longer waiting");
         }
+        // 正常事件命中后取消同节点超时计时器；timer worker 即使已 claim，也不能再推进节点。
+        jdbc.sql("""
+                UPDATE wfl_timer_subscription
+                   SET status = 'CANCELLED', claim_owner = NULL, claim_until = NULL,
+                       version = version + 1
+                 WHERE tenant_id = :tenantId
+                   AND workflow_node_instance_id = :nodeInstanceId
+                   AND status IN ('WAITING', 'CLAIMED')
+                """)
+                .param("tenantId", command.tenantId())
+                .param("nodeInstanceId", wait.workflowNodeInstanceId())
+                .update();
         int nodeUpdated = jdbc.sql("""
                         UPDATE wfl_node_instance
                            SET status = 'COMPLETED', completion_event_id = :completionEventId,
@@ -279,7 +305,7 @@ final class WorkflowTaskCompletedHandler
         var asset = configurations.requireAssetVersion(
                 command.tenantId(), current.workflowDefinitionVersionId(),
                 ConfigurationAssetType.WORKFLOW, current.workflowDefinitionDigest());
-        ExpressionContext expressionContext = expressionContext(command.tenantId(), current);
+        ExpressionContext expressionContext = expressionContext(command.tenantId(), current, "SUCCESS");
         var progression = parser.progressionAfterWait(asset, current.nodeId(), expressionContext);
         UUID activationEventId = UUID.nameUUIDFromBytes(
                 ("wait-wake:" + command.signalId()).getBytes());
@@ -389,6 +415,9 @@ final class WorkflowTaskCompletedHandler
                     .param("activationEventId", activationEventId)
                     .param("activatedAt", java.sql.Timestamp.from(activatedAt))
                     .update();
+            updateCurrentExecution(
+                    tenantId, current.workflowInstanceId(), nextNodeInstanceId,
+                    progression.nodeId(), progression.stageCode());
             if (progression.waiting()) {
                 String correlationKey = WorkflowCorrelationKeys.resolve(
                         progression.correlationKeyTemplate(),
@@ -419,6 +448,32 @@ final class WorkflowTaskCompletedHandler
                         .param("activationEventId", activationEventId)
                         .param("activatedAt", java.sql.Timestamp.from(activatedAt))
                         .update();
+                if (progression.durationSeconds() > 0) {
+                    Instant fireAt = activatedAt.plusSeconds(progression.durationSeconds());
+                    jdbc.sql("""
+                                    INSERT INTO wfl_timer_subscription (
+                                        timer_subscription_id, tenant_id, project_id, workflow_instance_id,
+                                        workflow_node_instance_id, work_order_id, node_id, duration_seconds,
+                                        fire_at, status, activation_event_id, version, activated_at
+                                    ) VALUES (
+                                        :timerId, :tenantId, :projectId, :workflowId,
+                                        :nodeInstanceId, :workOrderId, :nodeId, :durationSeconds,
+                                        :fireAt, 'WAITING', :activationEventId, 1, :activatedAt
+                                    )
+                                    """)
+                            .param("timerId", UUID.randomUUID())
+                            .param("tenantId", tenantId)
+                            .param("projectId", current.projectId())
+                            .param("workflowId", current.workflowInstanceId())
+                            .param("nodeInstanceId", nextNodeInstanceId)
+                            .param("workOrderId", current.workOrderId())
+                            .param("nodeId", progression.nodeId())
+                            .param("durationSeconds", progression.durationSeconds())
+                            .param("fireAt", java.sql.Timestamp.from(fireAt))
+                            .param("activationEventId", activationEventId)
+                            .param("activatedAt", java.sql.Timestamp.from(activatedAt))
+                            .update();
+                }
                 // M365：REVIEW_TASK 门闸激活时立即消费早期 APPROVED 信号，避免“先审后到闸”卡住。
                 if (ReviewGateWait.WAIT_EVENT_TYPE.equals(progression.waitEventType())) {
                     EarlyReviewSignal early = findUnconsumedEarlyReviewSignal(
@@ -515,6 +570,9 @@ final class WorkflowTaskCompletedHandler
                 .param("activationEventId", activationEventId)
                 .param("activatedAt", java.sql.Timestamp.from(activatedAt))
                 .update();
+        updateCurrentExecution(
+                tenantId, current.workflowInstanceId(), nextNodeInstanceId,
+                progression.nodeId(), progression.stageCode());
         return Sha256.digest(current.workflowNodeInstanceId() + "|" + nextNodeInstanceId
                 + "|" + nextTask.taskId());
     }
@@ -946,7 +1004,8 @@ final class WorkflowTaskCompletedHandler
     ) {
         int updated = jdbc.sql("""
                         UPDATE wfl_stage_instance
-                           SET status = 'COMPLETED', completed_at = :completedAt, version = version + 1
+                           SET status = 'COMPLETED', completed_at = :completedAt,
+                               version = version + 1
                          WHERE tenant_id = :tenantId AND stage_instance_id = :stageId
                            AND status = 'ACTIVE'
                         """)
@@ -1052,6 +1111,30 @@ final class WorkflowTaskCompletedHandler
         workOrders.fulfill(new FulfillWorkOrderCommand(
                 tenantId, current.workOrderId(), current.workflowInstanceId(),
                 activationEventId, correlationId, completedStageCodes));
+    }
+
+    private void updateCurrentExecution(
+            String tenantId,
+            UUID workflowInstanceId,
+            UUID nodeInstanceId,
+            String nodeCode,
+            String phaseCode
+    ) {
+        jdbc.sql("""
+                UPDATE wfl_workflow_instance
+                   SET current_node_instance_id = :nodeInstanceId,
+                       current_node_code = :nodeCode,
+                       current_phase_code = :phaseCode
+                 WHERE tenant_id = :tenantId
+                   AND workflow_instance_id = :workflowId
+                   AND status = 'ACTIVE'
+                """)
+                .param("nodeInstanceId", nodeInstanceId)
+                .param("nodeCode", nodeCode)
+                .param("phaseCode", phaseCode)
+                .param("tenantId", tenantId)
+                .param("workflowId", workflowInstanceId)
+                .update();
     }
 
     private void resumeParentAfterSubProcess(
@@ -1348,6 +1431,14 @@ final class WorkflowTaskCompletedHandler
      * 网关条件只读取工单冻结事实与当前完成任务的 stage/taskType；不引入可变“最新配置”。
      */
     private ExpressionContext expressionContext(String tenantId, NodeRuntime current) {
+        return expressionContext(tenantId, current, null);
+    }
+
+    private ExpressionContext expressionContext(
+            String tenantId,
+            NodeRuntime current,
+            String resultCode
+    ) {
         WorkOrderExpressionContext workOrder = workOrderExpressions.find(tenantId, current.workOrderId())
                 .orElseThrow(() -> new IllegalStateException(
                         "workflow progression missing WorkOrder expression context: "
@@ -1358,7 +1449,18 @@ final class WorkflowTaskCompletedHandler
                         workOrder.clientCode(), workOrder.brandCode(), workOrder.serviceProductCode()),
                 new ExpressionContext.RegionContext(
                         workOrder.provinceCode(), workOrder.cityCode(), workOrder.districtCode()),
-                new ExpressionContext.TaskContext(current.stageCode(), taskType));
+                new ExpressionContext.TaskContext(current.stageCode(), taskType, resultCode));
+    }
+
+    /**
+     * 人工节点的 resultRef 就是节点完成结果；自动任务成功由 Worker 明确映射为 SUCCESS。
+     * 该值只进入本次冻结推进上下文，不查询可变配置。
+     */
+    private static String completionResultCode(TaskCompletedPayload completed, NodeRuntime current) {
+        if ("AUTOMATED".equals(current.taskKind())) {
+            return "SUCCESS";
+        }
+        return completed.resultRef();
     }
 
     private record TimerSubscription(

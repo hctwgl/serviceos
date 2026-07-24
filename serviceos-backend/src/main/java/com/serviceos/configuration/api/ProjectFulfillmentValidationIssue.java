@@ -13,7 +13,11 @@ public record ProjectFulfillmentValidationIssue(
         String fieldPath,
         String userMessage,
         String technicalMessage,
-        String suggestion
+        String suggestion,
+        String phaseId,
+        String nodeId,
+        String transitionId,
+        String configSection
 ) {
     public ProjectFulfillmentValidationIssue {
         severity = requireText(severity, "severity", 16);
@@ -21,6 +25,23 @@ public record ProjectFulfillmentValidationIssue(
         userMessage = requireText(userMessage, "userMessage", 500);
         technicalMessage = technicalMessage == null ? "" : technicalMessage.trim();
         suggestion = suggestion == null ? "" : suggestion.trim();
+    }
+
+    /** 兼容既有阶段/资产校验调用方。 */
+    public ProjectFulfillmentValidationIssue(
+            String severity,
+            String errorCode,
+            String profileId,
+            String stageCode,
+            String assetType,
+            String assetRef,
+            String fieldPath,
+            String userMessage,
+            String technicalMessage,
+            String suggestion
+    ) {
+        this(severity, errorCode, profileId, stageCode, assetType, assetRef, fieldPath,
+                userMessage, technicalMessage, suggestion, null, null, null, null);
     }
 
     private static String requireText(String value, String name, int max) {

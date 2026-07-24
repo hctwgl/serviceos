@@ -33,9 +33,7 @@ function permissionTone(risk: 'NORMAL' | 'HIGH' | 'CRITICAL') {
   <div class="role-directory-page">
     <div class="page-heading inline">
       <div>
-        <p class="breadcrumb">系统管理 / 角色与授权</p>
         <h1>角色与授权</h1>
-        <p>查看平台角色及其权限组合。真正的授权范围由服务端授权策略决定。</p>
       </div>
     </div>
 

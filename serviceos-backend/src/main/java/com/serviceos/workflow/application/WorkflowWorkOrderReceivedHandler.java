@@ -93,11 +93,13 @@ final class WorkflowWorkOrderReceivedHandler implements OutboxMessageHandler {
                     configuration_bundle_id, configuration_bundle_digest,
                     workflow_definition_version_id,
                     workflow_key, workflow_version, definition_digest, status,
+                    execution_mode,
                     start_event_id, correlation_id, version, started_at
                 ) VALUES (
                     :workflowId, :tenantId, :projectId, :workOrderId,
                     :bundleId, :bundleDigest, :definitionVersionId, :workflowKey, :workflowVersion,
-                    :definitionDigest, 'ACTIVE', :startEventId, :correlationId, 1, :startedAt
+                    :definitionDigest, 'ACTIVE', :executionMode,
+                    :startEventId, :correlationId, 1, :startedAt
                 )
                 """)
                 .param("workflowId", workflowId)
@@ -110,6 +112,7 @@ final class WorkflowWorkOrderReceivedHandler implements OutboxMessageHandler {
                 .param("workflowKey", definition.workflowKey())
                 .param("workflowVersion", definition.workflowVersion())
                 .param("definitionDigest", asset.contentDigest())
+                .param("executionMode", definition.executionMode())
                 .param("startEventId", message.eventId())
                 .param("correlationId", message.correlationId())
                 .param("startedAt", java.sql.Timestamp.from(now))
@@ -156,6 +159,19 @@ final class WorkflowWorkOrderReceivedHandler implements OutboxMessageHandler {
                 .param("taskId", firstTask.taskId())
                 .param("activationEventId", message.eventId())
                 .param("activatedAt", java.sql.Timestamp.from(now))
+                .update();
+        jdbc.sql("""
+                UPDATE wfl_workflow_instance
+                   SET current_node_instance_id = :nodeInstanceId,
+                       current_node_code = :nodeCode,
+                       current_phase_code = :phaseCode
+                 WHERE tenant_id = :tenantId AND workflow_instance_id = :workflowId
+                """)
+                .param("nodeInstanceId", nodeInstanceId)
+                .param("nodeCode", definition.firstNodeId())
+                .param("phaseCode", definition.firstStageCode())
+                .param("tenantId", message.tenantId())
+                .param("workflowId", workflowId)
                 .update();
         workOrders.activate(new ActivateWorkOrderCommand(
                 message.tenantId(), received.workOrderId(), message.eventId(), message.correlationId()));

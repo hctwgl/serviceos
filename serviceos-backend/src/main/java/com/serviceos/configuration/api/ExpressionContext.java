@@ -32,6 +32,9 @@ public record ExpressionContext(
     public record RegionContext(String provinceCode, String cityCode, String districtCode) {
     }
 
-    public record TaskContext(String stageCode, String taskType) {
+    public record TaskContext(String stageCode, String taskType, String resultCode) {
+        public TaskContext(String stageCode, String taskType) {
+            this(stageCode, taskType, null);
+        }
     }
 }

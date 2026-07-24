@@ -31,9 +31,9 @@ const emit = defineEmits<{
 <template>
   <aside class="sos-blueprint-sidebar">
     <div class="sos-blueprint-sidebar__heading">
-      <span class="sos-eyebrow">PROJECT BLUEPRINTS</span>
-      <strong>方案目录</strong>
-      <small>{{ plans.length }} 套服务场景</small>
+      <span class="sos-eyebrow">方案设计</span>
+      <strong>履约方案</strong>
+      <small>{{ plans.length }} 套方案</small>
     </div>
 
     <div v-if="plans.length" class="sos-blueprint-sidebar__plans">
@@ -58,7 +58,7 @@ const emit = defineEmits<{
     </div>
 
     <nav class="sos-blueprint-sidebar__nav" aria-label="蓝图设计导航">
-      <span class="sos-blueprint-sidebar__label">DESIGN SURFACE</span>
+      <span class="sos-blueprint-sidebar__label">设计目录</span>
       <button
         v-for="section in sections"
         :key="section.key"

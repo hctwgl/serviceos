@@ -13,9 +13,9 @@ defineProps<{
   <section class="sos-stage-bar">
     <header class="sos-panel-heading">
       <div>
-        <span class="sos-eyebrow">FULFILLMENT FLOW</span>
+        <span class="sos-eyebrow">履约进度</span>
         <h2>{{ title ?? '履约阶段进度' }}</h2>
-        <p>{{ description ?? '当前进度来自项目履约与工单运行投影' }}</p>
+        <p>{{ description ?? '当前进度来自项目履约与工单投影' }}</p>
       </div>
     </header>
     <div v-if="!stages.length" class="sos-inline-unavailable">

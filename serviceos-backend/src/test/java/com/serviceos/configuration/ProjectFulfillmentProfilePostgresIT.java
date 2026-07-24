@@ -252,7 +252,8 @@ class ProjectFulfillmentProfilePostgresIT {
         ProjectFulfillmentDraftView draft = profiles.getDraft(
                 principal(), "corr-draft", projectId, created.profileId());
         assertThat(draft.document()).isNotNull();
-        assertThat(draft.document().stages()).isNotEmpty();
+        assertThat(draft.document().phases()).isNotEmpty();
+        assertThat(draft.document().nodes()).isNotEmpty();
         ProjectFulfillmentDocument alignedDocument = runtimeAlignedDocument(draft.document());
         ProjectFulfillmentDraftView updated = profiles.updateDraft(principal(), meta("u1"),
                 new UpdateProjectFulfillmentDraftCommand(

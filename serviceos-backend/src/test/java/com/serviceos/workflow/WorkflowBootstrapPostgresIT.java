@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -158,6 +159,53 @@ class WorkflowBootstrapPostgresIT {
                 .query(String.class).single()).isEqualTo("FAILED");
     }
 
+    @Test
+    void serialWorkflowInheritsModeAndDatabaseRejectsSecondActiveNode() {
+        Scope scope = scope(serialWorkflow());
+        var receipt = workOrders.receive(command(scope, "c".repeat(64)));
+
+        assertThat(worker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
+        UUID workflowInstanceId = jdbc.sql("""
+                SELECT workflow_instance_id FROM wfl_workflow_instance
+                 WHERE work_order_id = :workOrderId
+                """).param("workOrderId", receipt.workOrderId()).query(UUID.class).single();
+        UUID stageInstanceId = jdbc.sql("""
+                SELECT stage_instance_id FROM wfl_stage_instance
+                 WHERE workflow_instance_id = :workflowInstanceId
+                """).param("workflowInstanceId", workflowInstanceId).query(UUID.class).single();
+
+        assertThat(jdbc.sql("""
+                SELECT execution_mode FROM wfl_workflow_instance
+                 WHERE workflow_instance_id = :workflowInstanceId
+                """).param("workflowInstanceId", workflowInstanceId).query(String.class).single())
+                .isEqualTo("SERIAL_V1");
+        assertThat(jdbc.sql("""
+                SELECT execution_mode || ':' || execution_sequence FROM wfl_node_instance
+                 WHERE workflow_instance_id = :workflowInstanceId
+                """).param("workflowInstanceId", workflowInstanceId).query(String.class).single())
+                .isEqualTo("SERIAL_V1:1");
+
+        assertThatThrownBy(() -> jdbc.sql("""
+                INSERT INTO wfl_node_instance (
+                    workflow_node_instance_id, tenant_id, workflow_instance_id, stage_instance_id,
+                    work_order_id, node_id, task_id, status, activation_event_id,
+                    version, activated_at
+                ) VALUES (
+                    :nodeInstanceId, :tenantId, :workflowInstanceId, :stageInstanceId,
+                    :workOrderId, 'ILLEGAL_PARALLEL_NODE', :taskId, 'ACTIVE', :activationEventId,
+                    1, now()
+                )
+                """)
+                .param("nodeInstanceId", UUID.randomUUID())
+                .param("tenantId", TENANT)
+                .param("workflowInstanceId", workflowInstanceId)
+                .param("stageInstanceId", stageInstanceId)
+                .param("workOrderId", receipt.workOrderId())
+                .param("taskId", UUID.randomUUID())
+                .param("activationEventId", UUID.randomUUID())
+                .update()).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
     private Scope scope(String workflowDefinition) {
         UUID projectId = UUID.randomUUID();
         jdbc.sql("""
@@ -259,6 +307,12 @@ class WorkflowBootstrapPostgresIT {
                    {"nodeId":"END","nodeType":"END","name":"结束"}],
                  "transitions":[{"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"}]}
                 """;
+    }
+
+    private static String serialWorkflow() {
+        return validWorkflow().replace(
+                "\"semanticVersion\":\"1.0.0\"",
+                "\"semanticVersion\":\"1.0.0\",\"executionMode\":\"SERIAL_V1\"");
     }
 
     private record Scope(UUID projectId, ConfigurationBundleReference bundle, String workflowDigest) {}

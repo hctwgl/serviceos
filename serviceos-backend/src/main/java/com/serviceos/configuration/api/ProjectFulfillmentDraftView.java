@@ -19,6 +19,9 @@ public record ProjectFulfillmentDraftView(
         UUID workflowAssetVersionId,
         UUID sourceBundleId,
         String validationJson,
+        String simulationJson,
+        String simulationDocumentDigest,
+        Instant simulatedAt,
         long aggregateVersion,
         Instant updatedAt
 ) {

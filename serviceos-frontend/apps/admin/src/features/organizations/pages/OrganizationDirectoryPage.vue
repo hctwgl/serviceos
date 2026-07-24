@@ -22,9 +22,7 @@ const unitNames = computed(() => new Map(units.value.map((unit) => [unit.id, uni
   <div class="organization-page">
     <div class="page-heading inline">
       <div>
-        <p class="breadcrumb">组织与资源 / 组织架构</p>
         <h1>组织架构</h1>
-        <p>维护企业组织和部门层级。人员任职与角色授权分别管理，组织层级本身不授予业务权限。</p>
       </div>
     </div>
 

@@ -24,7 +24,7 @@ final class ServiceOsExprV1Evaluator implements ExpressionEvaluator {
     private static final Set<String> ALLOWED_PATHS = Set.of(
             "workOrder.clientCode", "workOrder.brandCode", "workOrder.serviceProductCode",
             "region.provinceCode", "region.cityCode", "region.districtCode",
-            "task.stageCode", "task.taskType");
+            "task.stageCode", "task.taskType", "task.resultCode");
 
     @Override
     public ExpressionEvaluation evaluate(ExpressionDefinition expression, ExpressionContext context) {
@@ -292,6 +292,7 @@ final class ServiceOsExprV1Evaluator implements ExpressionEvaluator {
                 case "region.districtCode" -> require(context.region().districtCode(), path);
                 case "task.stageCode" -> require(context.task().stageCode(), path);
                 case "task.taskType" -> require(context.task().taskType(), path);
+                case "task.resultCode" -> require(context.task().resultCode(), path);
                 default -> throw new ExpressionEvaluationException("表达式路径不在白名单中: " + path);
             };
         }

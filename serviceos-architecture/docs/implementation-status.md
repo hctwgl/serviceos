@@ -32,7 +32,7 @@ baselineCommit: "afbbd9ab3752f4c319a869302077ea1e525b516f"
 |---|---|---|---|
 | 身份、组织、授权、审计 | `identity`、`organization`、`authorization`、`audit` | 已实现基础 | OIDC/JWT、Principal/Persona、组织任职、RoleGrant、Tenant/Project/Region/Network Scope；正式企业 IdP、HR Connector、完整 MFA obligation 尚未接入 |
 | 项目与工单 | `project`、`workorder` | 部分实现 | 项目、范围关系、工单受理、版本绑定和履约生命周期已有；完整项目审批、工单取消/暂停/恢复及客户敏感详情治理未闭环 |
-| 配置与工作流 | `configuration`、`workflow` | 部分实现 | 不可变配置资产、发布解析和多类节点运行时已有；同一服务产品多方案、品牌/省域硬匹配、优先级/具体度决策、发布期冲突阻断和只读模拟已有；Workflow ACTIVE Stage 已作为目录/工作区权威阶段，覆盖无 Task 的审核与等待事件门闸；其余结构化维度、待确认/人工指定/重匹配及全部高级表达式仍未完成 |
+| 配置与工作流 | `configuration`、`workflow` | 部分实现 | 不可变配置资产、项目级 Vue Flow 草稿设计、服务端图校验/模拟/编译发布和 `SERIAL_V1` 单活跃节点约束已有；同一服务产品多方案、品牌/省域硬匹配、优先级/具体度决策、发布期冲突阻断和工单版本冻结已有；Workflow 当前 Phase/Node 已进入工作区查询；节点级审核责任策略、通用系统动作绑定及最终外部回执全旅程仍未闭环 |
 | 任务与派单 | `task`、`dispatch`、`network` | 部分实现 | Task 责任/执行保护/重试、自动网点/师傅指派、整单责任跨阶段继承、终态容量释放和按责任事实待派筛选已有；完整评分、地理硬过滤和通用高风险特批未闭环 |
 | 现场履约 | `appointment`、`fieldwork`、`forms`、`evidence`、`files` | 部分实现 | 预约、Visit、动态表单、受限文件上传、资料槽位、机器校验、内部审核与 CLIENT ReviewCase 主链路已有；内部审核通过驱动资料门闸，外部复核通过驱动车企回执门闸；离线、后台上传、OCR/CV、生产对象存储和扫描服务未闭环 |
 | SLA 与异常 | `sla`、`operations` | 部分实现 | 基础时钟、对账、授权查询和异常工作台已有；暂停、预警、升级、通知与更多自动闭环未完成 |
@@ -44,7 +44,7 @@ baselineCommit: "afbbd9ab3752f4c319a869302077ea1e525b516f"
 
 | 客户端 | 当前事实 | 未完成边界 |
 |---|---|---|
-| Admin Web | 项目履约方案、多版本设计/发布/模拟、工单目录与工作区已有真实后端联调入口；履约进度按 Workflow 阶段历史展示并覆盖审核/外部回执门闸 | 完整项目审批、全部项目配置面和最终人工产品验收仍未完成 |
+| Admin Web | 项目履约方案已有 Vue Flow 三栏设计器、Phase/Node/Transition 编辑、节点资产空态创建、校验/模拟/发布和只读版本；工单工作区展示冻结版本的当前 Phase/Node | 审核责任与系统动作配置尚未完成真实运行闭环，最终双分辨率人工产品验收仍未完成 |
 | Network Web | 工单工作区、候选师傅、责任分配、联系预约和当前阶段事实进度已有真实联调入口 | 整改、异常和更多协作旅程仍需按当前产品决策验收 |
 | Technician Web | 在线任务 Feed、接单开工、预约、到场、冻结表单、资料上传与完成前复核已有 | 不承担原生离线、后台上传和设备可信采集承诺；浏览器定位仍依赖用户站点权限 |
 | Technician iOS | 原生工程、共享基础、在线 Visit/表单/资料能力已有 | 真机弱网、签名、TestFlight、VoiceOver、后台/离线闭环尚未形成完整证据 |

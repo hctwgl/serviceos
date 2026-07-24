@@ -6,9 +6,11 @@ const props = withDefaults(defineProps<{
   stages: WorkflowCanvasStage[]
   selectedCode?: string
   readonly?: boolean
+  showRuntimeStatus?: boolean
 }>(), {
   selectedCode: undefined,
   readonly: true,
+  showRuntimeStatus: false,
 })
 
 const emit = defineEmits<{
@@ -23,8 +25,8 @@ function select(stage: WorkflowCanvasStage) {
 <template>
   <section class="sos-workflow-canvas" aria-label="履约流程画布">
     <header class="sos-workflow-canvas__toolbar">
-      <div><span class="sos-eyebrow">FULFILLMENT BLUEPRINT</span><strong>流程设计</strong><small>{{ readonly ? '只读预览 · 配置随方案版本整体发布' : '编辑草稿 · 保存后重新校验' }}</small></div>
-      <span class="sos-canvas-legend"><i class="is-completed" />已完成 <i class="is-current" />当前 <i class="is-pending" />未开始</span>
+      <div><span class="sos-eyebrow">流程设计</span><strong>履约流程</strong><small>{{ readonly ? '只读预览 · 配置随方案版本整体发布' : '编辑草稿 · 保存后重新校验' }}</small></div>
+      <span v-if="showRuntimeStatus" class="sos-canvas-legend"><i class="is-completed" />已完成 <i class="is-current" />当前 <i class="is-pending" />未开始</span>
     </header>
     <div v-if="!stages.length" class="sos-workflow-canvas__empty">
       <strong>流程画布暂时没有阶段</strong>
@@ -39,7 +41,7 @@ function select(stage: WorkflowCanvasStage) {
             type="button"
             class="sos-workflow-node"
             :class="[
-              `sos-workflow-node--${stage.status ?? 'pending'}`,
+              `sos-workflow-node--${showRuntimeStatus ? (stage.status ?? 'pending') : 'design'}`,
               { 'is-selected': stage.code === props.selectedCode },
             ]"
             :aria-pressed="stage.code === props.selectedCode"

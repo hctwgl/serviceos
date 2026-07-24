@@ -66,7 +66,9 @@ const projectPersonnel = computed(() => workspace.data.value?.workspace.projectP
 const progressStages = computed<ProjectStageBarItem[]>(() => (
   (workspace.data.value?.workspace.workflowStages ?? []).map((stage) => ({
     code: stage.stageCode,
-    label: safeStageLabel(stage.stageCode),
+    label: stage.stageCode === workspace.data.value?.workspace.header.currentStageCode
+      ? (workspace.data.value?.stageName ?? safeStageLabel(stage.stageCode))
+      : safeStageLabel(stage.stageCode),
     status: stage.status === 'COMPLETED' || stage.status === 'SKIPPED'
       ? 'completed'
       : stage.status === 'ACTIVE'
@@ -129,7 +131,7 @@ function taskTitle(task: WorkOrderWorkspaceTask | null): string {
   try {
     return task ? taskLabel(task.taskType) : (workspace.data.value?.taskName ?? '暂无进行中的任务')
   } catch {
-    return '当前任务名称待确认'
+    return workspace.data.value?.taskName ?? '当前任务名称待确认'
   }
 }
 
@@ -137,7 +139,9 @@ function safeTaskLabel(code: string | null): string {
   try {
     return taskLabel(code)
   } catch {
-    return '当前任务名称待确认'
+    return code === currentTask.value?.taskType
+      ? (workspace.data.value?.taskName ?? '当前任务名称待确认')
+      : '当前任务名称待确认'
   }
 }
 
@@ -171,7 +175,6 @@ function copyOrderCode() {
       <template v-else>
         <section class="workorder-ops-header">
           <div class="workorder-ops-header__title">
-            <p class="breadcrumb">工单运营 / 工单工作区</p>
             <div class="workorder-code-line"><h1>{{ workspace.data.value.workspace.header.externalOrderCode }}</h1><button type="button" class="icon-link" aria-label="复制工单编号" @click="copyOrderCode"><CopyOutlined /></button><StatusPill tone="green" :label="workspace.data.value.statusName ?? '状态待确认'" /></div>
             <p>{{ workspace.data.value.clientName ?? '客户品牌待确认' }} · {{ workspace.data.value.projectName ?? '项目待确认' }} · {{ workspace.data.value.serviceName ?? '服务产品待确认' }}</p>
           </div>
