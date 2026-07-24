@@ -1,5 +1,5 @@
 <script setup lang="ts">
-export type BusinessTimelineItem = {
+export type ProjectTimelineItem = {
   id: string
   title: string
   time: string
@@ -8,40 +8,35 @@ export type BusinessTimelineItem = {
 }
 
 withDefaults(defineProps<{
-  items: BusinessTimelineItem[]
-  title?: string
-  description?: string
+  items: ProjectTimelineItem[]
   unavailable?: boolean
 }>(), {
-  title: '业务时间线',
-  description: '来自项目工单与履约事件的时间顺序投影。',
   unavailable: false,
 })
 </script>
 
 <template>
-  <section class="sos-business-timeline">
+  <section class="sos-project-timeline" aria-label="项目业务时间线">
     <header class="sos-panel-heading">
       <div>
-        <span class="sos-eyebrow">BUSINESS TIMELINE</span>
-        <h2>{{ title }}</h2>
-        <p>{{ description }}</p>
+        <span class="sos-eyebrow">项目进展</span>
+        <h2>业务时间线</h2>
       </div>
-      <span class="sos-timeline-freshness"><i aria-hidden="true" />已同步</span>
       <slot name="extra" />
     </header>
+
     <div v-if="unavailable" class="sos-inline-unavailable">
-      <strong>业务动态暂时无法获取</strong>
-      <span>工单投影恢复后会自动刷新，不显示伪造的空状态。</span>
+      <strong>业务事件暂不可获取</strong>
+      <span>工单投影恢复后会自动刷新。</span>
     </div>
     <div v-else-if="!items.length" class="sos-inline-empty">
       <strong>当前项目还没有业务事件</strong>
-      <span>新工单受理后，客户联系、预约和履约节点会出现在这里。</span>
+      <span>客户联系、预约和履约节点完成后会出现在这里。</span>
     </div>
-    <ol v-else class="sos-business-timeline__list">
+    <ol v-else class="sos-project-timeline__list">
       <li v-for="item in items" :key="item.id" :class="`tone-${item.tone ?? 'blue'}`">
         <time>{{ item.time }}</time>
-        <span class="sos-business-timeline__rail"><i aria-hidden="true" /></span>
+        <span class="sos-project-timeline__rail"><i aria-hidden="true" /></span>
         <div>
           <strong>{{ item.title }}</strong>
           <p>{{ item.description }}</p>

@@ -27,9 +27,9 @@ const emit = defineEmits<{
   <section class="sos-version-timeline" aria-label="履约方案版本时间线">
     <header class="sos-section-heading">
       <div>
-        <span class="sos-eyebrow">REVISION HISTORY</span>
+        <span class="sos-eyebrow">版本历史</span>
         <h3>版本时间线</h3>
-        <span>每个版本冻结完整流程、任务、表单、证据与 SLA；历史版本只读。</span>
+        <span>发布后的版本只读，可查看变更并继续生成新版本。</span>
       </div>
       <slot name="extra" />
     </header>

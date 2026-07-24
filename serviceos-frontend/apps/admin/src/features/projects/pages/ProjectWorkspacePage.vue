@@ -9,11 +9,10 @@ import { useQuery } from '@tanstack/vue-query'
 import { computed } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import PageError from '../../../components/PageError.vue'
-import BusinessTimeline from '../../../components/serviceos/BusinessTimeline.vue'
 import FulfillmentStageBar from '../../../components/serviceos/FulfillmentStageBar.vue'
-import ProjectMetricCard from '../../../components/serviceos/ProjectMetricCard.vue'
+import ProjectRiskPanel from '../../../components/serviceos/ProjectRiskPanel.vue'
 import ProjectSummaryHeader from '../../../components/serviceos/ProjectSummaryHeader.vue'
-import RiskPanel from '../../../components/serviceos/RiskPanel.vue'
+import ProjectTimeline from '../../../components/serviceos/ProjectTimeline.vue'
 import SlaHealthCard from '../../../components/serviceos/SlaHealthCard.vue'
 import {
   buildProjectActivities,
@@ -38,12 +37,12 @@ const workOrders = useQuery<AdminWorkOrderDirectoryView>({
 })
 
 const tabs: Array<{ key: ProjectTab; label: string; description: string }> = [
-  { key: 'dashboard', label: '项目驾驶舱', description: '项目状态、阶段、风险与最新动态' },
-  { key: 'fulfillment', label: '履约方案', description: '方案版本与流程设计' },
-  { key: 'work-orders', label: '工单执行', description: '当前项目的履约工单' },
-  { key: 'resources', label: '资源网络', description: '参与网点与服务范围' },
-  { key: 'quality', label: '质量异常', description: '审核、整改与履约风险' },
-  { key: 'analytics', label: '数据分析', description: '项目履约数据概览' },
+  { key: 'dashboard', label: '项目概览', description: '状态、风险、阶段、事件' },
+  { key: 'fulfillment', label: '履约方案', description: '版本与流程设计' },
+  { key: 'work-orders', label: '工单管理', description: '责任与当前任务' },
+  { key: 'resources', label: '资源网络', description: '网点与服务区域' },
+  { key: 'quality', label: '质量异常', description: '审核与整改入口' },
+  { key: 'analytics', label: '数据分析', description: '运营信号' },
 ]
 
 const activeTab = computed<ProjectTab>(() => {
@@ -74,19 +73,6 @@ const stageBar = computed(() => buildProjectStageBar(
 const riskItems = computed(() => buildProjectRiskItems(workOrders.data.value))
 const activities = computed(() => buildProjectActivities(workOrders.data.value?.items ?? []))
 const dashboardUnavailable = computed(() => workOrders.isError.value || !workOrders.data.value)
-const slaHealth = computed(() => {
-  const total = project.value?.activeWorkOrderCount
-  const risks = workOrders.data.value?.queueSummary.slaRiskCount
-  if (total === null || total === undefined || risks === undefined) {
-    return { label: '待同步', tone: 'default' as const, hint: '等待项目工单投影' }
-  }
-  const percentage = total === 0 ? 100 : Math.max(0, Math.round(((total - risks) / total) * 100))
-  return {
-    label: `${percentage}%`,
-    tone: risks > 0 ? 'warning' as const : 'success' as const,
-    hint: risks > 0 ? `${risks} 单存在时效风险` : '当前没有 SLA 风险',
-  }
-})
 const timelineItems = computed(() => activities.value.map((activity) => ({
   id: activity.id,
   title: activity.label,
@@ -94,6 +80,47 @@ const timelineItems = computed(() => activities.value.map((activity) => ({
   description: activity.detail,
   tone: activity.tone,
 })))
+
+const nextAction = computed(() => {
+  const risk = riskItems.value[0]
+  if (risk) {
+    return {
+      label: `处理${risk.label}`,
+      detail: risk.description,
+      actionLabel: '打开处置入口',
+      to: risk.to ?? '/work-orders',
+    }
+  }
+  if (activeProfileDetail.data.value?.draftRevisionId) {
+    return {
+      label: '完成方案发布校验',
+      detail: '活动草稿尚未成为新生效版本。',
+      actionLabel: '进入发布检查',
+      to: `/projects/${projectId.value}/fulfillment/${activeProfile.value?.profileId}/publish`,
+    }
+  }
+  if (!activeProfile.value) {
+    return {
+      label: '建立履约方案',
+      detail: '项目尚未绑定可用于受理的履约方案。',
+      actionLabel: '打开方案设计器',
+      to: `/projects/${projectId.value}/fulfillment`,
+    }
+  }
+  return workOrders.data.value?.items.length
+    ? {
+        label: '查看当前项目工单',
+        detail: '继续判断责任、阶段和时效。',
+        actionLabel: '打开工单工作区',
+        to: `/work-orders?projectId=${projectId.value}`,
+      }
+    : {
+        label: '检查履约方案',
+        detail: '确认流程、责任和版本发布状态。',
+        actionLabel: '打开方案设计器',
+        to: `/projects/${projectId.value}/fulfillment`,
+      }
+})
 
 function openTab(tab: ProjectTab) {
   if (tab === 'fulfillment') {
@@ -109,10 +136,6 @@ function openTab(tab: ProjectTab) {
 
 function projectPeriod(startsOn: string, endsOn: string | null) {
   return `${startsOn} 至 ${endsOn ?? '长期有效'}`
-}
-
-function countLabel(value: number | null, suffix: string) {
-  return value === null ? '暂不可见' : `${value}${suffix}`
 }
 </script>
 
@@ -139,9 +162,8 @@ function countLabel(value: number | null, suffix: string) {
 
       <PageError v-if="!project.dataComplete" :detail="project.dataProblem ?? '项目页面数据不完整，部分事实暂不可用。'" />
 
-      <section class="sos-project-context-strip" aria-label="项目上下文">
+      <section class="sos-project-context-strip" aria-label="项目周期">
         <div><span>服务周期</span><strong>{{ projectPeriod(project.startsOn, project.endsOn) }}</strong></div>
-        <div><span>项目编号</span><strong>{{ project.projectCode }}</strong></div>
         <div><span>数据更新时间</span><strong>{{ project.asOf.slice(0, 16).replace('T', ' ') }}</strong></div>
       </section>
 
@@ -160,72 +182,63 @@ function countLabel(value: number | null, suffix: string) {
       </nav>
 
       <template v-if="activeTab === 'dashboard'">
+        <section class="project-next-action" aria-label="项目下一动作">
+          <div>
+            <span class="sos-eyebrow">下一动作</span>
+            <strong>{{ nextAction.label }}</strong>
+            <p>{{ nextAction.detail }}</p>
+          </div>
+          <RouterLink class="primary-link-button" :to="nextAction.to">{{ nextAction.actionLabel }}</RouterLink>
+        </section>
+
         <section class="project-operations-grid">
           <main class="project-operations-main">
-            <div class="project-ops-metric-row">
-              <ProjectMetricCard label="运行工单" :value="countLabel(project.activeWorkOrderCount, ' 单')" hint="当前项目范围" tone="blue" />
-              <ProjectMetricCard label="参与网点" :value="`${project.networkNames.length} 个`" hint="责任网点候选范围" />
-              <ProjectMetricCard label="履约方案" :value="`${project.fulfillmentProfiles.length} 套`" hint="项目服务场景" tone="blue" />
-              <ProjectMetricCard label="SLA 健康度" :value="slaHealth.label" :hint="slaHealth.hint" :tone="slaHealth.tone" />
-            </div>
-
-            <FulfillmentStageBar
-              :stages="stageBar"
-              title="履约阶段进度"
-              description="沿用项目绑定方案与当前工单投影，不另建一套项目状态。"
-            />
-
-            <BusinessTimeline :items="timelineItems" :unavailable="dashboardUnavailable">
-              <template #extra><RouterLink to="/work-orders">全部工单</RouterLink></template>
-            </BusinessTimeline>
+            <FulfillmentStageBar :stages="stageBar" title="履约状态" description="按当前方案和工单投影定位项目所在阶段。" />
+            <ProjectTimeline :items="timelineItems" :unavailable="dashboardUnavailable">
+              <template #extra><RouterLink to="/work-orders">全部业务事件</RouterLink></template>
+            </ProjectTimeline>
           </main>
 
           <aside class="project-operations-rail">
+            <ProjectRiskPanel :items="riskItems" :unavailable="dashboardUnavailable" />
             <SlaHealthCard
               :risk-count="workOrders.data.value?.queueSummary.slaRiskCount"
               :total-count="project.activeWorkOrderCount"
-              description="来自当前项目工单风险投影"
+              description="当前项目工单时效投影"
             />
-            <RiskPanel
-              :items="riskItems"
-              :unavailable="dashboardUnavailable"
-              title="需要项目经理关注"
-              description="风险入口只负责发现，处置回到正式工单工作区。"
-            />
-            <section class="project-context-note">
-              <span class="sos-eyebrow">OPERATING CONTEXT</span>
-              <h2>履约责任边界</h2>
-              <p>项目人员负责协同，平台分配责任网点，责任网点再分配责任师傅。不同责任层在工单工作区分别展示。</p>
-              <RouterLink :to="`/projects/${project.projectId}/team-regions`">查看团队与区域分工</RouterLink>
+            <section class="project-context-note project-context-note--compact">
+              <span class="sos-eyebrow">责任网络</span>
+              <strong>{{ project.networkNames.length ? `${project.networkNames.length} 个参与网点` : '参与网点待配置' }}</strong>
+              <RouterLink :to="`/projects/${project.projectId}/team-regions`">查看资源网络</RouterLink>
             </section>
           </aside>
         </section>
       </template>
 
       <section v-else-if="activeTab === 'resources'" class="project-tab-surface">
-        <header class="sos-panel-heading"><div><span class="sos-eyebrow">RESOURCE NETWORK</span><h2>资源网络</h2><p>当前项目参与的服务网点与服务范围只读展示。</p></div><RouterLink :to="`/projects/${project.projectId}/team-regions`">维护区域分工</RouterLink></header>
+        <header class="sos-panel-heading"><div><span class="sos-eyebrow">资源网络</span><h2>参与网点与服务区域</h2></div><RouterLink :to="`/projects/${project.projectId}/team-regions`">维护区域分工</RouterLink></header>
         <div class="project-resource-list"><span v-for="network in project.networkNames" :key="network">{{ network }}</span><em v-if="!project.networkNames.length">尚未配置参与网点</em></div>
       </section>
 
       <section v-else-if="activeTab === 'quality'" class="project-tab-surface project-tab-surface--split">
-        <RiskPanel :items="riskItems" :unavailable="dashboardUnavailable" title="质量与履约异常" description="项目级风险由工单运行投影聚合，处置进入工单工作区。" />
-        <div class="project-tab-callout"><span class="sos-eyebrow">QUALITY LOOP</span><h2>审核与整改</h2><p>当前 Admin 以工单工作区的审核整改区块作为事实入口，项目页不复制审核状态。</p><RouterLink to="/work-orders?view=review">进入审核与整改</RouterLink></div>
+        <ProjectRiskPanel :items="riskItems" :unavailable="dashboardUnavailable" />
+        <div class="project-tab-callout"><span class="sos-eyebrow">质量闭环</span><h2>审核与整改</h2><p>项目级异常在工单工作区完成判断和处置。</p><RouterLink to="/work-orders?view=review">进入审核与整改</RouterLink></div>
       </section>
 
       <section v-else-if="activeTab === 'analytics'" class="project-tab-surface">
-        <header class="sos-panel-heading"><div><span class="sos-eyebrow">PROJECT SIGNALS</span><h2>数据分析</h2><p>只呈现现有查询可证明的项目运营信号，不生成未提供的精确百分比。</p></div></header>
+        <header class="sos-panel-heading"><div><span class="sos-eyebrow">项目运营信号</span><h2>数据分析</h2></div></header>
         <div class="project-analytics-grid">
           <article><span>项目工单</span><strong>{{ workOrders.data.value?.totalCount ?? '—' }}</strong><small>当前查询返回总量</small></article>
           <article><span>SLA 风险</span><strong>{{ workOrders.data.value?.queueSummary.slaRiskCount ?? '—' }}</strong><small>进入风险工作区继续判断</small></article>
-          <article><span>异常工单</span><strong>{{ workOrders.data.value?.queueSummary.exceptionCount ?? '—' }}</strong><small>只统计当前数据范围</small></article>
+          <article><span>异常工单</span><strong>{{ workOrders.data.value?.queueSummary.exceptionCount ?? '—' }}</strong><small>当前数据范围</small></article>
           <article><span>数据生成时间</span><strong>{{ workOrders.data.value?.generatedAt?.slice(0, 16).replace('T', ' ') ?? '—' }}</strong><small>服务端投影</small></article>
         </div>
       </section>
 
       <section v-else class="project-tab-surface project-tab-surface--handoff">
-        <span class="sos-eyebrow">WORKSPACE HANDOFF</span>
+        <span class="sos-eyebrow">工作入口</span>
         <h2>{{ activeTab === 'fulfillment' ? '履约方案设计器' : '工单执行中心' }}</h2>
-        <p>{{ activeTab === 'fulfillment' ? '项目履约方案不在驾驶舱内平铺编辑，进入方案设计器完成流程、版本和发布准备。' : '项目工单的责任、阶段、SLA 和当前任务在工单工作区内完成判断与操作。' }}</p>
+        <p>{{ activeTab === 'fulfillment' ? '流程、任务、表单、证据和 SLA 在方案工作台中作为一个版本设计和发布。' : '责任、阶段、SLA 和当前任务在工单工作区内完成判断与操作。' }}</p>
         <RouterLink class="primary-link-button" :to="activeTab === 'fulfillment' ? `/projects/${project.projectId}/fulfillment` : `/work-orders?projectId=${project.projectId}`">{{ activeTab === 'fulfillment' ? '打开方案设计器' : '打开项目工单' }}</RouterLink>
       </section>
     </template>

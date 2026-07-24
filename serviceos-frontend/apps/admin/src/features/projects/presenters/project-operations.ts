@@ -184,7 +184,13 @@ export function buildProjectActivities(items: AdminWorkOrderDirectoryItem[]): Pr
     .map((item) => ({
       id: item.id,
       time: formatDateTime(item.updatedAt),
-      label: item.stageName ? `${item.stageName}工单动态` : '工单数据更新',
+      label: item.stageName
+        ? item.statusName === '已完成'
+          ? `${item.stageName}完成`
+          : item.statusName === '执行中'
+            ? `${item.stageName}进行中`
+            : `${item.stageName}状态更新`
+        : '履约事项状态更新',
       detail: `${item.orderCode} · ${item.statusName ?? '状态待确认'}`,
       tone: activityTone(item),
     }))

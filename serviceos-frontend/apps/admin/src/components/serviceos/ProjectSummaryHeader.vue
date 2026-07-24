@@ -12,7 +12,7 @@ withDefaults(defineProps<{
   fulfillmentName: string
   version?: string | null
 }>(), {
-  breadcrumb: '客户与项目 / 项目管理 / 项目驾驶舱',
+  breadcrumb: '客户与项目 / 项目管理 / 项目运营工作区',
   version: null,
 })
 </script>
