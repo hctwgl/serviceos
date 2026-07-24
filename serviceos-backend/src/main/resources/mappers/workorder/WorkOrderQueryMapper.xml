@@ -58,6 +58,16 @@
         <otherwise>AND FALSE</otherwise>
       </choose>
     </if>
+    <!-- 待派网点是“无 ACTIVE NETWORK 责任”的业务事实，不与任何固定流程阶段绑定。 -->
+    <if test="applyNetworkUnassignedFilter">
+      AND status IN ('RECEIVED', 'ACTIVE', 'SUSPENDED')
+      <if test="activeNetworkWorkOrderIds != null and !activeNetworkWorkOrderIds.isEmpty()">
+        AND id NOT IN
+        <foreach collection="activeNetworkWorkOrderIds" item="id" open="(" separator="," close=")">
+          CAST(#{id} AS uuid)
+        </foreach>
+      </if>
+    </if>
     <!-- M441：师傅筛选由 dispatch SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
     <if test="applyTechnicianFilter">
       <choose>

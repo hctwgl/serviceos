@@ -108,16 +108,17 @@ final class DefaultAdminWorkOrderQueryService implements AdminWorkOrderQueryServ
         String serviceName = AdminProductLabels.service(workspace.header().serviceProductCode());
         String statusName = AdminProductLabels.status(workspace.header().status());
         String stageName = AdminProductLabels.stage(
-                workspace.currentTaskSummary() == null ? null : workspace.currentTaskSummary().stageCode());
-        String taskName = AdminProductLabels.task(
-                workspace.currentTaskSummary() == null ? null : workspace.currentTaskSummary().taskType());
+                workspace.header().status(), workspace.header().currentStageCode());
+        String taskName = workspace.currentTaskSummary() == null
+                ? AdminProductLabels.currentTask(workspace.header().status(), stageName)
+                : AdminProductLabels.task(workspace.currentTaskSummary().taskType());
         List<String> missing = missingLabels(
                 project.name(), clientName, serviceName, statusName, stageName, taskName);
 
         List<TaskAllowedAction> pageActions = new java.util.ArrayList<>(
                 actions == null ? List.of() : actions.actions());
         if (workspace.currentTaskSummary() != null
-                && "ASSIGN_COORDINATORS".equals(workspace.currentTaskSummary().taskType())
+                && "HUMAN".equals(workspace.currentTaskSummary().taskKind())
                 && workspace.header().currentNetworkId() == null
                 && canManageAssignment(principal, correlationId, workspace)) {
             pageActions.addFirst(new TaskAllowedAction(
@@ -167,7 +168,7 @@ final class DefaultAdminWorkOrderQueryService implements AdminWorkOrderQueryServ
         String clientName = AdminProductLabels.client(item.clientCode());
         String serviceName = AdminProductLabels.service(item.serviceProductCode());
         String statusName = AdminProductLabels.status(item.status());
-        String stageName = AdminProductLabels.stage(item.currentStageCode());
+        String stageName = AdminProductLabels.stage(item.status(), item.currentStageCode());
         List<String> missing = missingLabels(project == null ? null : project.name(), clientName,
                 serviceName, statusName, stageName);
         String slaLevel = sla == null ? "NORMAL" : sla.breachedCount() > 0 ? "BREACHED" : "RISK";

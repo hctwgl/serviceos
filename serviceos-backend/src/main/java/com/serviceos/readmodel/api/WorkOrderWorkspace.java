@@ -17,6 +17,7 @@ import com.serviceos.workorder.api.WorkOrderProjectPersonnelView;
 public record WorkOrderWorkspace(
         WorkOrderView header,
         WorkOrderWorkspaceTaskSummary currentTaskSummary,
+        List<WorkOrderWorkspaceStageSummary> workflowStages,
         Map<String, String> sectionAvailability,
         String allowedActionLink,
         WorkOrderWorkspaceServiceAssignmentSummary serviceAssignmentSummary,
@@ -31,6 +32,7 @@ public record WorkOrderWorkspace(
         String maskedServiceAddress
 ) {
     public WorkOrderWorkspace {
+        workflowStages = workflowStages == null ? List.of() : List.copyOf(workflowStages);
         sectionAvailability = Map.copyOf(sectionAvailability);
         projectPersonnel = projectPersonnel == null ? List.of() : List.copyOf(projectPersonnel);
     }
@@ -43,6 +45,18 @@ public record WorkOrderWorkspace(
             String stageCode,
             String claimedBy,
             long version
+    ) {
+    }
+
+    /**
+     * 工作流权威阶段历史。包含没有 Task 实例的 REVIEW_TASK / WAIT_EVENT 门闸。
+     */
+    public record WorkOrderWorkspaceStageSummary(
+            String stageCode,
+            int sequenceNo,
+            String status,
+            Instant activatedAt,
+            Instant completedAt
     ) {
     }
 

@@ -26,6 +26,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
@@ -39,6 +40,14 @@ class DispatchServiceAssignmentPostgresIT {
     private static final String TENANT = "tenant-dispatch-assignment-it";
     private static final String MANAGER = "dispatch-manager";
     private static final String BUSINESS_TYPE = "SITE_SURVEY";
+    private static final UUID TECHNICIAN_PROFILE_A =
+            UUID.fromString("b8327a39-1394-446c-8e83-f7068ce13a48");
+    private static final UUID TECHNICIAN_PRINCIPAL_A =
+            UUID.fromString("4e690eb9-1790-47db-9d79-05e19b123559");
+    private static final UUID TECHNICIAN_PROFILE_B =
+            UUID.fromString("23b2cb18-fcee-42aa-a4d0-8d86cc135460");
+    private static final UUID TECHNICIAN_PRINCIPAL_B =
+            UUID.fromString("82b8c944-62ab-4be2-9d66-67e0f40f8c3f");
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -68,19 +77,24 @@ class DispatchServiceAssignmentPostgresIT {
                     dsp_service_assignment, dsp_capacity_counter,
                     aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
                     rel_idempotency_record, auth_role_field_policy,
-                    auth_role_grant, auth_role_capability, auth_role CASCADE
+                    auth_role_grant, auth_role_capability, auth_role,
+                    tsk_task, net_technician_profile, idn_security_principal CASCADE
                 """).update();
+        DispatchTechnicianFixture.seed(
+                jdbc, TENANT, TECHNICIAN_PROFILE_A, TECHNICIAN_PRINCIPAL_A, "初始派单师傅");
+        DispatchTechnicianFixture.seed(
+                jdbc, TENANT, TECHNICIAN_PROFILE_B, TECHNICIAN_PRINCIPAL_B, "候选改派师傅");
         seedGrant(Set.of("dispatch.capacity.configure", "dispatch.assignment.manage"));
     }
 
     @Test
     void activationAndReassignmentSwitchResponsibilityAndCapacityAtomically() {
-        configure("technician-a", "capacity-a");
-        configure("technician-b", "capacity-b");
+        configure(TECHNICIAN_PROFILE_A.toString(), "capacity-a");
+        configure(TECHNICIAN_PROFILE_B.toString(), "capacity-b");
         UUID workOrderId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
 
-        ActivatedAssignment initial = activateInitial(workOrderId, taskId, "technician-a", "initial");
+        ActivatedAssignment initial = activateInitial(workOrderId, taskId, TECHNICIAN_PROFILE_A.toString(), "initial");
         var initialCompleted = assignments.complete(manager(), metadata("initial-complete"),
                 new CompleteServiceAssignmentActivationCommand(
                         initial.receipt().sagaId(), initial.receipt().serviceAssignmentId(),
@@ -90,7 +104,7 @@ class DispatchServiceAssignmentPostgresIT {
         UUID sagaId = UUID.randomUUID();
         PrepareServiceAssignmentCommand prepareCommand = new PrepareServiceAssignmentCommand(
                 sagaId, workOrderId, taskId, ResponsibilityLevel.TECHNICIAN,
-                "technician-b", BUSINESS_TYPE, "decision://reassign-b",
+                TECHNICIAN_PROFILE_B.toString(), BUSINESS_TYPE, "decision://reassign-b",
                 initial.receipt().serviceAssignmentId(), "MANUAL_REASSIGNMENT", 1);
         ServiceAssignmentReceipt pending = assignments.prepare(
                 manager(), metadata("reassign-prepare"), prepareCommand);
@@ -103,7 +117,8 @@ class DispatchServiceAssignmentPostgresIT {
                         sagaId, pending.serviceAssignmentId(), taskId, guardId, preparedId, 1));
         ActivateServiceAssignmentCommand activateCommand = new ActivateServiceAssignmentCommand(
                 sagaId, pending.serviceAssignmentId(), 2,
-                "authority://technician-b", 7, "fence://decision-7", "policy-2026-07");
+                "authority://" + TECHNICIAN_PROFILE_B, 7,
+                "fence://decision-7", "policy-2026-07");
         ServiceAssignmentReceipt activated = assignments.activate(
                 manager(), metadata("reassign-activate"), activateCommand);
         assertThat(assignments.activate(manager(), metadata("reassign-activate"), activateCommand))
@@ -115,20 +130,25 @@ class DispatchServiceAssignmentPostgresIT {
                 SELECT assignee_id || ':' || status FROM dsp_service_assignment
                  WHERE task_id = :taskId ORDER BY created_at
                 """).param("taskId", taskId).query(String.class).list())
-                .containsExactly("technician-a:ENDED", "technician-b:ACTIVE");
+                .containsExactly(
+                        TECHNICIAN_PROFILE_A + ":ENDED",
+                        TECHNICIAN_PROFILE_B + ":ACTIVE");
         assertThat(jdbc.sql("""
                 SELECT c.assignee_id || ':' || c.occupied_units || ':' || r.status
                   FROM dsp_capacity_counter c
-                  JOIN dsp_capacity_reservation r ON r.capacity_counter_id = c.capacity_counter_id
+                 JOIN dsp_capacity_reservation r ON r.capacity_counter_id = c.capacity_counter_id
                  ORDER BY c.assignee_id
                 """).query(String.class).list())
-                .containsExactly("technician-a:0:RELEASED", "technician-b:1:CONFIRMED");
+                .containsExactly(
+                        TECHNICIAN_PROFILE_B + ":1:CONFIRMED",
+                        TECHNICIAN_PROFILE_A + ":0:RELEASED");
         assertThat(jdbc.sql("""
                 SELECT authority_assignment_id || ':' || authority_version || ':'
                     || fence_decision_id || ':' || fence_policy_version
                   FROM dsp_service_assignment WHERE service_assignment_id = :assignmentId
                 """).param("assignmentId", pending.serviceAssignmentId()).query(String.class).single())
-                .isEqualTo("authority://technician-b:7:fence://decision-7:policy-2026-07");
+                .isEqualTo("authority://" + TECHNICIAN_PROFILE_B
+                        + ":7:fence://decision-7:policy-2026-07");
 
         ServiceAssignmentReceipt completed = assignments.complete(manager(), metadata("reassign-complete"),
                 new CompleteServiceAssignmentActivationCommand(
@@ -145,16 +165,16 @@ class DispatchServiceAssignmentPostgresIT {
 
     @Test
     void capacityLimitAndAbortPreserveExistingResponsibility() {
-        configure("technician-a", "capacity-a");
-        configure("technician-b", "capacity-b");
+        configure(TECHNICIAN_PROFILE_A.toString(), "capacity-a");
+        configure(TECHNICIAN_PROFILE_B.toString(), "capacity-b");
         UUID workOrderId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
-        ActivatedAssignment initial = activateInitial(workOrderId, taskId, "technician-a", "initial");
+        ActivatedAssignment initial = activateInitial(workOrderId, taskId, TECHNICIAN_PROFILE_A.toString(), "initial");
 
         ServiceAssignmentReceipt pending = assignments.prepare(manager(), metadata("abort-prepare"),
                 new PrepareServiceAssignmentCommand(
                         UUID.randomUUID(), workOrderId, taskId, ResponsibilityLevel.TECHNICIAN,
-                        "technician-b", BUSINESS_TYPE, "decision://abort",
+                        TECHNICIAN_PROFILE_B.toString(), BUSINESS_TYPE, "decision://abort",
                         initial.receipt().serviceAssignmentId(), "POLICY_REJECTED", 1));
         UUID preparedId = UUID.randomUUID();
         assignments.confirmTaskPrepared(manager(), metadata("abort-task-prepared"),
@@ -165,7 +185,7 @@ class DispatchServiceAssignmentPostgresIT {
         assertThatThrownBy(() -> assignments.prepare(manager(), metadata("capacity-exhausted"),
                 new PrepareServiceAssignmentCommand(
                         UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                        ResponsibilityLevel.TECHNICIAN, "technician-b", BUSINESS_TYPE,
+                        ResponsibilityLevel.TECHNICIAN, TECHNICIAN_PROFILE_B.toString(), BUSINESS_TYPE,
                         "decision://capacity-exhausted", null, null, 2)))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code())
@@ -182,24 +202,27 @@ class DispatchServiceAssignmentPostgresIT {
                 SELECT assignee_id || ':' || status FROM dsp_service_assignment
                  WHERE task_id = :taskId ORDER BY created_at
                 """).param("taskId", taskId).query(String.class).list())
-                .containsExactly("technician-a:ACTIVE", "technician-b:FAILED_ACTIVATION");
+                .containsExactly(
+                        TECHNICIAN_PROFILE_A + ":ACTIVE",
+                        TECHNICIAN_PROFILE_B + ":FAILED_ACTIVATION");
         assertThat(jdbc.sql("""
                 SELECT occupied_units FROM dsp_capacity_counter
-                 WHERE assignee_id = 'technician-b'
-                """).query(Integer.class).single()).isZero();
+                 WHERE assignee_id = :assigneeId
+                """).param("assigneeId", TECHNICIAN_PROFILE_B.toString())
+                .query(Integer.class).single()).isZero();
     }
 
     @Test
     void activationOutboxFailureRollsBackAssignmentCapacityAndSagaForForwardRetry() {
-        configure("technician-a", "capacity-a");
-        configure("technician-b", "capacity-b");
+        configure(TECHNICIAN_PROFILE_A.toString(), "capacity-a");
+        configure(TECHNICIAN_PROFILE_B.toString(), "capacity-b");
         UUID workOrderId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
-        ActivatedAssignment initial = activateInitial(workOrderId, taskId, "technician-a", "initial");
+        ActivatedAssignment initial = activateInitial(workOrderId, taskId, TECHNICIAN_PROFILE_A.toString(), "initial");
         ServiceAssignmentReceipt pending = assignments.prepare(manager(), metadata("rollback-prepare"),
                 new PrepareServiceAssignmentCommand(
                         UUID.randomUUID(), workOrderId, taskId, ResponsibilityLevel.TECHNICIAN,
-                        "technician-b", BUSINESS_TYPE, "decision://rollback",
+                        TECHNICIAN_PROFILE_B.toString(), BUSINESS_TYPE, "decision://rollback",
                         initial.receipt().serviceAssignmentId(), "MANUAL_REASSIGNMENT", 1));
         assignments.confirmTaskPrepared(manager(), metadata("rollback-task-prepared"),
                 new ConfirmTaskAssignmentPreparedCommand(
@@ -229,14 +252,18 @@ class DispatchServiceAssignmentPostgresIT {
                 SELECT assignee_id || ':' || status FROM dsp_service_assignment
                  WHERE task_id = :taskId ORDER BY created_at
                 """).param("taskId", taskId).query(String.class).list())
-                .containsExactly("technician-a:ACTIVE", "technician-b:PENDING_ACTIVATION");
+                .containsExactly(
+                        TECHNICIAN_PROFILE_A + ":ACTIVE",
+                        TECHNICIAN_PROFILE_B + ":PENDING_ACTIVATION");
         assertThat(jdbc.sql("""
                 SELECT c.assignee_id || ':' || c.occupied_units || ':' || r.status
                   FROM dsp_capacity_counter c
-                  JOIN dsp_capacity_reservation r ON r.capacity_counter_id = c.capacity_counter_id
+                 JOIN dsp_capacity_reservation r ON r.capacity_counter_id = c.capacity_counter_id
                  ORDER BY c.assignee_id
                 """).query(String.class).list())
-                .containsExactly("technician-a:1:CONFIRMED", "technician-b:1:HELD");
+                .containsExactly(
+                        TECHNICIAN_PROFILE_B + ":1:HELD",
+                        TECHNICIAN_PROFILE_A + ":1:CONFIRMED");
         assertThat(jdbc.sql("""
                 SELECT stage || ':' || version FROM dsp_service_assignment_activation_saga
                  WHERE activation_saga_id = :sagaId
@@ -251,6 +278,7 @@ class DispatchServiceAssignmentPostgresIT {
 
     private ActivatedAssignment activateInitial(
             UUID workOrderId, UUID taskId, String assigneeId, String key) {
+        seedHumanTask(workOrderId, taskId);
         ServiceAssignmentReceipt pending = assignments.prepare(manager(), metadata(key + "-prepare"),
                 new PrepareServiceAssignmentCommand(
                         UUID.randomUUID(), workOrderId, taskId, ResponsibilityLevel.TECHNICIAN,
@@ -265,6 +293,41 @@ class DispatchServiceAssignmentPostgresIT {
                         pending.sagaId(), pending.serviceAssignmentId(), 2,
                         "authority://" + assigneeId, 1, "fence://" + assigneeId, "policy-1"));
         return new ActivatedAssignment(activated, preparedId);
+    }
+
+    private void seedHumanTask(UUID workOrderId, UUID taskId) {
+        Instant now = Instant.parse("2026-07-17T00:00:00Z");
+        jdbc.sql("""
+                INSERT INTO tsk_task (
+                    task_id, tenant_id, task_type, task_kind, business_key, payload_digest,
+                    priority, status, next_run_at, attempt_count, max_attempts, correlation_id,
+                    version, created_at, updated_at, project_id, work_order_id,
+                    workflow_instance_id, stage_instance_id, workflow_node_instance_id,
+                    workflow_node_id, workflow_definition_version_id, workflow_definition_digest,
+                    configuration_bundle_id, configuration_bundle_digest, stage_code
+                ) VALUES (
+                    :taskId, :tenantId, 'SITE_SURVEY', 'HUMAN', :businessKey, :digest,
+                    500, 'READY', :now, 0, 3, 'corr-seed', 1, :now, :now, :projectId,
+                    :workOrderId, :workflowInstanceId, :stageInstanceId, :workflowNodeInstanceId,
+                    'SURVEY_NODE', :definitionId, :definitionDigest, :bundleId, :bundleDigest,
+                    'SURVEY'
+                )
+                """)
+                .param("taskId", taskId)
+                .param("tenantId", TENANT)
+                .param("businessKey", "dispatch-assignment:" + taskId)
+                .param("digest", "a".repeat(64))
+                .param("now", java.sql.Timestamp.from(now))
+                .param("projectId", UUID.randomUUID())
+                .param("workOrderId", workOrderId)
+                .param("workflowInstanceId", UUID.randomUUID())
+                .param("stageInstanceId", UUID.randomUUID())
+                .param("workflowNodeInstanceId", UUID.randomUUID())
+                .param("definitionId", UUID.randomUUID())
+                .param("definitionDigest", "b".repeat(64))
+                .param("bundleId", UUID.randomUUID())
+                .param("bundleDigest", "c".repeat(64))
+                .update();
     }
 
     private void configure(String assigneeId, String key) {

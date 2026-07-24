@@ -74,8 +74,22 @@ final class AdminProductLabels {
         return code == null ? null : STATUSES.get(code);
     }
 
-    static String stage(String code) {
+    static String stage(String workOrderStatus, String code) {
+        if ("FULFILLED".equals(workOrderStatus)) {
+            return "履约已完成";
+        }
+        if ("CANCELLED".equals(workOrderStatus)) {
+            return "履约已取消";
+        }
         return code == null ? "尚未进入履约流程" : STAGES.get(code);
+    }
+
+    static String currentTask(String workOrderStatus, String stageName) {
+        return switch (workOrderStatus) {
+            case "FULFILLED" -> "全部任务已完成";
+            case "CANCELLED" -> "工单已取消";
+            default -> stageName;
+        };
     }
 
     static String task(String code) {

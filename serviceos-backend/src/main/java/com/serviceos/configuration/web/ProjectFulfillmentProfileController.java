@@ -8,6 +8,8 @@ import com.serviceos.configuration.api.ProjectFulfillmentManifestView;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileDetail;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileSummary;
+import com.serviceos.configuration.api.ProjectFulfillmentResolveQuery;
+import com.serviceos.configuration.api.ProjectFulfillmentResolveResult;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionView;
 import com.serviceos.configuration.api.ProjectFulfillmentValidationIssue;
 import com.serviceos.configuration.api.UpdateProjectFulfillmentDraftCommand;
@@ -55,6 +57,28 @@ final class ProjectFulfillmentProfileController {
                 .body(profiles.list(principals.current(), correlationId, projectId));
     }
 
+    @PostMapping("/simulations")
+    ResponseEntity<ProjectFulfillmentResolveResult> simulateMatch(
+            @PathVariable UUID projectId,
+            @RequestBody SimulateMatchRequest request,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        var principal = principals.current();
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(profiles.simulateMatch(
+                        principal,
+                        correlationId,
+                        new ProjectFulfillmentResolveQuery(
+                                principal.tenantId(),
+                                projectId,
+                                request.serviceProductCode(),
+                                request.asOf() == null ? Instant.now() : request.asOf(),
+                                request.clientKind(),
+                                request.brandCode(),
+                                request.provinceCode())));
+    }
+
     @PostMapping
     ResponseEntity<ProjectFulfillmentProfileDetail> create(
             @PathVariable UUID projectId,
@@ -71,7 +95,11 @@ final class ProjectFulfillmentProfileController {
                         request.profileName(),
                         request.description(),
                         request.templateCode(),
-                        request.copyFromProfileId()));
+                        request.copyFromProfileId(),
+                        request.profileCode() == null
+                                ? request.serviceProductCode()
+                                : request.profileCode(),
+                        request.matchPriority() == null ? 0 : request.matchPriority()));
         return ResponseEntity
                 .created(URI.create("/api/v1/projects/" + projectId
                         + "/fulfillment-profiles/" + detail.profileId()))
@@ -271,7 +299,18 @@ final class ProjectFulfillmentProfileController {
             String profileName,
             String description,
             String templateCode,
-            UUID copyFromProfileId
+            UUID copyFromProfileId,
+            String profileCode,
+            Integer matchPriority
+    ) {
+    }
+
+    record SimulateMatchRequest(
+            String serviceProductCode,
+            String clientKind,
+            String brandCode,
+            String provinceCode,
+            Instant asOf
     ) {
     }
 

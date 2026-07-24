@@ -120,8 +120,8 @@ class NetworkPortalReadPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("149");
-        assertThat(flyway.info().applied()).hasSize(151);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("151");
+        assertThat(flyway.info().applied()).hasSize(153);
 
         seedPrincipal(PRINCIPAL, "Portal Member");
         seedPrincipal(OTHER_PRINCIPAL, "Other Member");

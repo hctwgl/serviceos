@@ -19,6 +19,7 @@ import com.serviceos.dispatch.api.ServiceAssignmentHandshakePayload;
 import com.serviceos.dispatch.api.ServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ServiceAssignmentService;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.network.api.TechnicianPrincipalQuery;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -28,6 +29,11 @@ import com.serviceos.shared.CommandContext;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
+import com.serviceos.task.api.AssignTaskCandidatesCommand;
+import com.serviceos.task.api.AssignmentSourceType;
+import com.serviceos.task.api.TaskAssignmentService;
+import com.serviceos.task.api.TaskFulfillmentContext;
+import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -68,6 +74,9 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
     private final OutboxAppender outbox;
+    private final TechnicianPrincipalQuery technicianPrincipals;
+    private final TaskFulfillmentContextService taskContexts;
+    private final TaskAssignmentService taskAssignments;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final Duration activationStageTimeout;
@@ -78,6 +87,9 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
             IdempotencyService idempotency,
             AuditAppender audit,
             OutboxAppender outbox,
+            TechnicianPrincipalQuery technicianPrincipals,
+            TaskFulfillmentContextService taskContexts,
+            TaskAssignmentService taskAssignments,
             ObjectMapper objectMapper,
             Clock clock,
             @Value("${serviceos.dispatch.activation-stage-timeout:PT15M}") Duration activationStageTimeout
@@ -87,6 +99,9 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         this.idempotency = idempotency;
         this.audit = audit;
         this.outbox = outbox;
+        this.technicianPrincipals = technicianPrincipals;
+        this.taskContexts = taskContexts;
+        this.taskAssignments = taskAssignments;
         this.objectMapper = objectMapper;
         this.clock = clock;
         if (activationStageTimeout == null || activationStageTimeout.isZero()
@@ -685,9 +700,44 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
                 state.serviceAssignmentId(), command.sagaId(), state.taskId(),
                 state.capacityReservationId(), "ACTIVE", "COMPLETED",
                 command.expectedSagaVersion() + 1, now);
+        freezeProtocolV1TechnicianCandidate(context, state);
         finish(context, authorizationDecision, COMPLETE, "SERVICE_ASSIGNMENT_COMPLETE",
                 digest, receipt, "service.assignment.activation-completed", "TASK_ASSIGNMENT_ACTIVATED");
         return receipt;
+    }
+
+    private void freezeProtocolV1TechnicianCandidate(
+            CommandContext context,
+            AssignmentState state
+    ) {
+        if (state.protocolVersion() != 1
+                || !ResponsibilityLevel.TECHNICIAN.name().equals(state.responsibilityLevel())) {
+            return;
+        }
+        String principalId = technicianPrincipals
+                .findActivePrincipalId(context.tenantId(), state.assigneeId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
+                        "Assigned technician does not map to an ACTIVE login principal"));
+        TaskFulfillmentContext task = taskContexts
+                .find(context.tenantId(), state.taskId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
+
+        /*
+         * protocol v1 在同一事务内先完成服务责任切换，再由 Task 公共命令冻结候选执行人；
+         * ServiceAssignment ID 同时作为幂等来源。任何一步失败都会回滚 saga、容量与责任，
+         * 避免出现“调度显示已分配、师傅却无法接单”的跨模块半成功状态。
+         */
+        taskAssignments.assignCandidateFromServiceAssignment(
+                context.tenantId(),
+                context.correlationId(),
+                new AssignTaskCandidatesCommand(
+                        state.taskId(),
+                        task.version(),
+                        List.of(principalId),
+                        AssignmentSourceType.SYSTEM,
+                        state.serviceAssignmentId().toString()));
     }
 
     private CommandContext context(CurrentPrincipal principal, CommandMetadata metadata) {

@@ -105,6 +105,31 @@ class WorkOrderQueryPostgresIT {
   assertThat(queries.get(reader,"corr-stage-get",wa).workOrder().currentTaskType()).isEqualTo("SITE_SURVEY");
  }
 
+ @Test void listAndDetailExposeWaitEventStageWithoutActiveTask(){
+  Scope a=scope("tenant-test","A");
+  UUID waiting=receive(a,"ORDER-WAIT-OEM","1".repeat(64));
+  UUID surveyOnly=receive(a,"ORDER-TASK-STAGE","2".repeat(64));
+  seedActiveWorkflowStage(a,waiting,"CLIENT_CALLBACK",4);
+  seedActiveTask(a,surveyOnly,"SURVEY",null,null);
+  seedRole("reader","PROJECT",a.projectId().toString());
+  CurrentPrincipal reader=principal("reader","tenant-test");
+
+  var page=queries.list(reader,"corr-wait-list",new WorkOrderQuery(null,null,null,null,20));
+  assertThat(page.items()).filteredOn(item->item.id().equals(waiting)).singleElement().satisfies(item->{
+   assertThat(item.currentStageCode()).isEqualTo("CLIENT_CALLBACK");
+   assertThat(item.currentTaskType()).isNull();
+   assertThat(item.currentTaskStatus()).isNull();
+  });
+  assertThat(queries.get(reader,"corr-wait-get",waiting).workOrder().currentStageCode())
+    .isEqualTo("CLIENT_CALLBACK");
+
+  var filtered=queries.list(reader,"corr-wait-filter",
+    new WorkOrderQuery(null,null,null,null,null,null,null,"CLIENT_CALLBACK",
+      null,null,null,null,null,null,null,null,null,20));
+  assertThat(filtered.items()).extracting(WorkOrderView::id).containsExactly(waiting);
+  assertThat(filtered.totalCount()).isEqualTo(1);
+ }
+
  @Test void listAndDetailExposeCurrentAssigneeFromClaimedTask(){
   Scope a=scope("tenant-test","A");
   UUID wa=receive(a,"ORDER-ASSIGNEE","e".repeat(64));
@@ -299,7 +324,36 @@ class WorkOrderQueryPostgresIT {
   var none=queries.list(reader,"corr-network-none",
     new WorkOrderQuery(null,null,null,null,null,null,null,null,null,UUID.randomUUID(),null,null,null,null,null,null,null,20));
   assertThat(none.items()).isEmpty();
-  assertThat(none.totalCount()).isZero();
+ assertThat(none.totalCount()).isZero();
+ }
+
+ @Test void listFiltersUnassignedNetworkByResponsibilityFactInsteadOfStage(){
+  Scope a=scope("tenant-test","A");
+  UUID assigned=receive(a,"ORDER-NET-ASSIGNED","e".repeat(64));
+  UUID unassigned=receive(a,"ORDER-NET-UNASSIGNED","f".repeat(64));
+  UUID fulfilled=receive(a,"ORDER-NET-FULFILLED","0".repeat(64));
+  UUID assignedTask=seedActiveTask(a,assigned,"SURVEY",null,null);
+  seedActiveTask(a,unassigned,"INSTALLATION",null,null);
+  jdbc.sql("""
+    UPDATE wo_work_order
+       SET status='FULFILLED', activated_at=now(), fulfilled_at=now(), version=version+1
+     WHERE id=:id
+    """).param("id",fulfilled).update();
+  UUID network=UUID.randomUUID();
+  seedNetworkAndTechnician(a.tenant(),network,"责任事实网点",UUID.randomUUID(),UUID.randomUUID(),"责任事实师傅");
+  seedActiveAssignment(a,assigned,assignedTask,"NETWORK",network.toString());
+  seedRole("reader","PROJECT",a.projectId().toString());
+  CurrentPrincipal reader=principal("reader","tenant-test");
+
+  var page=queries.list(reader,"corr-network-unassigned",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,
+      "NETWORK_UNASSIGNED",null,null,null,null,null,null,20));
+  assertThat(page.items()).extracting(WorkOrderView::id).containsExactly(unassigned);
+  assertThat(page.totalCount()).isEqualTo(1);
+  assertThatThrownBy(()->queries.list(reader,"corr-network-unassigned-invalid",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,
+      "UNASSIGNED",null,null,null,null,null,null,20)))
+    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("responsibilityStatus");
  }
 
  @Test void listFiltersByCurrentTechnicianId(){
@@ -499,8 +553,8 @@ class WorkOrderQueryPostgresIT {
     .isInstanceOfSatisfying(BusinessProblem.class,p->assertThat(p.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
   assertThat(jdbc.sql("SELECT risk_level FROM auth_capability WHERE capability_code='workOrder.read'").query(String.class).single()).isEqualTo("NORMAL");
   assertThat(jdbc.sql("SELECT count(*) FROM pg_indexes WHERE indexname='ix_wo_work_order_tenant_project_received'").query(Long.class).single()).isOne();
-  assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("149");
-  assertThat(flyway.info().applied()).hasSize(151);
+  assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("151");
+  assertThat(flyway.info().applied()).hasSize(153);
  }
 
  private Scope scope(String tenant,String code){return scope(tenant,code,false);}
@@ -610,6 +664,50 @@ class WorkOrderQueryPostgresIT {
    .param("startedAt","RUNNING".equals(taskStatus)?java.sql.Timestamp.from(now):null)
    .update();
   return taskId;
+ }
+ private void seedActiveWorkflowStage(Scope s,UUID workOrderId,String stageCode,int sequenceNo){
+  UUID workflowId=UUID.randomUUID();
+  Instant now=Instant.parse("2026-07-15T05:00:00Z");
+  jdbc.sql("""
+   INSERT INTO wfl_workflow_instance (
+     workflow_instance_id,tenant_id,project_id,work_order_id,configuration_bundle_id,
+     configuration_bundle_digest,workflow_definition_version_id,workflow_key,workflow_version,definition_digest,
+     status,start_event_id,correlation_id,version,started_at
+   ) VALUES (
+     :workflowId,:tenant,:projectId,:workOrderId,:bundleId,
+     :bundleDigest,:definitionId,'BYD_HOME_CHARGING','1.0.0',:digest,
+     'ACTIVE',:startEventId,'corr-wait-stage',1,:now
+   )
+   """)
+   .param("workflowId",workflowId)
+   .param("tenant",s.tenant())
+   .param("projectId",s.projectId())
+   .param("workOrderId",workOrderId)
+   .param("bundleId",s.bundle().bundleId())
+   .param("bundleDigest",s.bundle().manifestDigest())
+   .param("definitionId",UUID.randomUUID())
+   .param("digest","c".repeat(64))
+   .param("startEventId",UUID.randomUUID())
+   .param("now",java.sql.Timestamp.from(now))
+   .update();
+  jdbc.sql("""
+   INSERT INTO wfl_stage_instance (
+     stage_instance_id,tenant_id,workflow_instance_id,work_order_id,stage_code,
+     sequence_no,status,activation_event_id,version,activated_at
+   ) VALUES (
+     :stageId,:tenant,:workflowId,:workOrderId,:stageCode,
+     :sequenceNo,'ACTIVE',:activationEventId,1,:now
+   )
+   """)
+   .param("stageId",UUID.randomUUID())
+   .param("tenant",s.tenant())
+   .param("workflowId",workflowId)
+   .param("workOrderId",workOrderId)
+   .param("stageCode",stageCode)
+   .param("sequenceNo",sequenceNo)
+   .param("activationEventId",UUID.randomUUID())
+   .param("now",java.sql.Timestamp.from(now))
+   .update();
  }
  /** M447：最小 OPEN ReviewCase（经 snapshot → task → work_order）。 */
  private void seedOpenReviewCase(Scope s,UUID taskId){

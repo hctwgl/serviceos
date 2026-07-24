@@ -10,30 +10,89 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
- * 正式建单履约解析：Profile 必须可建单，且 createdAt 命中唯一已发布生效 Revision。
+ * 正式建单履约解析。
  *
- * <p>失败关闭：不回退草稿、默认 Workflow 或任意最新 Bundle。</p>
+ * <p>候选范围限定为当前项目、服务产品和 ACTIVE Profile，再按发布版本中冻结的结构化
+ * 适用范围硬匹配，最后依次比较 matchPriority 与具体度。零命中或并列命中均失败关闭，
+ * 禁止用数据库顺序、创建时间或主键兜底。</p>
  */
 @Service
 final class DefaultProjectFulfillmentResolver implements ProjectFulfillmentResolver {
     private final JdbcClient jdbc;
+    private final ProjectFulfillmentDocumentMapper documents;
 
-    DefaultProjectFulfillmentResolver(JdbcClient jdbc) {
+    DefaultProjectFulfillmentResolver(
+            JdbcClient jdbc,
+            ProjectFulfillmentDocumentMapper documents
+    ) {
         this.jdbc = jdbc;
+        this.documents = documents;
     }
 
     @Override
     @Transactional(readOnly = true)
     public ProjectFulfillmentResolveResult resolve(ProjectFulfillmentResolveQuery query) {
         Objects.requireNonNull(query, "query");
-        var profile = jdbc.sql("""
-                SELECT profile_id, status, active_revision_id
+        List<ProfileState> profiles = loadProfileStates(query);
+        requireResolvableProfileState(profiles);
+
+        List<ResolvedRevision> effective = loadEffectiveRevisions(query);
+        if (effective.isEmpty()) {
+            throw new BusinessProblem(
+                    ProblemCode.PROJECT_FULFILLMENT_REVISION_NOT_EFFECTIVE,
+                    "建单时刻没有生效的履约配置版本");
+        }
+
+        List<MatchedRevision> matches = effective.stream()
+                .map(revision -> match(revision, query))
+                .filter(Objects::nonNull)
+                .sorted(Comparator
+                        .comparingInt(MatchedRevision::matchPriority).reversed()
+                        .thenComparing(Comparator.comparingInt(MatchedRevision::specificity).reversed()))
+                .toList();
+        if (matches.isEmpty()) {
+            throw new BusinessProblem(
+                    ProblemCode.PROJECT_FULFILLMENT_PROFILE_NOT_FOUND,
+                    "没有履约方案满足当前品牌、区域和客户端适用范围");
+        }
+        MatchedRevision hit = matches.getFirst();
+        if (matches.size() > 1
+                && matches.get(1).matchPriority() == hit.matchPriority()
+                && matches.get(1).specificity() == hit.specificity()) {
+            throw new BusinessProblem(
+                    ProblemCode.PROJECT_FULFILLMENT_MATCH_NOT_UNIQUE,
+                    "多个履约方案具有相同匹配优先级和具体度，请调整方案适用范围或优先级");
+        }
+
+        ResolvedRevision revision = hit.revision();
+        return new ProjectFulfillmentResolveResult(
+                revision.profileId(),
+                revision.profileCode(),
+                revision.profileName(),
+                revision.revisionId(),
+                String.valueOf(revision.versionNo()),
+                hit.matchPriority(),
+                hit.specificity(),
+                hit.explanation(),
+                revision.bundleId(),
+                revision.bundleCode(),
+                revision.bundleVersion(),
+                revision.bundleDigest(),
+                revision.manifestJson(),
+                revision.contentDigest());
+    }
+
+    private List<ProfileState> loadProfileStates(ProjectFulfillmentResolveQuery query) {
+        return jdbc.sql("""
+                SELECT profile_id, status
                   FROM cfg_project_fulfillment_profile
                  WHERE tenant_id = :tenantId
                    AND project_id = :projectId
@@ -42,43 +101,59 @@ final class DefaultProjectFulfillmentResolver implements ProjectFulfillmentResol
                 .param("tenantId", query.tenantId())
                 .param("projectId", query.projectId())
                 .param("product", query.serviceProductCode())
-                .query((rs, n) -> Map.of(
-                        "profileId", rs.getObject("profile_id", UUID.class),
-                        "status", rs.getString("status")))
-                .optional()
-                .orElseThrow(() -> new BusinessProblem(
-                        ProblemCode.PROJECT_FULFILLMENT_PROFILE_NOT_FOUND,
-                        "项目未配置该工单类型的履约方案"));
-        String status = (String) profile.get("status");
-        if ("SUSPENDED".equals(status)) {
+                .query((rs, n) -> new ProfileState(
+                        rs.getObject("profile_id", UUID.class),
+                        rs.getString("status")))
+                .list();
+    }
+
+    private static void requireResolvableProfileState(List<ProfileState> profiles) {
+        if (profiles.isEmpty()) {
+            throw new BusinessProblem(
+                    ProblemCode.PROJECT_FULFILLMENT_PROFILE_NOT_FOUND,
+                    "项目未配置该工单类型的履约方案");
+        }
+        boolean hasActive = profiles.stream().anyMatch(profile -> "ACTIVE".equals(profile.status()));
+        if (!hasActive && profiles.stream().anyMatch(profile -> "SUSPENDED".equals(profile.status()))) {
             throw new BusinessProblem(
                     ProblemCode.PROJECT_FULFILLMENT_PROFILE_SUSPENDED,
-                    "该工单类型履约配置已暂停，无法创建新工单");
+                    "该工单类型的履约方案均已暂停，无法创建新工单");
         }
-        if ("RETIRED".equals(status) || "DRAFT".equals(status)) {
+        if (!hasActive) {
             throw new BusinessProblem(
                     ProblemCode.PROJECT_FULFILLMENT_REVISION_NOT_EFFECTIVE,
                     "该工单类型没有可生效的履约发布版本");
         }
-        UUID profileId = (UUID) profile.get("profileId");
-        List<ResolvedRevision> matches = jdbc.sql("""
-                SELECT r.revision_id, r.version_no, r.manifest_json::text AS manifest_json,
+    }
+
+    private List<ResolvedRevision> loadEffectiveRevisions(ProjectFulfillmentResolveQuery query) {
+        return jdbc.sql("""
+                SELECT p.profile_id, p.profile_code, p.profile_name, p.match_priority,
+                       r.revision_id, r.version_no, r.manifest_json::text AS manifest_json,
                        r.content_digest, r.source_bundle_id,
                        b.bundle_code, b.bundle_version, b.manifest_digest AS bundle_digest
-                  FROM cfg_project_fulfillment_revision r
+                  FROM cfg_project_fulfillment_profile p
+                  JOIN cfg_project_fulfillment_revision r
+                    ON r.tenant_id = p.tenant_id AND r.profile_id = p.profile_id
                   JOIN cfg_configuration_bundle b
                     ON b.tenant_id = r.tenant_id AND b.bundle_id = r.source_bundle_id
-                 WHERE r.tenant_id = :tenantId
-                   AND r.profile_id = :profileId
+                 WHERE p.tenant_id = :tenantId
+                   AND p.project_id = :projectId
+                   AND p.service_product_code = :product
+                   AND p.status = 'ACTIVE'
                    AND r.revision_status = 'PUBLISHED'
                    AND r.effective_from <= :at
                    AND (r.effective_to IS NULL OR r.effective_to > :at)
-                 ORDER BY r.version_no DESC
                 """)
                 .param("tenantId", query.tenantId())
-                .param("profileId", profileId)
+                .param("projectId", query.projectId())
+                .param("product", query.serviceProductCode())
                 .param("at", PostgresJdbcParameters.timestamptz(query.createdAt()))
                 .query((rs, n) -> new ResolvedRevision(
+                        rs.getObject("profile_id", UUID.class),
+                        rs.getString("profile_code"),
+                        rs.getString("profile_name"),
+                        rs.getInt("match_priority"),
                         rs.getObject("revision_id", UUID.class),
                         rs.getInt("version_no"),
                         rs.getString("manifest_json"),
@@ -88,46 +163,55 @@ final class DefaultProjectFulfillmentResolver implements ProjectFulfillmentResol
                         rs.getString("bundle_version"),
                         rs.getString("bundle_digest")))
                 .list();
-        if (matches.isEmpty()) {
-            throw new BusinessProblem(
-                    ProblemCode.PROJECT_FULFILLMENT_REVISION_NOT_EFFECTIVE,
-                    "建单时刻没有生效的履约配置版本");
+    }
+
+    private MatchedRevision match(
+            ResolvedRevision revision,
+            ProjectFulfillmentResolveQuery query
+    ) {
+        Map<String, Object> manifest = documents.parseMap(revision.manifestJson());
+        Map<?, ?> rule = manifest.get("matchRule") instanceof Map<?, ?> map ? map : Map.of();
+        List<String> brandCodes = values(rule.get("brandCodes"));
+        List<String> provinceCodes = values(rule.get("provinceCodes"));
+        if (!matchesDimension(brandCodes, query.brandCode())
+                || !matchesDimension(provinceCodes, query.provinceCode())) {
+            return null;
         }
-        if (matches.size() > 1) {
-            // 理论上 exclusion 约束阻止重叠；仍失败关闭以防脏数据。
-            throw new BusinessProblem(
-                    ProblemCode.PROJECT_FULFILLMENT_REVISION_NOT_EFFECTIVE,
-                    "建单时刻命中多个冲突的履约配置版本");
+
+        int specificity = 0;
+        List<String> explanation = new ArrayList<>();
+        explanation.add("服务产品=" + query.serviceProductCode());
+        if (!brandCodes.isEmpty()) {
+            specificity++;
+            explanation.add("品牌=" + query.brandCode());
         }
-        ResolvedRevision hit = matches.getFirst();
-        if (query.clientKind() != null && hit.manifestJson() != null
-                && hit.manifestJson().contains("supportedClientKinds")
-                && !hit.manifestJson().contains("\"" + query.clientKind() + "\"")) {
-            // 粗粒度兼容检查；精细校验在发布期完成。stages 级 clientKinds 后续增强。
-            // 若 Manifest 未声明 supportedClientKinds 则放行。
+        if (!provinceCodes.isEmpty()) {
+            specificity++;
+            explanation.add("省级区域=" + query.provinceCode());
         }
-        if (query.clientKind() != null) {
-            boolean declares = hit.manifestJson() != null
-                    && hit.manifestJson().contains("\"supportedClientKinds\"");
-            if (declares) {
-                String needle = "\"" + query.clientKind() + "\"";
-                // 仅在顶层文档曾写入 supportedClientKinds 时检查；编译后可能在 stages。
-                // V1：若 profile 草稿模板包含 clientKinds，manifest stages 也可能包含。
-            }
+        return new MatchedRevision(
+                revision, revision.matchPriority(), specificity, List.copyOf(explanation));
+    }
+
+    private static boolean matchesDimension(List<String> accepted, String actual) {
+        return accepted.isEmpty() || (actual != null && accepted.contains(actual));
+    }
+
+    private static List<String> values(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
         }
-        return new ProjectFulfillmentResolveResult(
-                profileId,
-                hit.revisionId(),
-                String.valueOf(hit.versionNo()),
-                hit.bundleId(),
-                hit.bundleCode(),
-                hit.bundleVersion(),
-                hit.bundleDigest(),
-                hit.manifestJson(),
-                hit.contentDigest());
+        return list.stream().map(String::valueOf).toList();
+    }
+
+    private record ProfileState(UUID profileId, String status) {
     }
 
     private record ResolvedRevision(
+            UUID profileId,
+            String profileCode,
+            String profileName,
+            int matchPriority,
             UUID revisionId,
             int versionNo,
             String manifestJson,
@@ -136,6 +220,14 @@ final class DefaultProjectFulfillmentResolver implements ProjectFulfillmentResol
             String bundleCode,
             String bundleVersion,
             String bundleDigest
+    ) {
+    }
+
+    private record MatchedRevision(
+            ResolvedRevision revision,
+            int matchPriority,
+            int specificity,
+            List<String> explanation
     ) {
     }
 }

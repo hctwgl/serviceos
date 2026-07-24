@@ -23,14 +23,21 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * M365 A5-B：消费 {@code evidence.review-decided}，在 APPROVED / FORCE_APPROVED 时
- * 唤醒 REVIEW_TASK 编排门闸（或写入早期信号供门闸激活时消费）。
+ * 消费 {@code evidence.review-decided}，按审核来源推进不同的工作流等待点。
  *
- * <p>REJECTED 不推进（整改/复审仍停留在门闸）。不修改 ReviewCase.reviewTaskId 绑定语义。</p>
+ * <p>内部审核通过唤醒 REVIEW_TASK 门闸；如果审核先于门闸激活，则保存早期信号。
+ * 外部车企复核通过只允许唤醒已经激活的 OEM 回调等待点，不保存早期信号：
+ * 外部回执只能发生在平台完成提审之后，等待点不存在代表链路状态不一致，必须失败并由
+ * Outbox 重试或人工接管，不能把回执静默标记为已消费。</p>
+ *
+ * <p>REJECTED 不推进（整改/复审仍停留在对应门闸）。不修改 ReviewCase.reviewTaskId 绑定语义。</p>
  */
 @Service
 final class WorkflowReviewDecidedHandler implements OutboxMessageHandler {
     private static final String CONSUMER = "workflow.evidence-review-decided.v1";
+    private static final String INTERNAL = "INTERNAL";
+    private static final String EXTERNAL = "EXTERNAL";
+    private static final String OEM_ACKNOWLEDGED_EVENT_TYPE = "platform.oem.acknowledged";
     private static final Set<String> PASSING = Set.of("APPROVED", "FORCE_APPROVED");
 
     private final JdbcClient jdbc;
@@ -87,6 +94,15 @@ final class WorkflowReviewDecidedHandler implements OutboxMessageHandler {
                     "Review decided source Task has no workOrderId: " + decided.taskId());
         }
 
+        if (EXTERNAL.equals(decided.decisionSource())) {
+            wakeExternalReviewWait(message, decided, sourceTask.workOrderId());
+            return;
+        }
+        if (!INTERNAL.equals(decided.decisionSource())) {
+            throw new IllegalArgumentException(
+                    "Unsupported review decisionSource: " + decided.decisionSource());
+        }
+
         Instant now = clock.instant();
         String signalId = decided.reviewDecisionId().toString();
         // 先落早期信号，再尝试唤醒；门闸尚未激活时保留 token，激活时由 WorkflowTaskCompletedHandler 消费。
@@ -135,6 +151,48 @@ final class WorkflowReviewDecidedHandler implements OutboxMessageHandler {
                 Sha256.digest("PARKED|" + sourceTask.workOrderId()));
     }
 
+    private void wakeExternalReviewWait(
+            OutboxMessage message,
+            ReviewDecidedPayload decided,
+            UUID workOrderId
+    ) {
+        String correlationKey = "workOrder:" + workOrderId;
+        boolean waiting = hasWaitingSubscription(
+                message.tenantId(), OEM_ACKNOWLEDGED_EVENT_TYPE, correlationKey);
+        if (!waiting) {
+            throw new IllegalStateException(
+                    "External review approved but OEM acknowledgement wait is not active: "
+                            + workOrderId);
+        }
+        waitSignals.signal(new SignalWorkflowWaitCommand(
+                message.tenantId(), OEM_ACKNOWLEDGED_EVENT_TYPE, correlationKey,
+                decided.reviewDecisionId().toString(), message.correlationId()));
+        inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
+                Sha256.digest("WOKE_EXTERNAL|" + workOrderId));
+    }
+
+    private boolean hasWaitingSubscription(
+            String tenantId,
+            String waitEventType,
+            String correlationKey
+    ) {
+        return jdbc.sql("""
+                        SELECT 1
+                          FROM wfl_wait_subscription
+                         WHERE tenant_id = :tenantId
+                           AND wait_event_type = :waitEventType
+                           AND correlation_key = :correlationKey
+                           AND status = 'WAITING'
+                         LIMIT 1
+                        """)
+                .param("tenantId", tenantId)
+                .param("waitEventType", waitEventType)
+                .param("correlationKey", correlationKey)
+                .query(Integer.class)
+                .optional()
+                .isPresent();
+    }
+
     private void upsertEarlySignal(
             String tenantId,
             UUID workOrderId,
@@ -180,11 +238,18 @@ final class WorkflowReviewDecidedHandler implements OutboxMessageHandler {
             if (payload.isMissingNode() || payload.isNull()) {
                 payload = root;
             }
+            String decisionSource = payload.path("decisionSource").asText();
+            // v1 早期内部审核事件未携带 decisionSource；已发布契约中该字段为可选。
+            // 缺失只能解释为历史 INTERNAL 语义，EXTERNAL 必须始终显式声明。
+            if (decisionSource.isBlank()) {
+                decisionSource = INTERNAL;
+            }
             return new ReviewDecidedPayload(
                     UUID.fromString(payload.path("reviewCaseId").asText()),
                     UUID.fromString(payload.path("reviewDecisionId").asText()),
                     UUID.fromString(payload.path("taskId").asText()),
-                    payload.path("decision").asText());
+                    payload.path("decision").asText(),
+                    decisionSource);
         } catch (JacksonException | IllegalArgumentException exception) {
             throw new IllegalArgumentException("evidence.review-decided payload is invalid", exception);
         }
@@ -194,7 +259,8 @@ final class WorkflowReviewDecidedHandler implements OutboxMessageHandler {
             UUID reviewCaseId,
             UUID reviewDecisionId,
             UUID taskId,
-            String decision
+            String decision,
+            String decisionSource
     ) {
     }
 }

@@ -14,12 +14,16 @@ import com.serviceos.dispatch.api.ActivateTechnicianFromFrozenDispatchCommand;
 import com.serviceos.dispatch.api.ServiceAssignmentService;
 import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
+import com.serviceos.network.api.TechnicianPrincipalQuery;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
+import com.serviceos.task.api.AssignTaskCandidatesCommand;
+import com.serviceos.task.api.AssignmentSourceType;
+import com.serviceos.task.api.TaskAssignmentService;
 import com.serviceos.workorder.api.WorkOrderExpressionContext;
 import com.serviceos.workorder.api.WorkOrderExpressionContextQuery;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -53,9 +57,11 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
     private final WorkOrderExpressionContextQuery workOrderContexts;
     private final NetworkDispatchCandidateEvaluator networkCandidates;
     private final NetworkPortalTechnicianQuery technicians;
+    private final TechnicianPrincipalQuery technicianPrincipals;
     private final FrozenBundleClientCapabilityProbe clientCapabilityProbe;
     private final DispatchRuntime dispatchRuntime;
     private final ServiceAssignmentService assignments;
+    private final TaskAssignmentService taskAssignments;
     private final InboxService inbox;
     private final AuditAppender audit;
     private final JdbcClient jdbc;
@@ -66,9 +72,11 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
             WorkOrderExpressionContextQuery workOrderContexts,
             NetworkDispatchCandidateEvaluator networkCandidates,
             NetworkPortalTechnicianQuery technicians,
+            TechnicianPrincipalQuery technicianPrincipals,
             FrozenBundleClientCapabilityProbe clientCapabilityProbe,
             DispatchRuntime dispatchRuntime,
             ServiceAssignmentService assignments,
+            TaskAssignmentService taskAssignments,
             InboxService inbox,
             AuditAppender audit,
             JdbcClient jdbc,
@@ -78,9 +86,11 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
         this.workOrderContexts = workOrderContexts;
         this.networkCandidates = networkCandidates;
         this.technicians = technicians;
+        this.technicianPrincipals = technicianPrincipals;
         this.clientCapabilityProbe = clientCapabilityProbe;
         this.dispatchRuntime = dispatchRuntime;
         this.assignments = assignments;
+        this.taskAssignments = taskAssignments;
         this.inbox = inbox;
         this.audit = audit;
         this.jdbc = jdbc;
@@ -105,6 +115,14 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
             return;
         }
         if (task.dispatchPolicyRef() == null || task.dispatchPolicyRef().isBlank()) {
+            if (hasActiveAssignment(message.tenantId(), taskId, "TECHNICIAN")) {
+                inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
+                        Sha256.digest(taskId + "|ALREADY_TECHNICIAN_ASSIGNED"));
+                return;
+            }
+            if (inheritWorkOrderTechnician(message, task)) {
+                return;
+            }
             inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
                     Sha256.digest(taskId + "|POLICY_NOT_CONFIGURED"));
             return;
@@ -159,6 +177,68 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
         activateTechnician(
                 message, task, wo, expressionContext, asOf,
                 networkAssigneeId, networkPolicyEvidence);
+    }
+
+    private boolean inheritWorkOrderTechnician(
+            OutboxMessage message,
+            TaskFulfillmentContext task
+    ) {
+        WorkOrderTechnicianAssignment previous = jdbc.sql("""
+                        SELECT service_assignment_id AS "serviceAssignmentId",
+                               assignee_id AS "technicianProfileId"
+                          FROM dsp_service_assignment
+                         WHERE tenant_id = :tenantId
+                           AND work_order_id = :workOrderId
+                           AND responsibility_level = 'TECHNICIAN'
+                           AND status = 'ACTIVE'
+                         ORDER BY (task_id = :taskId) DESC,
+                                  effective_from DESC,
+                                  created_at DESC
+                         LIMIT 1
+                        """)
+                .param("tenantId", message.tenantId())
+                .param("workOrderId", task.workOrderId())
+                .param("taskId", task.taskId())
+                .query(WorkOrderTechnicianAssignment.class)
+                .optional()
+                .orElse(null);
+        if (previous == null) {
+            return false;
+        }
+        String principalId = technicianPrincipals
+                .findActivePrincipalId(message.tenantId(), previous.technicianProfileId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "ACTIVE work-order technician has no ACTIVE login principal"));
+
+        /*
+         * 网点和师傅责任属于整张工单，容量在首个现场任务指派时已预占；后续人工阶段只冻结
+         * 新 Task 的候选执行权，不重复创建 ServiceAssignment 或占用容量。Task 版本与
+         * ServiceAssignment 来源共同幂等，失败会让 Inbox 重试而不是把任务暴露为无人可接。
+         */
+        taskAssignments.assignCandidateFromServiceAssignment(
+                message.tenantId(),
+                message.correlationId(),
+                new AssignTaskCandidatesCommand(
+                        task.taskId(),
+                        task.version(),
+                        List.of(principalId),
+                        AssignmentSourceType.SYSTEM,
+                        previous.serviceAssignmentId().toString()));
+        Instant now = clock.instant();
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), message.tenantId(), SYSTEM_ACTOR,
+                "SERVICE_ASSIGNMENT_RESPONSIBILITY_INHERITED", "dispatch.assignment.manage",
+                "Task", task.taskId().toString(),
+                "ALLOW", List.of(), "service-assignment-runtime-v1", "INHERITED", null,
+                Sha256.digest(previous.serviceAssignmentId() + "|" + task.taskId()),
+                message.correlationId(), now));
+        inbox.complete(
+                message.tenantId(),
+                CONSUMER,
+                message.eventId(),
+                Sha256.digest(task.taskId() + "|INHERITED|"
+                        + previous.serviceAssignmentId()));
+        return true;
     }
 
     private NetworkActivation activateNetwork(
@@ -415,5 +495,11 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
     }
 
     private record NetworkActivation(String networkAssigneeId, String policyEvidence) {
+    }
+
+    private record WorkOrderTechnicianAssignment(
+            UUID serviceAssignmentId,
+            String technicianProfileId
+    ) {
     }
 }

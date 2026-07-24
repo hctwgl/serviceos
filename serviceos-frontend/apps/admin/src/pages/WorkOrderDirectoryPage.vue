@@ -49,7 +49,13 @@ const query = useQuery({
 })
 
 const viewTabs = computed(() => [
-  { key: 'all', label: `全部工单 ${query.data.value?.totalCount ?? '—'}` },
+  {
+    key: 'all',
+    label:
+      activeView.value === 'all'
+        ? `全部工单 ${query.data.value?.totalCount ?? '—'}`
+        : '全部工单',
+  },
   { key: 'dispatch', label: `待派责任网点 ${query.data.value?.queueSummary.dispatchCount ?? '—'}` },
   { key: 'sla', label: `SLA 风险 ${query.data.value?.queueSummary.slaRiskCount ?? '—'}` },
   { key: 'review', label: `待审核 ${query.data.value?.queueSummary.reviewCount ?? '—'}` },
@@ -83,7 +89,7 @@ function buildFilters(
   selectedSlaRisk?: string,
 ) {
   const viewFilters: Record<string, string | undefined> = {}
-  if (view === 'dispatch') viewFilters.currentStageCode = 'PILOT_DISPATCH'
+  if (view === 'dispatch') viewFilters.responsibilityStatus = 'NETWORK_UNASSIGNED'
   if (view === 'sla') viewFilters.slaRisk = 'OPEN'
   if (view === 'review') viewFilters.reviewCorrectionStatus = 'REVIEW_OPEN'
   if (view === 'correction') viewFilters.reviewCorrectionStatus = 'CORRECTION_ACTIVE'

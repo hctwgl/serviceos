@@ -1,10 +1,12 @@
 import { accessToken, beginLogin } from '@serviceos/auth-context'
 
-// 师傅端本地 API 客户端：复用 @serviceos/auth-context 的 OIDC 访问令牌，经 Vite /api 代理访问后端。
+// 网点端本地 API 客户端：复用 @serviceos/auth-context 的 OIDC 访问令牌，经 Vite /api 代理访问后端。
 // 自包含实现；保持与旧端相同的 apiGet/apiGetWithMeta/apiPost 契约，
-// 使移植的 technicianPortal/me/pages 无需改动。
+// 使移植的 networkPortal/me/pages 无需改动。
 const API_BASE =
   (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_API_BASE_URL ?? '/api/v1'
+const SERVICEOS_CLIENT_KIND = 'NETWORK_WEB'
+const SERVICEOS_CLIENT_VERSION = '1.0.0'
 
 export type ProblemBody = {
   errorCode?: string
@@ -77,6 +79,8 @@ async function request<T>(
     Accept: 'application/json',
     'X-Correlation-Id': crypto.randomUUID(),
     ...(options.headers ?? {}),
+    'X-ServiceOS-Client-Kind': SERVICEOS_CLIENT_KIND,
+    'X-ServiceOS-Client-Version': SERVICEOS_CLIENT_VERSION,
   }
   if (token) headers.Authorization = `Bearer ${token}`
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'

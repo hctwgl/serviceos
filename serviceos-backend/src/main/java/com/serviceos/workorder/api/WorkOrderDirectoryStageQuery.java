@@ -6,14 +6,15 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 工单目录当前阶段/任务类型/任务状态旁载与筛选端口。
+ * 工单目录当前任务所处阶段/任务类型/任务状态旁载与筛选端口。
  *
  * <p>由 task 模块实现。调用方（工单授权目录）已完成 {@code workOrder.read} 项目范围授权，
  * 本端口不再二次鉴权，也不穿越租户。</p>
  *
- * <p>口径与工作区 {@code currentTaskSummary} 一致：每个工单取创建时间最早的
+ * <p>任务事实口径与工作区 {@code currentTaskSummary} 一致：每个工单取创建时间最早的
  * ACTIVE 任务（READY/PENDING/CLAIMED/RUNNING/RETRY_WAIT/MANUAL_INTERVENTION）；
- * 无 ACTIVE 任务时不出现在结果中。</p>
+ * 无 ACTIVE 任务时不出现在结果中。无任务的工作流门闸阶段由
+ * {@link WorkOrderDirectoryWorkflowStageQuery} 提供。</p>
  */
 public interface WorkOrderDirectoryStageQuery {
 

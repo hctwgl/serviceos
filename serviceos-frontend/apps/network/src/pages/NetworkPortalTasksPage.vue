@@ -21,6 +21,7 @@ import {
   resubmitNetworkPortalCorrectionCase,
   createNetworkPortalCorrectionEvidenceSnapshot,
   type NetworkPortalAppointment,
+  type NetworkPortalAppointmentType,
   type NetworkPortalContactAttempt,
   type NetworkPortalTaskItem,
   type NetworkPortalTechnicianItem,
@@ -172,7 +173,7 @@ const reassignBusy = ref(false)
 const reassignError = ref<string | null>(null)
 const reassignMessage = ref<string | null>(null)
 
-const appointmentType = ref('SURVEY')
+const appointmentType = ref<NetworkPortalAppointmentType>('SURVEY')
 const addressRef = ref('network-portal-address')
 const addressVersion = ref('v1')
 const windowStart = ref('2026-08-20T01:00:00.000Z')

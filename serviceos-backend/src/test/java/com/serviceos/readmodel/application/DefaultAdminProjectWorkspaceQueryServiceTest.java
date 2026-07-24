@@ -43,7 +43,8 @@ class DefaultAdminProjectWorkspaceQueryServiceTest {
         UUID profileId = UUID.randomUUID();
         when(fixture.fulfillment.list(fixture.actor, "corr-project", fixture.projectId)).thenReturn(List.of(
                 new ProjectFulfillmentProfileSummary(
-                        profileId, fixture.projectId, "HOME_CHARGING_SURVEY_INSTALL", "家充勘测安装",
+                        profileId, fixture.projectId, "BYD_HOME_CHARGING_STANDARD",
+                        "HOME_CHARGING_SURVEY_INSTALL", "家充勘测安装", 100,
                         "ACTIVE", 7, 3, 8, "V1", NOW, "7 个阶段", "安装 48 小时", 2, NOW)));
         when(fixture.fulfillment.usageSummary(fixture.actor, "corr-project", fixture.projectId))
                 .thenReturn(new ProjectFulfillmentUsageSummary(fixture.projectId, 8, false, NOW));

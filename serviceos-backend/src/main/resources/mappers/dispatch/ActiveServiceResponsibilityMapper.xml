@@ -2,16 +2,26 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.serviceos.dispatch.infrastructure.ActiveServiceResponsibilityMapper">
     <select id="find" resultType="map">
-        SELECT task_id AS "taskId",
+        SELECT #{taskId} AS "taskId",
                max(assignee_id) FILTER (WHERE responsibility_level = 'NETWORK') AS "networkId",
                max(assignee_id) FILTER (WHERE responsibility_level = 'TECHNICIAN') AS "technicianId"
-          FROM dsp_service_assignment
-         WHERE tenant_id = #{tenantId} AND task_id = #{taskId} AND status = 'ACTIVE'
-         GROUP BY task_id
+          FROM (
+                SELECT DISTINCT ON (responsibility_level)
+                       responsibility_level, assignee_id
+                  FROM dsp_service_assignment
+                 WHERE tenant_id = #{tenantId}
+                   AND work_order_id = #{workOrderId}
+                   AND status = 'ACTIVE'
+                 ORDER BY responsibility_level,
+                          (task_id = #{taskId}) DESC,
+                          effective_from DESC,
+                          created_at DESC
+               ) active_assignment
+        HAVING count(*) &gt; 0
     </select>
 
     <select id="findSummary" resultType="map">
-        SELECT task_id AS "taskId",
+        SELECT #{taskId} AS "taskId",
                max(assignee_id) FILTER (WHERE responsibility_level = 'NETWORK') AS "networkId",
                max(effective_from) FILTER (WHERE responsibility_level = 'NETWORK') AS "networkEffectiveFrom",
                max(reassignment_reason_code) FILTER (WHERE responsibility_level = 'NETWORK')
@@ -21,10 +31,19 @@
                    AS "technicianEffectiveFrom",
                max(reassignment_reason_code) FILTER (WHERE responsibility_level = 'TECHNICIAN')
                    AS "technicianReassignmentReasonCode"
-          FROM dsp_service_assignment
-         WHERE tenant_id = #{tenantId}
-           AND task_id = #{taskId}
-           AND status = 'ACTIVE'
-         GROUP BY task_id
+          FROM (
+                SELECT DISTINCT ON (responsibility_level)
+                       responsibility_level, assignee_id, effective_from,
+                       reassignment_reason_code
+                  FROM dsp_service_assignment
+                 WHERE tenant_id = #{tenantId}
+                   AND work_order_id = #{workOrderId}
+                   AND status = 'ACTIVE'
+                 ORDER BY responsibility_level,
+                          (task_id = #{taskId}) DESC,
+                          effective_from DESC,
+                          created_at DESC
+               ) active_assignment
+        HAVING count(*) &gt; 0
     </select>
 </mapper>

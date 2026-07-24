@@ -41,6 +41,7 @@ final class AdminWorkOrderController {
             @RequestParam(required = false) String currentStageCode,
             @RequestParam(required = false) UUID currentNetworkId,
             @RequestParam(required = false) UUID currentTechnicianId,
+            @RequestParam(required = false) String responsibilityStatus,
             @RequestParam(required = false) String slaRisk,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate receivedFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate receivedTo,
@@ -52,7 +53,7 @@ final class AdminWorkOrderController {
     ) {
         WorkOrderQuery query = new WorkOrderQuery(
                 clientCode, projectId, status, null, null, null, null, currentStageCode, null,
-                currentNetworkId, currentTechnicianId, slaRisk, receivedFrom, receivedTo,
+                currentNetworkId, currentTechnicianId, responsibilityStatus, slaRisk, receivedFrom, receivedTo,
                 reviewCorrectionStatus, q, cursor, limit);
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)

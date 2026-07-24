@@ -3,6 +3,8 @@ package com.serviceos.dispatch.application;
 import com.serviceos.dispatch.api.ActiveServiceResponsibility;
 import com.serviceos.dispatch.api.ActiveServiceResponsibilityService;
 import com.serviceos.network.api.TechnicianPrincipalQuery;
+import com.serviceos.task.api.TaskFulfillmentContext;
+import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,19 +15,25 @@ import java.util.UUID;
 final class DefaultActiveServiceResponsibilityService implements ActiveServiceResponsibilityService {
     private final ActiveServiceResponsibilityRepository repository;
     private final TechnicianPrincipalQuery technicianPrincipals;
+    private final TaskFulfillmentContextService tasks;
 
     DefaultActiveServiceResponsibilityService(
             ActiveServiceResponsibilityRepository repository,
-            TechnicianPrincipalQuery technicianPrincipals
+            TechnicianPrincipalQuery technicianPrincipals,
+            TaskFulfillmentContextService tasks
     ) {
         this.repository = repository;
         this.technicianPrincipals = technicianPrincipals;
+        this.tasks = tasks;
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<ActiveServiceResponsibility> find(String tenantId, UUID taskId) {
-        return repository.find(tenantId, taskId).map(responsibility -> enrich(tenantId, responsibility));
+        return tasks.find(tenantId, taskId)
+                .map(TaskFulfillmentContext::workOrderId)
+                .flatMap(workOrderId -> repository.find(tenantId, taskId, workOrderId))
+                .map(responsibility -> enrich(tenantId, responsibility));
     }
 
     private ActiveServiceResponsibility enrich(

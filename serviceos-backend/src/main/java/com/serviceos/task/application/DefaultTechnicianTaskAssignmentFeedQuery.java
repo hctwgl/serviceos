@@ -48,7 +48,7 @@ final class DefaultTechnicianTaskAssignmentFeedQuery implements TechnicianTaskAs
                          WHERE a.tenant_id = :tenantId
                            AND a.principal_id = :principalId
                            AND a.principal_type = 'USER'
-                           AND a.assignment_kind = 'RESPONSIBLE'
+                           AND a.assignment_kind IN ('CANDIDATE', 'RESPONSIBLE')
                            AND a.status = :status
                          ORDER BY a.effective_from DESC, a.task_assignment_id
                         """)

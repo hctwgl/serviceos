@@ -9,6 +9,7 @@ import com.serviceos.configuration.api.ConfigurationResolutionException;
 import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
+import com.serviceos.configuration.api.PublishConfigurationBundleSuccessorCommand;
 import com.serviceos.configuration.api.ResolveConfigurationBundleQuery;
 import com.serviceos.shared.Sha256;
 import com.serviceos.shared.infrastructure.PostgresJdbcParameters;
@@ -137,6 +138,79 @@ final class JdbcConfigurationService implements ConfigurationService {
                     "published bundle validity overlaps the same resolution scope");
         }
 
+        return insertBundle(command, project, assets, actualManifestDigest);
+    }
+
+    @Override
+    @Transactional
+    public ConfigurationBundleReference publishBundleSuccessor(
+            PublishConfigurationBundleSuccessorCommand revision
+    ) {
+        PublishConfigurationBundleCommand command = revision.successor();
+        ProjectRow project = requireActiveProject(command.tenantId(), command.projectId());
+        List<AssetRow> assets = findAssets(command.tenantId(), command.assetVersionIds());
+        if (assets.size() != command.assetVersionIds().size()) {
+            throw new ConfigurationPublicationException(
+                    "every bundle item must reference a published asset in the same tenant");
+        }
+        schemaValidator.validateBundle(assets.stream().map(AssetRow::definition).toList());
+        String actualManifestDigest = bundleDigest(command, assets);
+
+        String scopeKey = String.join("|", command.tenantId(), command.projectId().toString(),
+                command.brandCode(), command.serviceProductCode(), nullToEmpty(command.provinceCode()));
+        jdbc.sql("SELECT pg_advisory_xact_lock(hashtextextended(:scopeKey, 0))")
+                .param("scopeKey", scopeKey)
+                .query((rs, rowNum) -> 0)
+                .single();
+
+        ExistingBundle existing = findBundleVersion(
+                command.tenantId(), command.bundleCode(), command.bundleVersion());
+        if (existing != null) {
+            if (!existing.manifestDigest().equals(actualManifestDigest)) {
+                throw new ConfigurationPublicationException(
+                        "bundle version already exists with different immutable content");
+            }
+            return existing.reference();
+        }
+
+        int closed = jdbc.sql("""
+                UPDATE cfg_configuration_bundle
+                   SET effective_until = :transitionAt
+                 WHERE tenant_id = :tenantId
+                   AND bundle_id = :expectedCurrentBundleId
+                   AND project_id = :projectId
+                   AND brand_code = :brandCode
+                   AND service_product_code = :serviceProductCode
+                   AND COALESCE(province_code, '') = COALESCE(:provinceCode, '')
+                   AND status = 'PUBLISHED'
+                   AND effective_until IS NULL
+                   AND effective_from < :transitionAt
+                """)
+                .param("transitionAt", PostgresJdbcParameters.timestamptz(command.effectiveFrom()))
+                .param("tenantId", command.tenantId())
+                .param("expectedCurrentBundleId", revision.expectedCurrentBundleId())
+                .param("projectId", command.projectId())
+                .param("brandCode", command.brandCode())
+                .param("serviceProductCode", command.serviceProductCode())
+                .param("provinceCode", command.provinceCode(), java.sql.Types.VARCHAR)
+                .update();
+        if (closed != 1) {
+            throw new ConfigurationPublicationException(
+                    "expected current bundle is not the open version for the successor scope");
+        }
+        if (hasOverlappingBundle(command)) {
+            throw new ConfigurationPublicationException(
+                    "successor bundle still overlaps another published version");
+        }
+        return insertBundle(command, project, assets, actualManifestDigest);
+    }
+
+    private ConfigurationBundleReference insertBundle(
+            PublishConfigurationBundleCommand command,
+            ProjectRow project,
+            List<AssetRow> assets,
+            String actualManifestDigest
+    ) {
         UUID bundleId = UUID.randomUUID();
         Instant publishedAt = clock.instant();
         jdbc.sql("""

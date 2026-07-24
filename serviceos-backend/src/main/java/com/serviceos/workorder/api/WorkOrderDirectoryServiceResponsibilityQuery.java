@@ -32,4 +32,11 @@ public interface WorkOrderDirectoryServiceResponsibilityQuery {
      * @return 匹配工单 ID；无匹配时为空列表（调用方应失败关闭为无结果，不得忽略筛选）
      */
     List<UUID> findWorkOrderIdsByActiveTechnicianId(String tenantId, UUID technicianProfileId);
+
+    /**
+     * 返回租户内当前存在 ACTIVE NETWORK 服务责任的工单集合。
+     *
+     * <p>调用方用该集合做反向筛选得到待派责任网点工单；工单授权和项目范围仍由调用方 SQL 收敛。</p>
+     */
+    List<UUID> findWorkOrderIdsWithActiveNetwork(String tenantId);
 }

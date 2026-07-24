@@ -1,5 +1,8 @@
 import { accessToken, beginLogin } from '@serviceos/auth-context'
 
+const SERVICEOS_CLIENT_KIND = 'ADMIN_WEB'
+const SERVICEOS_CLIENT_VERSION = '1.0.0'
+
 export type ProblemDetail = {
   code?: string
   detail?: string
@@ -52,6 +55,10 @@ async function request<T>(
     Accept: 'application/json',
     'X-Correlation-Id': crypto.randomUUID(),
     ...(options.headers ?? {}),
+    // 客户端类型只参与能力兼容门禁与低基数诊断，不参与身份或 Scope 判定。
+    // Admin 共享客户端必须显式声明，不能让后端把请求降为 UNKNOWN 后跳过能力校验。
+    'X-ServiceOS-Client-Kind': SERVICEOS_CLIENT_KIND,
+    'X-ServiceOS-Client-Version': SERVICEOS_CLIENT_VERSION,
   }
   if (token) headers.Authorization = `Bearer ${token}`
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'

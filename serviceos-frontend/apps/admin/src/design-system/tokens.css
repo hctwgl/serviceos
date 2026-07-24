@@ -1,0 +1,49 @@
+@import '@serviceos/design-system/tokens.css';
+
+/*
+ * Admin 的业务层只从这里读取尺寸和语义颜色。Vben 的 preferences 仍然是
+ * Shell 实际尺寸的事实源；这些 Token 只用于让页面样式与它保持一致。
+ */
+:root {
+  --sos-shell-header-height: 50px;
+  --sos-shell-sidebar-width: 224px;
+  --sos-shell-sidebar-collapsed-width: 60px;
+  --sos-shell-content-padding-x: 20px;
+  --sos-shell-content-padding-y: 18px;
+
+  --sos-sidebar-width: var(--sos-shell-sidebar-width);
+  --sos-header-height: var(--sos-shell-header-height);
+
+  --sos-bg-subtle: rgb(248 250 252);
+  --sos-border-subtle: rgb(240 242 245);
+  --sos-warning-border: rgb(246 217 154);
+  --sos-text-inverse: rgb(255 255 255);
+
+  --sos-space-1: 4px;
+  --sos-space-2: 8px;
+  --sos-space-3: 12px;
+  --sos-space-4: 16px;
+  --sos-space-5: 20px;
+  --sos-space-6: 24px;
+  --sos-space-7: 28px;
+  --sos-radius-sm: 6px;
+  --sos-radius-md: 8px;
+  --sos-radius-lg: 10px;
+  --sos-shadow-card: 0 1px 3px rgb(15 23 42 / 5%);
+  --sos-shadow-popover: 0 10px 30px rgb(16 24 40 / 12%);
+
+  --sos-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+  --sos-font-size-xs: 11px;
+  --sos-font-size-sm: 12px;
+  --sos-font-size-md: 14px;
+  --sos-font-size-lg: 16px;
+  --sos-font-size-xl: 22px;
+  --sos-line-height-tight: 1.35;
+  --sos-line-height-normal: 1.5;
+  --sos-line-height-relaxed: 1.65;
+
+  --sos-table-header-height: 42px;
+  --sos-table-row-min-height: 48px;
+  --sos-focus-ring: 0 0 0 3px rgb(23 105 255 / 18%);
+}

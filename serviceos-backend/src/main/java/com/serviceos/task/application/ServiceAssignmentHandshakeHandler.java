@@ -10,6 +10,7 @@ import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.ActivatePreparedTaskAssignmentCommand;
 import com.serviceos.task.api.AbortPreparedTaskAssignmentCommand;
 import com.serviceos.task.api.PrepareTaskReassignmentCommand;
+import com.serviceos.task.api.ServiceAssignmentExecutorPrincipalResolver;
 import com.serviceos.task.api.TaskReassignmentReceipt;
 import com.serviceos.task.api.TaskReassignmentService;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -37,17 +38,20 @@ final class ServiceAssignmentHandshakeHandler implements OutboxMessageHandler {
     private final JdbcClient jdbc;
     private final InboxService inbox;
     private final TaskReassignmentService reassignments;
+    private final ServiceAssignmentExecutorPrincipalResolver executorPrincipals;
     private final ObjectMapper objectMapper;
 
     ServiceAssignmentHandshakeHandler(
             JdbcClient jdbc,
             InboxService inbox,
             TaskReassignmentService reassignments,
+            ServiceAssignmentExecutorPrincipalResolver executorPrincipals,
             ObjectMapper objectMapper
     ) {
         this.jdbc = jdbc;
         this.inbox = inbox;
         this.reassignments = reassignments;
+        this.executorPrincipals = executorPrincipals;
         this.objectMapper = objectMapper;
     }
 
@@ -89,7 +93,9 @@ final class ServiceAssignmentHandshakeHandler implements OutboxMessageHandler {
                 principal(message, payload.initiatedBy()), metadata(message, "prepare"),
                 new PrepareTaskReassignmentCommand(
                         payload.taskId(), taskVersion, payload.sagaId().toString(),
-                        payload.assigneeId(), payload.serviceAssignmentId().toString(),
+                        executorPrincipals.requireActivePrincipalId(
+                                message.tenantId(), payload.assigneeId()),
+                        payload.serviceAssignmentId().toString(),
                         payload.reasonCode()));
         inbox.complete(message.tenantId(), PREPARE_CONSUMER, message.eventId(), digest(receipt));
     }

@@ -6,6 +6,8 @@ import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
+import com.serviceos.reliability.api.OutboxAppender;
+import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.reliability.application.OutboxWorker;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.application.TaskExecutionQueue;
@@ -67,6 +69,7 @@ class HomeChargingSurveyInstallTemplatePostgresIT {
     @Autowired WorkOrderCommandService workOrders;
     @Autowired TaskExecutionQueue taskQueue;
     @Autowired OutboxWorker outboxWorker;
+    @Autowired OutboxAppender outbox;
     @Autowired WorkflowWaitSignalService waitSignals;
     @Autowired JdbcClient jdbc;
 
@@ -167,8 +170,35 @@ class HomeChargingSurveyInstallTemplatePostgresIT {
                  WHERE node_id = 'WAIT_OEM_ACK'
                 """).query(String.class).single()).isEqualTo("WAIT_OEM_ACK:WAITING");
 
-        waitSignals.signal(new SignalWorkflowWaitCommand(
-                TENANT, "platform.oem.acknowledged", key, "sig-oem-1", "corr-m271-w2"));
+        UUID installTaskId = jdbc.sql("""
+                SELECT task_id FROM tsk_task WHERE task_type = 'FIELD_INSTALL'
+                """).query(UUID.class).single();
+        UUID externalReviewCaseId = UUID.randomUUID();
+        UUID externalDecisionId = UUID.randomUUID();
+        Instant decidedAt = Instant.now();
+        String externalDecisionPayload = """
+                {
+                  "reviewCaseId":"%s",
+                  "reviewDecisionId":"%s",
+                  "evidenceSetSnapshotId":"%s",
+                  "taskId":"%s",
+                  "projectId":"%s",
+                  "decision":"APPROVED",
+                  "decisionSource":"EXTERNAL",
+                  "reasonCodes":[],
+                  "decidedBy":"byd-reviewer",
+                  "decidedAt":"%s"
+                }
+                """.formatted(
+                externalReviewCaseId, externalDecisionId, UUID.randomUUID(),
+                installTaskId, projectId, decidedAt);
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.review-decided", 1,
+                "ReviewCase", externalReviewCaseId.toString(), 1,
+                TENANT, "corr-m271-w2", "external-review-callback",
+                installTaskId.toString(), externalDecisionPayload,
+                Sha256.digest(externalDecisionPayload), decidedAt));
+        publishUntil("evidence.review-decided");
 
         assertThat(jdbc.sql("SELECT status FROM wfl_workflow_instance")
                 .query(String.class).single()).isEqualTo("COMPLETED");

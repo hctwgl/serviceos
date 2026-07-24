@@ -12,6 +12,7 @@ import com.serviceos.project.api.ProjectQueryService;
 import com.serviceos.project.api.ProjectReferenceOptions;
 import com.serviceos.project.api.ProjectRegionOption;
 import com.serviceos.project.api.ProjectScopeRelationRevisionView;
+import com.serviceos.project.api.ProjectTeamService;
 import com.serviceos.project.api.ReviseProjectScopeRelationsCommand;
 import com.serviceos.project.api.ProjectView;
 import com.serviceos.shared.CommandMetadata;
@@ -52,6 +53,9 @@ class ProjectControllerSecurityTest {
 
     @MockitoBean
     ProjectQueryService queries;
+
+    @MockitoBean
+    ProjectTeamService teams;
 
     @MockitoBean
     CurrentPrincipalProvider principals;

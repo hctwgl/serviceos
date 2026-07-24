@@ -1,0 +1,30 @@
+{
+  "mappingKey": "product.byd-ocean.submit-review",
+  "version": "1.0.0",
+  "connectorCode": "BYD_CPIM",
+  "direction": "OUTBOUND",
+  "title": "比亚迪家充完工资料提审",
+  "fieldMappings": [
+    {
+      "mappingId": "operator",
+      "internalPath": "operator",
+      "externalPath": "operatePerson",
+      "required": true,
+      "transform": "TRIM"
+    },
+    {
+      "mappingId": "order",
+      "internalPath": "externalOrderCode",
+      "externalPath": "orderCode",
+      "required": true,
+      "transform": "NONE"
+    },
+    {
+      "mappingId": "commit",
+      "internalPath": "commitDate",
+      "externalPath": "commitDate",
+      "required": true,
+      "transform": "NONE"
+    }
+  ]
+}

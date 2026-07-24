@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   Input,
-  Select,
   Space,
   Tag,
 } from '@serviceos/design-system'
@@ -14,6 +13,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import PageError from '../../../components/PageError.vue'
 import { formatDateTime } from '../../../presenters/work-order'
+import FulfillmentStageDesigner from '../components/FulfillmentStageDesigner.vue'
 import {
   useUpdateProjectFulfillmentDraftCommand,
   useValidateProjectFulfillmentDraftCommand,
@@ -40,21 +40,23 @@ const model = reactive<{
   profileName: string
 }>({
   description: '',
-  document: { orderTypeName: null, schemaVersion: '1.0', stages: [] },
+  document: {
+    matchRule: { brandCodes: [], provinceCodes: [] },
+    orderTypeName: null,
+    schemaVersion: '1.0',
+    stages: [],
+  },
   profileName: '',
 })
 const saved = ref(false)
 
-const ownerOptions = [
-  { value: 'PLATFORM', label: '平台' },
-  { value: 'NETWORK', label: '责任网点' },
-  { value: 'TECHNICIAN', label: '责任师傅' },
-  { value: 'SYSTEM', label: '系统自动执行' },
-]
-
 function cloneDocument(document: ProjectFulfillmentDocument): ProjectFulfillmentDocument {
   return {
     ...document,
+    matchRule: {
+      brandCodes: [...(document.matchRule?.brandCodes ?? [])],
+      provinceCodes: [...(document.matchRule?.provinceCodes ?? [])],
+    },
     supportedClientKinds: document.supportedClientKinds
       ? [...document.supportedClientKinds]
       : undefined,
@@ -66,6 +68,25 @@ function cloneDocument(document: ProjectFulfillmentDocument): ProjectFulfillment
       formRefs: stage.formRefs ? [...stage.formRefs] : undefined,
       transitions: stage.transitions?.map((transition) => ({ ...transition })),
     })),
+  }
+}
+
+function parseCodes(value: unknown) {
+  return String(value ?? '')
+    .split(/[,，\s]+/)
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean)
+    .filter((item, index, values) => values.indexOf(item) === index)
+}
+
+function updateMatchRule(
+  dimension: 'brandCodes' | 'provinceCodes',
+  value: unknown,
+) {
+  const current = model.document.matchRule ?? { brandCodes: [], provinceCodes: [] }
+  model.document.matchRule = {
+    ...current,
+    [dimension]: parseCodes(value),
   }
 }
 
@@ -88,6 +109,8 @@ async function saveDraft() {
     profileName: model.profileName.trim(),
     description: model.description.trim() || undefined,
     document: model.document,
+    sourceBundleId: draft.data.value.sourceBundleId,
+    workflowAssetVersionId: draft.data.value.workflowAssetVersionId,
   })
   saved.value = true
   validateCommand.reset()
@@ -104,15 +127,6 @@ function serviceProductLabel(code: string) {
   return '项目服务产品'
 }
 
-function taskTypeLabel(taskType: string | null) {
-  const labels: Record<string, string> = {
-    DISPATCH: '派单协调',
-    INSTALL: '上门安装',
-    REVIEW: '资料审核',
-    SURVEY: '现场勘测',
-  }
-  return taskType ? labels[taskType] ?? '业务任务' : '无独立任务'
-}
 </script>
 
 <template>
@@ -145,26 +159,61 @@ function taskTypeLabel(taskType: string | null) {
             <label class="draft-description"><span>方案说明</span><Input.TextArea v-model:value="model.description" :rows="3" :maxlength="2000" /></label>
           </div>
 
-          <div class="draft-stage-heading">
-            <div><h2>履约阶段</h2><p>按实际执行顺序配置每个阶段的名称、责任方和业务说明。</p></div>
-            <Tag color="processing">{{ model.document.stages.length }} 个阶段</Tag>
-          </div>
-          <div class="draft-stage-list">
-            <article v-for="stage in model.document.stages" :key="stage.stageCode" class="draft-stage-card">
-              <header><b>{{ stage.sequence }}</b><div><strong>{{ stage.stageName }}</strong><span>第 {{ stage.sequence }} 个履约阶段</span></div><Tag v-if="stage.terminal" color="success">终态</Tag></header>
-              <label><span>阶段名称</span><Input v-model:value="stage.stageName" :maxlength="120" /></label>
-              <label><span>责任方</span><Select v-model:value="stage.ownerType" :options="ownerOptions" /></label>
-              <label><span>业务说明</span><Input.TextArea :value="stage.description ?? ''" :rows="2" @update:value="(value) => stage.description = String(value)" /></label>
-              <footer>
-                <span>任务：{{ taskTypeLabel(stage.taskType) }}</span>
-                <span>表单 {{ stage.formRefs?.length ?? 0 }} 份</span>
-                <span>资料 {{ stage.evidenceRefs?.length ?? 0 }} 项</span>
-              </footer>
-            </article>
-          </div>
+          <section class="fulfillment-match-rule">
+            <header>
+              <div>
+                <span>适用范围</span>
+                <h2>结构化匹配条件</h2>
+                <p>空值表示该维度不限制；正式受理时先硬匹配，再按优先级和规则具体度确定唯一方案。</p>
+              </div>
+              <Tag color="processing">
+                {{ (model.document.matchRule?.brandCodes.length ?? 0) + (model.document.matchRule?.provinceCodes.length ?? 0) }} 个条件值
+              </Tag>
+            </header>
+            <div class="fulfillment-match-rule-grid">
+              <label>
+                <span>客户品牌编码</span>
+                <Input
+                  :value="(model.document.matchRule?.brandCodes ?? []).join(', ')"
+                  placeholder="例如：BYD_OCEAN；多个值用逗号分隔"
+                  @update:value="(value) => updateMatchRule('brandCodes', value)"
+                />
+              </label>
+              <label>
+                <span>省级行政区编码</span>
+                <Input
+                  :value="(model.document.matchRule?.provinceCodes ?? []).join(', ')"
+                  placeholder="例如：370000；多个值用逗号分隔"
+                  @update:value="(value) => updateMatchRule('provinceCodes', value)"
+                />
+              </label>
+            </div>
+          </section>
+
+          <FulfillmentStageDesigner v-model:stages="model.document.stages" />
         </Card>
 
         <aside class="fulfillment-draft-rail">
+          <Card :bordered="false" title="运行绑定">
+            <div
+              class="runtime-binding-health"
+              :class="{ ready: draft.data.value.workflowAssetVersionId && draft.data.value.sourceBundleId }"
+            >
+              <span aria-hidden="true" />
+              <div>
+                <strong>
+                  {{ draft.data.value.workflowAssetVersionId && draft.data.value.sourceBundleId
+                    ? '运行基础已绑定'
+                    : '运行基础不完整' }}
+                </strong>
+                <p>
+                  {{ draft.data.value.workflowAssetVersionId && draft.data.value.sourceBundleId
+                    ? '保存草稿会保留 Workflow 与配置包引用；发布时还会核对阶段一致性。'
+                    : '当前方案尚不能发布，请先建立 Workflow 与配置包。' }}
+                </p>
+              </div>
+            </div>
+          </Card>
           <Card :bordered="false" title="草稿状态">
             <dl>
               <div><dt>服务产品</dt><dd>{{ serviceProductLabel(draft.data.value.serviceProductCode) }}</dd></div>

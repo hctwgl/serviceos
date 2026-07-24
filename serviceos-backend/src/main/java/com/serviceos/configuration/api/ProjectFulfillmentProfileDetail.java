@@ -8,9 +8,11 @@ import java.util.UUID;
 public record ProjectFulfillmentProfileDetail(
         UUID profileId,
         UUID projectId,
+        String profileCode,
         String serviceProductCode,
         String profileName,
         String description,
+        int matchPriority,
         String status,
         UUID draftRevisionId,
         UUID activeRevisionId,

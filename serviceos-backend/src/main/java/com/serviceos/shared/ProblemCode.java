@@ -76,5 +76,7 @@ public enum ProblemCode {
     PROJECT_FULFILLMENT_PROFILE_SUSPENDED,
     /** 客户端类型不被当前履约配置支持。 */
     PROJECT_FULFILLMENT_CLIENT_NOT_SUPPORTED,
+    /** 多个履约方案具有相同优先级和具体度，无法确定唯一方案。 */
+    PROJECT_FULFILLMENT_MATCH_NOT_UNIQUE,
     INTERNAL_ERROR
 }

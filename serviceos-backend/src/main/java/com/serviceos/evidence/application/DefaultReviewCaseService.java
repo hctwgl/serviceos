@@ -406,7 +406,7 @@ final class DefaultReviewCaseService implements ReviewCaseService, ReviewCaseHan
 
         String payload = serialize(new ReviewDecidedPayload(
                 current.reviewCaseId(), decisionView.reviewDecisionId(), current.evidenceSetSnapshotId(),
-                current.taskId(), current.projectId(), decision, reasonCodes, null,
+                current.taskId(), current.projectId(), decision, "INTERNAL", reasonCodes, null,
                 principal.principalId(), now));
         outbox.append(new OutboxEvent(
                 UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.review-decided", 1,
@@ -611,7 +611,8 @@ final class DefaultReviewCaseService implements ReviewCaseService, ReviewCaseHan
 
         String payload = serialize(new ReviewDecidedPayload(
                 current.reviewCaseId(), decisionView.reviewDecisionId(), current.evidenceSetSnapshotId(),
-                current.taskId(), current.projectId(), "FORCE_APPROVED", reasonCodes, approvalRef,
+                current.taskId(), current.projectId(), "FORCE_APPROVED", "INTERNAL",
+                reasonCodes, approvalRef,
                 principal.principalId(), now));
         outbox.append(new OutboxEvent(
                 UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.review-decided", 1,
@@ -937,6 +938,7 @@ final class DefaultReviewCaseService implements ReviewCaseService, ReviewCaseHan
             UUID taskId,
             UUID projectId,
             String decision,
+            String decisionSource,
             List<String> reasonCodes,
             String approvalRef,
             String decidedBy,

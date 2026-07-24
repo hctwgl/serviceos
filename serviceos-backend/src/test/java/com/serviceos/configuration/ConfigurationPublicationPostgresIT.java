@@ -8,6 +8,7 @@ import com.serviceos.configuration.api.ConfigurationResolutionException;
 import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
+import com.serviceos.configuration.api.PublishConfigurationBundleSuccessorCommand;
 import com.serviceos.configuration.api.ResolveConfigurationBundleQuery;
 import com.serviceos.shared.Sha256;
 import org.junit.jupiter.api.BeforeEach;
@@ -136,6 +137,44 @@ class ConfigurationPublicationPostgresIT {
                 Instant.now().minusSeconds(60), null)))
                 .isInstanceOf(ConfigurationPublicationException.class)
                 .hasMessageContaining("overlaps");
+    }
+
+    @Test
+    void atomicallyPublishesSuccessorAndPreservesHistoricalBundleIdentity() {
+        ConfigurationBundleReference first = configurations.publishBundle(bundle(
+                "BYD-OCEAN-SD", "1.0.0", "370000", validFrom, null));
+        Instant transitionAt = Instant.now().minusSeconds(30);
+        PublishConfigurationBundleCommand successorCommand = bundle(
+                "BYD-OCEAN-SD", "1.1.0", "370000", transitionAt, null);
+
+        ConfigurationBundleReference successor = configurations.publishBundleSuccessor(
+                new PublishConfigurationBundleSuccessorCommand(first.bundleId(), successorCommand));
+        ConfigurationBundleReference replay = configurations.publishBundleSuccessor(
+                new PublishConfigurationBundleSuccessorCommand(first.bundleId(), successorCommand));
+
+        assertThat(replay).isEqualTo(successor);
+        assertThat(configurations.resolve(query("370000", transitionAt.minusMillis(1))))
+                .isEqualTo(first);
+        assertThat(configurations.resolve(query("370000", transitionAt.plusMillis(1))))
+                .isEqualTo(successor);
+        assertThat(jdbc.sql("""
+                SELECT effective_until FROM cfg_configuration_bundle
+                 WHERE bundle_id = :bundleId
+                """)
+                .param("bundleId", first.bundleId())
+                .query(Instant.class)
+                .single()).isEqualTo(transitionAt);
+
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE cfg_configuration_bundle
+                   SET effective_until = :changed
+                 WHERE bundle_id = :bundleId
+                """)
+                .param("changed", OffsetDateTime.now().plusDays(1))
+                .param("bundleId", first.bundleId())
+                .update())
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("published configuration is immutable");
     }
 
     @Test

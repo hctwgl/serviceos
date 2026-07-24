@@ -26,6 +26,9 @@ export type AdminProjectDirectoryItem = {
   status: 'DRAFT' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
   publishedConfigurationCount: number | null
   draftConfigurationCount: number | null
+  currentFulfillmentPlanName: string | null
+  currentFulfillmentVersion: string | null
+  updatedAt: string | null
   configurationStatus: 'NOT_CONFIGURED' | 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED_CHANGES' | 'NO_PERMISSION'
   dataComplete: boolean
   dataProblem: string | null

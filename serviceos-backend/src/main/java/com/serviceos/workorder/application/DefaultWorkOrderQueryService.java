@@ -20,6 +20,7 @@ import com.serviceos.workorder.api.WorkOrderDirectorySlaRiskSummary;
 import com.serviceos.workorder.api.WorkOrderDirectoryExceptionQuery;
 import com.serviceos.workorder.api.WorkOrderDirectoryExceptionSummary;
 import com.serviceos.workorder.api.WorkOrderDirectoryStageQuery;
+import com.serviceos.workorder.api.WorkOrderDirectoryWorkflowStageQuery;
 import com.serviceos.workorder.api.WorkOrderDirectoryReviewCorrectionQuery;
 import com.serviceos.workorder.api.WorkOrderMaskedContactView;
 import com.serviceos.workorder.api.WorkOrderPage;
@@ -67,10 +68,13 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     /** M447：审核/整改运营桶。 */
     private static final Set<String> REVIEW_CORRECTION_STATUSES = Set.of(
             "REVIEW_OPEN", "CORRECTION_ACTIVE");
+    /** 当前仅开放可由服务责任事实精确证明的待派网点运营桶。 */
+    private static final Set<String> RESPONSIBILITY_STATUSES = Set.of("NETWORK_UNASSIGNED");
     private final WorkOrderQueryRepository queries;
     private final AuthorizationService authorization;
     private final ProjectScopeAuthorizationService projectScopes;
     private final ObjectProvider<WorkOrderDirectoryStageQuery> stageQuery;
+    private final ObjectProvider<WorkOrderDirectoryWorkflowStageQuery> workflowStageQuery;
     private final ObjectProvider<WorkOrderDirectoryAssigneeQuery> assigneeQuery;
     private final ObjectProvider<WorkOrderDirectoryServiceResponsibilityQuery> responsibilityQuery;
     private final ObjectProvider<WorkOrderDirectorySlaRiskQuery> slaRiskQuery;
@@ -82,6 +86,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     DefaultWorkOrderQueryService(WorkOrderQueryRepository queries, AuthorizationService authorization,
             ProjectScopeAuthorizationService projectScopes,
             ObjectProvider<WorkOrderDirectoryStageQuery> stageQuery,
+            ObjectProvider<WorkOrderDirectoryWorkflowStageQuery> workflowStageQuery,
             ObjectProvider<WorkOrderDirectoryAssigneeQuery> assigneeQuery,
             ObjectProvider<WorkOrderDirectoryServiceResponsibilityQuery> responsibilityQuery,
             ObjectProvider<WorkOrderDirectorySlaRiskQuery> slaRiskQuery,
@@ -90,6 +95,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             PrincipalPersonaQuery personas, Clock clock) {
         this.queries = queries; this.authorization = authorization;
         this.projectScopes = projectScopes; this.stageQuery = stageQuery;
+        this.workflowStageQuery = workflowStageQuery;
         this.assigneeQuery = assigneeQuery; this.responsibilityQuery = responsibilityQuery;
         this.slaRiskQuery = slaRiskQuery;
         this.reviewCorrectionQuery = reviewCorrectionQuery;
@@ -131,6 +137,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         // M440/M441：网点/师傅 ID 与目录列同口径；非法 UUID 由绑定层失败，此处仅参与 digest。
         UUID currentNetworkId = query.currentNetworkId();
         UUID currentTechnicianId = query.currentTechnicianId();
+        String responsibilityStatus = normalizeResponsibilityStatus(query.responsibilityStatus());
         // M442：SLA 风险口径与目录列一致；非法枚举失败关闭。
         String slaRisk = normalizeSlaRisk(query.slaRisk());
         // M443：创建日闭区间 → Asia/Shanghai 半开时间窗；非法跨度失败关闭。
@@ -155,6 +162,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 + "|currentTaskStatus=" + nullable(currentTaskStatus)
                 + "|currentNetworkId=" + nullable(currentNetworkId)
                 + "|currentTechnicianId=" + nullable(currentTechnicianId)
+                + "|responsibilityStatus=" + nullable(responsibilityStatus)
                 + "|slaRisk=" + nullable(slaRisk)
                 + "|receivedFrom=" + nullable(query.receivedFrom())
                 + "|receivedTo=" + nullable(query.receivedTo())
@@ -163,16 +171,27 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         Cursor cursor = decodeCursor(query.cursor(), scope.scopeDigest(), filterDigest);
         List<UUID> projectIds = scope.projectIds().stream()
                 .sorted(Comparator.comparing(UUID::toString)).toList();
-        // M438：阶段筛选经 task SPI 解析为工单 ID，再在授权 SQL 中 IN 收敛。
+        // M438：阶段筛选同时读取 workflow ACTIVE Stage 与 task 兼容旁载，
+        // 再在授权 SQL 中 IN 收敛。REVIEW_TASK/WAIT_EVENT 没有 tsk_task，不能只查任务。
         boolean applyStageFilter = currentStageCode != null;
         List<UUID> stageWorkOrderIds = List.of();
         if (applyStageFilter) {
             WorkOrderDirectoryStageQuery stagesPort = stageQuery.getIfAvailable();
-            if (stagesPort == null) {
+            WorkOrderDirectoryWorkflowStageQuery workflowStagesPort =
+                    workflowStageQuery.getIfAvailable();
+            if (stagesPort == null && workflowStagesPort == null) {
                 throw new IllegalStateException("工单目录阶段筛选端口不可用");
             }
-            stageWorkOrderIds = stagesPort.findWorkOrderIdsByCurrentStageCode(
-                    principal.tenantId(), currentStageCode, scope.tenantWide(), projectIds);
+            LinkedHashSet<UUID> stageIds = new LinkedHashSet<>();
+            if (stagesPort != null) {
+                stageIds.addAll(stagesPort.findWorkOrderIdsByCurrentStageCode(
+                        principal.tenantId(), currentStageCode, scope.tenantWide(), projectIds));
+            }
+            if (workflowStagesPort != null) {
+                stageIds.addAll(workflowStagesPort.findWorkOrderIdsByCurrentStageCode(
+                        principal.tenantId(), currentStageCode, scope.tenantWide(), projectIds));
+            }
+            stageWorkOrderIds = List.copyOf(stageIds);
         }
         // M446：任务状态筛选经同一 task SPI，口径为最早 ACTIVE 任务 status。
         boolean applyTaskStatusFilter = currentTaskStatus != null;
@@ -190,7 +209,9 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         boolean applyTechnicianFilter = currentTechnicianId != null;
         List<UUID> networkWorkOrderIds = List.of();
         List<UUID> technicianWorkOrderIds = List.of();
-        if (applyNetworkFilter || applyTechnicianFilter) {
+        boolean applyNetworkUnassignedFilter = "NETWORK_UNASSIGNED".equals(responsibilityStatus);
+        List<UUID> activeNetworkWorkOrderIds = List.of();
+        if (applyNetworkFilter || applyTechnicianFilter || applyNetworkUnassignedFilter) {
             WorkOrderDirectoryServiceResponsibilityQuery responsibilityPort =
                     responsibilityQuery.getIfAvailable();
             if (responsibilityPort == null) {
@@ -203,6 +224,10 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             if (applyTechnicianFilter) {
                 technicianWorkOrderIds = responsibilityPort.findWorkOrderIdsByActiveTechnicianId(
                         principal.tenantId(), currentTechnicianId);
+            }
+            if (applyNetworkUnassignedFilter) {
+                activeNetworkWorkOrderIds = responsibilityPort.findWorkOrderIdsWithActiveNetwork(
+                        principal.tenantId());
             }
         }
         // M442：SLA 筛选仅在具备 sla.read 的范围内解析；无权限 → 空集失败关闭，不泄露 SLA 事实。
@@ -255,6 +280,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 applyStageFilter, stageWorkOrderIds,
                 applyTaskStatusFilter, taskStatusWorkOrderIds,
                 applyNetworkFilter, networkWorkOrderIds,
+                applyNetworkUnassignedFilter, activeNetworkWorkOrderIds,
                 applyTechnicianFilter, technicianWorkOrderIds,
                 applySlaRiskFilter, slaRiskWorkOrderIds,
                 applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds,
@@ -286,6 +312,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 applyStageFilter, stageWorkOrderIds,
                 applyTaskStatusFilter, taskStatusWorkOrderIds,
                 applyNetworkFilter, networkWorkOrderIds,
+                applyNetworkUnassignedFilter, activeNetworkWorkOrderIds,
                 applyTechnicianFilter, technicianWorkOrderIds,
                 applySlaRiskFilter, slaRiskWorkOrderIds,
                 applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds,
@@ -415,6 +442,14 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             stages = stagesPort.findCurrentStageCodes(tenantId, workOrderIds);
             taskTypes = stagesPort.findCurrentTaskTypes(tenantId, workOrderIds);
             taskStatuses = stagesPort.findCurrentTaskStatuses(tenantId, workOrderIds);
+        }
+        WorkOrderDirectoryWorkflowStageQuery workflowStagesPort =
+                workflowStageQuery.getIfAvailable();
+        if (workflowStagesPort != null) {
+            Map<UUID, String> authoritativeStages = new java.util.HashMap<>(stages);
+            authoritativeStages.putAll(
+                    workflowStagesPort.findCurrentStageCodes(tenantId, workOrderIds));
+            stages = Map.copyOf(authoritativeStages);
         }
         Map<UUID, String> claimedBy = Map.of();
         WorkOrderDirectoryAssigneeQuery assigneesPort = assigneeQuery.getIfAvailable();
@@ -761,6 +796,16 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         }
         if (!ACTIVE_TASK_STATUSES.contains(value)) {
             throw new IllegalArgumentException("currentTaskStatus is invalid");
+        }
+        return value;
+    }
+
+    private static String normalizeResponsibilityStatus(String value) {
+        if (value == null) {
+            return null;
+        }
+        if (!RESPONSIBILITY_STATUSES.contains(value)) {
+            throw new IllegalArgumentException("responsibilityStatus is invalid");
         }
         return value;
     }

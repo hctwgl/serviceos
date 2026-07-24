@@ -74,6 +74,15 @@ final class JdbcWorkOrderDirectoryServiceResponsibilityQuery
              WHERE assignee_id = :technicianAssigneeId
             """;
 
+    private static final String FILTER_WITH_ACTIVE_NETWORK_SQL = """
+            SELECT DISTINCT work_order_id
+              FROM dsp_service_assignment
+             WHERE tenant_id = :tenantId
+               AND work_order_id IS NOT NULL
+               AND status = 'ACTIVE'
+               AND responsibility_level = 'NETWORK'
+            """;
+
     private final JdbcClient jdbc;
     private final NetworkDirectoryLabelQuery labels;
 
@@ -120,6 +129,15 @@ final class JdbcWorkOrderDirectoryServiceResponsibilityQuery
                 })
                 .list();
         return List.copyOf(ids);
+    }
+
+    @Override
+    public List<UUID> findWorkOrderIdsWithActiveNetwork(String tenantId) {
+        Objects.requireNonNull(tenantId, "tenantId must not be null");
+        return jdbc.sql(FILTER_WITH_ACTIVE_NETWORK_SQL)
+                .param("tenantId", tenantId)
+                .query(UUID.class)
+                .list();
     }
 
     @Override

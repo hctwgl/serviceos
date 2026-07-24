@@ -38,12 +38,13 @@ public final class ProjectFulfillmentTestSupport {
 
         jdbc.sql("""
                 INSERT INTO cfg_project_fulfillment_profile (
-                    profile_id, tenant_id, project_id, service_product_code, profile_name,
-                    description, status, active_revision_id, draft_revision_id,
+                    profile_id, tenant_id, project_id, profile_code, service_product_code,
+                    profile_name, description, match_priority, status,
+                    active_revision_id, draft_revision_id,
                     aggregate_version, created_by, updated_by, created_at, updated_at
                 ) VALUES (
-                    :profileId, :tenantId, :projectId, :product, 'IT履约方案',
-                    'test', 'ACTIVE', NULL, NULL,
+                    :profileId, :tenantId, :projectId, :product, :product, 'IT履约方案',
+                    'test', 0, 'ACTIVE', NULL, NULL,
                     1, 'it', 'it', :now, :now
                 )
                 """)

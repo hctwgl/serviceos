@@ -20,6 +20,9 @@ import java.util.UUID;
  * <p>M441：可选 {@code currentTechnicianId} 与目录师傅列同口径（ACTIVE TECHNICIAN assignee）精确匹配，
  * 写入 cursor filterDigest。</p>
  *
+ * <p>{@code responsibilityStatus=NETWORK_UNASSIGNED} 筛选当前没有 ACTIVE NETWORK 服务责任的工单。
+ * 它表达责任缺口而不是某个流程阶段，避免项目配置调整后待派队列失真。</p>
+ *
  * <p>M442：可选 {@code slaRisk}（{@code OPEN}/{@code BREACHED}）与目录 SLA 列同口径精确匹配，
  * 写入 cursor filterDigest；仅在具备 PROJECT {@code sla.read} 的项目范围内解析。</p>
  *
@@ -46,6 +49,7 @@ public record WorkOrderQuery(
         String currentTaskStatus,
         UUID currentNetworkId,
         UUID currentTechnicianId,
+        String responsibilityStatus,
         String slaRisk,
         LocalDate receivedFrom,
         LocalDate receivedTo,
@@ -54,9 +58,37 @@ public record WorkOrderQuery(
         String cursor,
         int limit
 ) {
+    /**
+     * 兼容现有模块内调用的构造；新增责任缺口筛选默认不启用。
+     */
+    public WorkOrderQuery(
+            String clientCode,
+            UUID projectId,
+            String status,
+            String externalOrderCode,
+            String provinceCode,
+            String cityCode,
+            String districtCode,
+            String currentStageCode,
+            String currentTaskStatus,
+            UUID currentNetworkId,
+            UUID currentTechnicianId,
+            String slaRisk,
+            LocalDate receivedFrom,
+            LocalDate receivedTo,
+            String reviewCorrectionStatus,
+            String q,
+            String cursor,
+            int limit
+    ) {
+        this(clientCode, projectId, status, externalOrderCode, provinceCode, cityCode, districtCode,
+                currentStageCode, currentTaskStatus, currentNetworkId, currentTechnicianId, null, slaRisk,
+                receivedFrom, receivedTo, reviewCorrectionStatus, q, cursor, limit);
+    }
+
     /** 无区域/阶段/任务状态/网点/师傅/SLA/创建日/审核整改/关键词筛选的常用构造。 */
     public WorkOrderQuery(String clientCode, UUID projectId, String status, String cursor, int limit) {
-        this(clientCode, projectId, status, null, null, null, null, null, null, null, null, null, null, null, null, null, cursor, limit);
+        this(clientCode, projectId, status, null, null, null, null, null, null, null, null, null, null, null, null, null, null, cursor, limit);
     }
 
     /** 含 externalOrderCode、无区域等扩展筛选（受控搜索等）。 */
@@ -64,6 +96,6 @@ public record WorkOrderQuery(
             String clientCode, UUID projectId, String status, String externalOrderCode,
             String cursor, int limit
     ) {
-        this(clientCode, projectId, status, externalOrderCode, null, null, null, null, null, null, null, null, null, null, null, null, cursor, limit);
+        this(clientCode, projectId, status, externalOrderCode, null, null, null, null, null, null, null, null, null, null, null, null, null, cursor, limit);
     }
 }

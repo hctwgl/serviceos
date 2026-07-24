@@ -8,7 +8,9 @@ import java.util.UUID;
 
 /** Dispatch 内部持久化端口。 */
 public interface ActiveServiceResponsibilityRepository {
-    Optional<ActiveServiceResponsibility> find(String tenantId, UUID taskId);
+    Optional<ActiveServiceResponsibility> find(
+            String tenantId, UUID taskId, UUID workOrderId);
 
-    Optional<ServiceAssignmentSummary> findSummary(String tenantId, UUID taskId);
+    Optional<ServiceAssignmentSummary> findSummary(
+            String tenantId, UUID taskId, UUID workOrderId);
 }

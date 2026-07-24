@@ -3528,7 +3528,8 @@ paths:
         M444 起 `totalCount` 为精确全量 COUNT(*)，`totalCountTruncated` 恒为 false。
         M437：可选 `provinceCode` / `cityCode` / `districtCode` 国标码精确匹配（AND）；
         写入 cursor filterDigest；不发明名称解析。
-        M438：可选 `currentStageCode` 与目录列同口径（最早 ACTIVE 任务 stageCode）精确匹配；
+        M438：可选 `currentStageCode` 与目录列同口径（Workflow ACTIVE Stage 优先，
+        未启动 Workflow 时兼容最早 ACTIVE 任务 stageCode）精确匹配；
         经 task SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
         M446：可选 `currentTaskStatus` 与目录列同口径（最早 ACTIVE 任务 status）精确匹配；
         经 task SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
@@ -3536,6 +3537,8 @@ paths:
         经 dispatch SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
         M441：可选 `currentTechnicianId` 与目录师傅列同口径（ACTIVE TECHNICIAN assignee）精确匹配；
         经 dispatch SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
+        可选 `responsibilityStatus=NETWORK_UNASSIGNED` 按“无 ACTIVE NETWORK 服务责任”精确筛选待派工单；
+        不依赖固定流程阶段，写入 cursor filterDigest。
         M442：可选 `slaRisk`（OPEN/BREACHED）与目录 SLA 列同口径精确匹配；
         仅在具备 PROJECT/TENANT `sla.read` 的范围内经 sla SPI 解析后 IN 收敛；写入 cursor filterDigest。
         M445：`slaRisk=NEAR` 为 RUNNING 且 `now < deadline_at ≤ now+30m` 的即将超时窗口（固定 30 分钟 MVP）。
@@ -3564,6 +3567,9 @@ paths:
             description: M440：当前 ACTIVE NETWORK 网点 ID 精确匹配（与 currentNetworkId 列同口径） }
         - { name: currentTechnicianId, in: query, schema: { type: string, format: uuid },
             description: M441：当前 ACTIVE TECHNICIAN 师傅档案 ID 精确匹配（与 currentTechnicianId 列同口径） }
+        - { name: responsibilityStatus, in: query,
+            schema: { type: string, enum: [NETWORK_UNASSIGNED] },
+            description: 当前无 ACTIVE NETWORK 服务责任的待派工单 }
         - name: slaRisk
           in: query
           schema: { type: string, enum: [OPEN, BREACHED, NEAR] }
@@ -3777,6 +3783,8 @@ paths:
         - { name: currentStageCode, in: query, schema: { type: string } }
         - { name: currentNetworkId, in: query, schema: { type: string, format: uuid } }
         - { name: currentTechnicianId, in: query, schema: { type: string, format: uuid } }
+        - { name: responsibilityStatus, in: query,
+            schema: { type: string, enum: [NETWORK_UNASSIGNED] } }
         - { name: slaRisk, in: query, schema: { type: string, enum: [OPEN, BREACHED, NEAR] } }
         - { name: receivedFrom, in: query, schema: { type: string, format: date } }
         - { name: receivedTo, in: query, schema: { type: string, format: date } }
@@ -4477,8 +4485,8 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
     post:
       operationId: createProjectFulfillmentProfile
-      summary: 创建项目工单类型履约配置
-      description: 需要 project.fulfillment.create；同一项目+服务产品唯一。
+      summary: 创建项目履约方案
+      description: 需要 project.fulfillment.create；同一项目内方案编码唯一，同一服务产品可配置多个方案。
       parameters:
         - name: projectId
           in: path
@@ -4501,6 +4509,35 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProjectFulfillmentProfileDetail' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/simulations:
+    post:
+      operationId: simulateProjectFulfillmentPlanMatch
+      summary: 模拟履约方案匹配
+      description: 使用正式建单相同的结构化规则、优先级和具体度算法，只读且不创建任何运行实例。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectFulfillmentMatchSimulationRequest' }
+      responses:
+        '200':
+          description: 唯一命中的履约方案和可解释匹配结果
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentMatchResult' }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -7974,6 +8011,9 @@ components:
         status: { enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED] }
         publishedConfigurationCount: { type: [integer, 'null'], minimum: 0 }
         draftConfigurationCount: { type: [integer, 'null'], minimum: 0 }
+        currentFulfillmentPlanName: { type: [string, 'null'], maxLength: 200, description: 当前生效履约方案名称；无权限或尚未发布时为 null }
+        currentFulfillmentVersion: { type: [string, 'null'], maxLength: 64, description: 当前生效履约方案版本；无权限或尚未发布时为 null }
+        updatedAt: { type: [string, 'null'], format: date-time, description: 当前生效履约方案最近更新时间；没有生效方案时为 null }
         configurationStatus:
           enum: [NOT_CONFIGURED, DRAFT, PUBLISHED, UNPUBLISHED_CHANGES, NO_PERMISSION]
         dataComplete: { type: boolean }
@@ -10383,9 +10423,9 @@ components:
           type: [string, 'null']
           maxLength: 100
           description: >
-            M432：当前阶段码，与工作区 currentTaskSummary.stageCode 同口径
-            （首个 ACTIVE 任务：READY/PENDING/CLAIMED/RUNNING/RETRY_WAIT/MANUAL_INTERVENTION）。
-            无 ACTIVE 任务时为 null；不发明阶段名。
+            M432：当前阶段码优先来自 Workflow ACTIVE Stage，因此 REVIEW_TASK/WAIT_EVENT
+            等无 Task 门闸仍可见；尚未启动 Workflow 时兼容首个 ACTIVE 任务 stageCode。
+            两者均不存在时为 null；不发明阶段名。
         currentTaskType:
           type: [string, 'null']
           maxLength: 120
@@ -10924,7 +10964,7 @@ components:
     WorkOrderWorkspace:
       type: object
       additionalProperties: false
-      required: [header, currentTaskSummary, sectionAvailability, allowedActionLink,
+      required: [header, currentTaskSummary, workflowStages, sectionAvailability, allowedActionLink,
         serviceAssignmentSummary, slaSummary, exceptionSummary, projectPersonnel, timelineFreshnessStatus,
         sourceVersions, meta, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress]
       properties:
@@ -10933,6 +10973,10 @@ components:
           oneOf:
             - { $ref: '#/components/schemas/WorkOrderWorkspaceTaskSummary' }
             - { type: 'null' }
+        workflowStages:
+          type: array
+          description: Workflow 权威阶段历史，包含无 Task 的 REVIEW_TASK / WAIT_EVENT 门闸
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceStageSummary' }
         sectionAvailability:
           type: object
           additionalProperties: { enum: [AVAILABLE, EMPTY, UNAVAILABLE] }
@@ -10971,6 +11015,16 @@ components:
           type: [string, 'null']
           maxLength: 200
           description: M423：服务端脱敏服务地址；不得返回完整地址
+    WorkOrderWorkspaceStageSummary:
+      type: object
+      additionalProperties: false
+      required: [stageCode, sequenceNo, status, activatedAt, completedAt]
+      properties:
+        stageCode: { type: string, minLength: 1, maxLength: 100 }
+        sequenceNo: { type: integer, minimum: 1 }
+        status: { enum: [PENDING, ACTIVE, BLOCKED, COMPLETED, SKIPPED, CANCELLED] }
+        activatedAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
     WorkOrderProjectPersonnel:
       type: object
       additionalProperties: false
@@ -13854,12 +13908,14 @@ components:
         asOf: { type: string, format: date-time }
     ProjectFulfillmentProfileSummary:
       type: object
-      required: [profileId, projectId, serviceProductCode, profileName, status, aggregateVersion, updatedAt]
+      required: [profileId, projectId, profileCode, serviceProductCode, profileName, matchPriority, status, aggregateVersion, updatedAt]
       properties:
         profileId: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
+        profileCode: { type: string, minLength: 1, maxLength: 96 }
         serviceProductCode: { type: string, minLength: 1, maxLength: 96 }
         profileName: { type: string, minLength: 1, maxLength: 200 }
+        matchPriority: { type: integer, minimum: -10000, maximum: 10000 }
         status: { enum: [DRAFT, ACTIVE, SUSPENDED, RETIRED] }
         stageCount: { type: integer, minimum: 0 }
         formCount: { type: integer, minimum: 0 }
@@ -13872,13 +13928,15 @@ components:
         updatedAt: { type: string, format: date-time }
     ProjectFulfillmentProfileDetail:
       type: object
-      required: [profileId, projectId, serviceProductCode, profileName, status, allowedActions, aggregateVersion, createdAt, updatedAt, asOf]
+      required: [profileId, projectId, profileCode, serviceProductCode, profileName, matchPriority, status, allowedActions, aggregateVersion, createdAt, updatedAt, asOf]
       properties:
         profileId: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
+        profileCode: { type: string }
         serviceProductCode: { type: string }
         profileName: { type: string }
         description: { type: string, nullable: true }
+        matchPriority: { type: integer, minimum: -10000, maximum: 10000 }
         status: { enum: [DRAFT, ACTIVE, SUSPENDED, RETIRED] }
         draftRevisionId: { type: string, format: uuid, nullable: true }
         activeRevisionId: { type: string, format: uuid, nullable: true }
@@ -13898,6 +13956,7 @@ components:
       properties:
         schemaVersion: { type: string, minLength: 1, maxLength: 32 }
         orderTypeName: { type: string, nullable: true }
+        matchRule: { $ref: '#/components/schemas/ProjectFulfillmentMatchRule' }
         supportedClientKinds:
           type: array
           items:
@@ -13906,6 +13965,65 @@ components:
         stages:
           type: array
           items: { $ref: '#/components/schemas/ProjectFulfillmentStageDraft' }
+    ProjectFulfillmentMatchRule:
+      type: object
+      description: 方案版本冻结的结构化适用范围；空集合表示该维度不设限制。
+      required: [brandCodes, provinceCodes]
+      properties:
+        brandCodes:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1, maxLength: 64 }
+        provinceCodes:
+          type: array
+          uniqueItems: true
+          items: { type: string, pattern: '^[0-9]{6}$' }
+    ProjectFulfillmentMatchSimulationRequest:
+      type: object
+      required: [serviceProductCode]
+      properties:
+        serviceProductCode: { type: string, minLength: 1, maxLength: 96 }
+        clientKind:
+          type: string
+          nullable: true
+          enum: [ADMIN_WEB, NETWORK_WEB, TECHNICIAN_WEB, TECHNICIAN_IOS]
+        brandCode: { type: string, minLength: 1, maxLength: 64, nullable: true }
+        provinceCode: { type: string, pattern: '^[0-9]{6}$', nullable: true }
+        asOf: { type: string, format: date-time, nullable: true }
+    ProjectFulfillmentMatchResult:
+      type: object
+      required:
+        - profileId
+        - profileCode
+        - profileName
+        - revisionId
+        - fulfillmentVersion
+        - matchPriority
+        - matchSpecificity
+        - matchExplanation
+        - configurationBundleId
+        - configurationBundleCode
+        - configurationBundleVersion
+        - configurationBundleDigest
+        - manifestJson
+        - contentDigest
+      properties:
+        profileId: { type: string, format: uuid }
+        profileCode: { type: string }
+        profileName: { type: string }
+        revisionId: { type: string, format: uuid }
+        fulfillmentVersion: { type: string }
+        matchPriority: { type: integer }
+        matchSpecificity: { type: integer, minimum: 0 }
+        matchExplanation:
+          type: array
+          items: { type: string }
+        configurationBundleId: { type: string, format: uuid }
+        configurationBundleCode: { type: string }
+        configurationBundleVersion: { type: string }
+        configurationBundleDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        manifestJson: { type: string }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
     ProjectFulfillmentStageDraft:
       type: object
       required: [stageCode, stageName, sequence, ownerType, terminal]
@@ -14093,7 +14211,13 @@ components:
       required: [serviceProductCode, profileName]
       properties:
         serviceProductCode: { type: string, minLength: 1, maxLength: 96 }
+        profileCode:
+          type: string
+          minLength: 1
+          maxLength: 96
+          description: 项目内稳定方案编码；v1 未传时按服务产品编码创建
         profileName: { type: string, minLength: 1, maxLength: 200 }
+        matchPriority: { type: integer, minimum: -10000, maximum: 10000, default: 0 }
         description: { type: string, maxLength: 2000 }
         templateCode: { type: string, enum: [HOME_CHARGING_SURVEY_INSTALL, BLANK] }
         copyFromProfileId: { type: string, format: uuid }

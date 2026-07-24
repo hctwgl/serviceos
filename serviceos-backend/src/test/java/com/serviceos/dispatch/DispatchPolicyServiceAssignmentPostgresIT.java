@@ -9,13 +9,21 @@ import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.dispatch.api.NetworkAssignmentCandidateQuery;
 import com.serviceos.dispatch.api.NetworkAssignmentCandidateView;
 import com.serviceos.dispatch.api.ManualServiceAssignmentService;
+import com.serviceos.dispatch.api.NetworkActiveAssignmentQuery;
 import com.serviceos.dispatch.api.NetworkPortalAcceptAssignmentReceipt;
+import com.serviceos.dispatch.api.ActiveServiceResponsibilityService;
+import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.application.OutboxWorker;
 import com.serviceos.shared.Sha256;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
+import com.serviceos.task.api.ClaimHumanTaskCommand;
+import com.serviceos.task.api.CompleteHumanTaskCommand;
+import com.serviceos.task.api.HumanTaskCommandService;
+import com.serviceos.task.api.StartHumanTaskCommand;
+import com.serviceos.task.api.TechnicianTaskAssignmentFeedQuery;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderCommandService;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,7 +80,12 @@ class DispatchPolicyServiceAssignmentPostgresIT {
     @Autowired ConfigurationService configurations;
     @Autowired OutboxWorker outboxWorker;
     @Autowired NetworkAssignmentCandidateQuery networkCandidates;
+    @Autowired NetworkActiveAssignmentQuery networkAssignments;
     @Autowired ManualServiceAssignmentService manualAssignments;
+    @Autowired HumanTaskCommandService humanTasks;
+    @Autowired ActiveServiceResponsibilityService activeResponsibilities;
+    @Autowired TechnicianActiveAssignmentQuery technicianAssignments;
+    @Autowired TechnicianTaskAssignmentFeedQuery technicianTaskAssignments;
     @Autowired JdbcClient jdbc;
 
     UUID projectId;
@@ -168,9 +181,176 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 .containsEntry("assignee_id", TECH_STRONG.toString())
                 .containsEntry("status", "ACTIVE");
         assertThat(jdbc.sql("""
+                SELECT assignment_kind, principal_id, status, source_type
+                  FROM tsk_task_assignment
+                """).query().singleRow())
+                .containsEntry("assignment_kind", "CANDIDATE")
+                .containsEntry("principal_id", TECH_PRINCIPAL.toString())
+                .containsEntry("status", "ACTIVE")
+                .containsEntry("source_type", "SYSTEM");
+        assertThat(jdbc.sql("SELECT version FROM tsk_task")
+                .query(Long.class).single()).isEqualTo(2L);
+        assertThat(jdbc.sql("""
                 SELECT count(*) FROM aud_audit_record
                  WHERE action_name = 'SERVICE_DISPATCH_TECHNICIAN_POLICY_APPLIED'
                 """).query(Long.class).single()).isGreaterThanOrEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name = 'TASK_ASSIGN_CANDIDATE_FROM_SERVICE_ASSIGNMENT'
+                """).query(Long.class).single()).isEqualTo(1);
+    }
+
+    @Test
+    void fulfilledWorkOrderEndsWholeOrderResponsibilitiesAndReleasesCapacityExactlyOnce() {
+        seedTechnician(TECH_STRONG, TECH_PRINCIPAL, NETWORK_STRONG, "Strong Tech");
+        seedCapacity("TECHNICIAN", TECH_STRONG.toString(), 5, 0);
+        seedHumanTaskGrant(TECH_PRINCIPAL.toString());
+        workOrders.receive(receiveCommand(
+                "M472-ORD-TERMINAL",
+                "6".repeat(64),
+                "VINM4720002",
+                "corr-m472-terminal",
+                "cause-m472-terminal"));
+        drainOutbox(50);
+
+        UUID taskId = jdbc.sql("SELECT task_id FROM tsk_task")
+                .query(UUID.class).single();
+        CurrentPrincipal technician = technicianPrincipal();
+        humanTasks.claim(
+                technician,
+                new CommandMetadata("corr-m472-terminal-claim", "m472-terminal-claim"),
+                new ClaimHumanTaskCommand(taskId, 2));
+        humanTasks.start(
+                technician,
+                new CommandMetadata("corr-m472-terminal-start", "m472-terminal-start"),
+                new StartHumanTaskCommand(taskId, 3));
+        humanTasks.complete(
+                technician,
+                new CommandMetadata("corr-m472-terminal-complete", "m472-terminal-complete"),
+                new CompleteHumanTaskCommand(
+                        taskId, 4, "result://m472/terminal", "7".repeat(64)));
+        drainOutbox(100);
+
+        assertThat(jdbc.sql("SELECT status FROM wo_work_order")
+                .query(String.class).single()).isEqualTo("FULFILLED");
+        assertThat(jdbc.sql("""
+                SELECT status, end_reason_code FROM dsp_service_assignment
+                 ORDER BY responsibility_level
+                """).query().listOfRows())
+                .allSatisfy(row -> {
+                    assertThat(row).containsEntry("status", "ENDED");
+                    assertThat(row).containsEntry("end_reason_code", "WORK_ORDER_FULFILLED");
+                });
+        assertThat(jdbc.sql("""
+                SELECT status, release_reason_code FROM dsp_capacity_reservation
+                """).query().listOfRows())
+                .allSatisfy(row -> {
+                    assertThat(row).containsEntry("status", "RELEASED");
+                    assertThat(row).containsEntry("release_reason_code", "WORK_ORDER_FULFILLED");
+                });
+        assertThat(jdbc.sql("""
+                SELECT occupied_units FROM dsp_capacity_counter
+                 WHERE responsibility_level = 'NETWORK' AND assignee_id = :assigneeId
+                """).param("assigneeId", NETWORK_STRONG.toString())
+                .query(Integer.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT occupied_units FROM dsp_capacity_counter
+                 WHERE responsibility_level = 'TECHNICIAN' AND assignee_id = :assigneeId
+                """).param("assigneeId", TECH_STRONG.toString())
+                .query(Integer.class).single()).isZero();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_inbox_record
+                 WHERE consumer_name = 'dispatch.work-order-terminal-responsibility.v1'
+                   AND status = 'SUCCEEDED'
+                """).query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name = 'WORK_ORDER_SERVICE_RESPONSIBILITY_ENDED'
+                """).query(Long.class).single()).isEqualTo(1);
+    }
+
+    @Test
+    void laterHumanStageInheritsWorkOrderResponsibilityWithoutDoubleCountingCapacity() {
+        jdbc.sql("""
+                TRUNCATE TABLE cfg_configuration_bundle_item, cfg_configuration_bundle,
+                    cfg_configuration_asset_version CASCADE
+                """).update();
+        dispatchVersionId = publishBundleWithDispatchPolicy(false, true);
+        seedTechnician(TECH_STRONG, TECH_PRINCIPAL, NETWORK_STRONG, "Strong Tech");
+        seedCapacity("TECHNICIAN", TECH_STRONG.toString(), 5, 0);
+        seedHumanTaskGrant(TECH_PRINCIPAL.toString());
+
+        workOrders.receive(receiveCommand(
+                "M472-ORD-INHERIT",
+                "4".repeat(64),
+                "VINM4720001",
+                "corr-m472",
+                "cause-m472"));
+        drainOutbox(50);
+
+        UUID firstTaskId = jdbc.sql("""
+                SELECT task_id FROM tsk_task WHERE task_type = 'FIELD_SURVEY'
+                """).query(UUID.class).single();
+        CurrentPrincipal technician = technicianPrincipal();
+        humanTasks.claim(
+                technician,
+                new CommandMetadata("corr-m472-claim", "m472-claim"),
+                new ClaimHumanTaskCommand(firstTaskId, 2));
+        humanTasks.start(
+                technician,
+                new CommandMetadata("corr-m472-start", "m472-start"),
+                new StartHumanTaskCommand(firstTaskId, 3));
+        humanTasks.complete(
+                technician,
+                new CommandMetadata("corr-m472-complete", "m472-complete"),
+                new CompleteHumanTaskCommand(
+                        firstTaskId, 4, "result://m472/survey", "5".repeat(64)));
+        drainOutbox(50);
+
+        UUID nextTaskId = jdbc.sql("""
+                SELECT task_id FROM tsk_task
+                 WHERE task_type = 'FIELD_INSTALL' AND status = 'READY'
+                """).query(UUID.class).single();
+        assertThat(jdbc.sql("""
+                SELECT principal_id, status, source_type
+                  FROM tsk_task_assignment
+                 WHERE task_id = :taskId
+                """).param("taskId", nextTaskId).query().singleRow())
+                .containsEntry("principal_id", TECH_PRINCIPAL.toString())
+                .containsEntry("status", "ACTIVE")
+                .containsEntry("source_type", "SYSTEM");
+        assertThat(activeResponsibilities.find(TENANT, nextTaskId)).get().satisfies(responsibility -> {
+            assertThat(responsibility.networkId()).isEqualTo(NETWORK_STRONG.toString());
+            assertThat(responsibility.technicianId()).isEqualTo(TECH_STRONG.toString());
+            assertThat(responsibility.technicianPrincipalId()).isEqualTo(TECH_PRINCIPAL.toString());
+        });
+        assertThat(networkAssignments.listActiveForNetwork(TENANT, NETWORK_STRONG.toString()))
+                .extracting(com.serviceos.dispatch.api.NetworkActiveAssignmentView::taskId)
+                .containsExactly(firstTaskId, nextTaskId);
+        assertThat(technicianTaskAssignments.listActiveForPrincipal(
+                TENANT, TECH_PRINCIPAL.toString()))
+                .extracting(com.serviceos.task.api.TechnicianTaskAssignmentFeedView::taskId)
+                .contains(nextTaskId);
+        assertThat(technicianAssignments.filterTaskIdsForNetwork(
+                TENANT, NETWORK_STRONG.toString(), List.of(nextTaskId)))
+                .containsExactly(nextTaskId);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM dsp_service_assignment WHERE status = 'ACTIVE'
+                """).query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("""
+                SELECT occupied_units FROM dsp_capacity_counter
+                 WHERE responsibility_level = 'NETWORK' AND assignee_id = :assigneeId
+                """).param("assigneeId", NETWORK_STRONG.toString())
+                .query(Integer.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("""
+                SELECT occupied_units FROM dsp_capacity_counter
+                 WHERE responsibility_level = 'TECHNICIAN' AND assignee_id = :assigneeId
+                """).param("assigneeId", TECH_STRONG.toString())
+                .query(Integer.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name = 'SERVICE_ASSIGNMENT_RESPONSIBILITY_INHERITED'
+                """).query(Long.class).single()).isEqualTo(1);
     }
 
     @Test
@@ -401,7 +581,28 @@ class DispatchPolicyServiceAssignmentPostgresIT {
     }
 
     private UUID publishBundleWithDispatchPolicy(boolean withAllocationRatio) {
-        String workflow = """
+        return publishBundleWithDispatchPolicy(withAllocationRatio, false);
+    }
+
+    private UUID publishBundleWithDispatchPolicy(
+            boolean withAllocationRatio,
+            boolean withSecondHumanStage
+    ) {
+        String workflow = withSecondHumanStage ? """
+                {"workflowKey":"M324_DISPATCH","semanticVersion":"1.0.0","startNodeId":"START",
+                 "nodes":[
+                   {"nodeId":"START","nodeType":"START","name":"开始"},
+                   {"nodeId":"SURVEY","nodeType":"USER_TASK","name":"勘测",
+                    "stageCode":"SURVEY","taskType":"FIELD_SURVEY",
+                    "dispatchPolicyRef":"default-dispatch"},
+                   {"nodeId":"INSTALL","nodeType":"USER_TASK","name":"安装",
+                    "stageCode":"INSTALLATION","taskType":"FIELD_INSTALL"},
+                   {"nodeId":"END","nodeType":"END","name":"结束"}],
+                 "transitions":[
+                   {"transitionId":"t1","from":"START","to":"SURVEY"},
+                   {"transitionId":"t2","from":"SURVEY","to":"INSTALL"},
+                   {"transitionId":"t3","from":"INSTALL","to":"END"}]}
+                """.replaceAll("\\s+", "") : """
                 {"workflowKey":"M324_DISPATCH","semanticVersion":"1.0.0","startNodeId":"START",
                  "nodes":[
                    {"nodeId":"START","nodeType":"START","name":"开始"},
@@ -410,7 +611,7 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                     "dispatchPolicyRef":"default-dispatch"},
                    {"nodeId":"END","nodeType":"END","name":"结束"}],
                  "transitions":[
-                   {"transitionId":"t1","from":"START","to":"HUMAN"},
+                 {"transitionId":"t1","from":"START","to":"HUMAN"},
                    {"transitionId":"t2","from":"HUMAN","to":"END"}]}
                 """.replaceAll("\\s+", "");
         String scoring = withAllocationRatio
@@ -638,6 +839,44 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 .update();
     }
 
+    private void seedHumanTaskGrant(String principalId) {
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (
+                    role_id, tenant_id, role_code, role_name, role_status, created_at
+                ) VALUES (
+                    :roleId, :tenant, :roleCode, 'M472 师傅执行', 'ACTIVE', now()
+                )
+                """)
+                .param("roleId", roleId)
+                .param("tenant", TENANT)
+                .param("roleCode", "m472-tech-" + principalId)
+                .update();
+        for (String capability : Set.of("task.claim", "task.start", "task.complete")) {
+            jdbc.sql("""
+                    INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                    VALUES (:roleId, :capability, now())
+                    """)
+                    .param("roleId", roleId)
+                    .param("capability", capability)
+                    .update();
+        }
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at
+                ) VALUES (
+                    :grantId, :tenant, :principalId, :roleId, 'TENANT', :tenant,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M472-TEST', now()
+                )
+                """)
+                .param("grantId", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("principalId", principalId)
+                .param("roleId", roleId)
+                .update();
+    }
+
     private static CurrentPrincipal dispatchReader() {
         return new CurrentPrincipal(
                 "m453-reader",
@@ -645,6 +884,15 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 CurrentPrincipal.PrincipalType.USER,
                 "admin-web",
                 Set.of("dispatch.read", "dispatch.assignment.manage"));
+    }
+
+    private static CurrentPrincipal technicianPrincipal() {
+        return new CurrentPrincipal(
+                TECH_PRINCIPAL.toString(),
+                TENANT,
+                CurrentPrincipal.PrincipalType.USER,
+                "technician-ios",
+                Set.of("task.claim", "task.start", "task.complete"));
     }
 
     private void clearAutomaticAssignments() {

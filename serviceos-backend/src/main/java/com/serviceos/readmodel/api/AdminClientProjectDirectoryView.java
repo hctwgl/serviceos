@@ -52,6 +52,9 @@ public record AdminClientProjectDirectoryView(
             String status,
             Integer publishedConfigurationCount,
             Integer draftConfigurationCount,
+            String currentFulfillmentPlanName,
+            String currentFulfillmentVersion,
+            Instant updatedAt,
             String configurationStatus,
             boolean dataComplete,
             String dataProblem
